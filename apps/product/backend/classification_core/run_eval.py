@@ -49,24 +49,29 @@ DSN = os.environ.get("TARIFF_DB_DSN", "postgresql:///tariff_db")
 # Keep these short - the report blows up otherwise.
 CONFIGS: dict[str, dict] = {
     "baseline_fts_only": dict(
+        use_curated=True,
         use_vector=False, use_facts=False, use_kg_context=False,
         use_facts_vec=False, use_kg_vec=False,
     ),
     "fts_plus_description_vec": dict(
+        use_curated=True,
         use_vector=True, use_facts=False, use_kg_context=False,
         use_facts_vec=False, use_kg_vec=False,
     ),
     "no_semantic_kg": dict(
+        use_curated=True,
         use_vector=True, use_facts=True, use_kg_context=True,
         use_facts_vec=False, use_kg_vec=False,
     ),
     "all_legs_on": dict(
+        use_curated=True,
         use_vector=True, use_facts=True, use_kg_context=True,
         use_facts_vec=True, use_kg_vec=True,
     ),
     # The honest tests - per codex's "leave-one-ATAR-out" critique.
     # 'loo': True triggers per-row exclusion of the gold ATAR's own facts+edge.
     "all_legs_loo": dict(
+        use_curated=True,
         use_vector=True, use_facts=True, use_kg_context=True,
         use_facts_vec=True, use_kg_vec=True,
         loo=True,

@@ -20,6 +20,13 @@ MATRIX_CSV = Path(__file__).parent.parent / "data" / "matrix" / "retrieval_matri
 TOP_RUN_LABEL = "no_curated_only"
 DEFAULT_LIMIT = 500
 DISPLAY_LIMIT = 25
+MATRIX_ROWS_WITH_IMPLICIT_REFERENCES = {
+    "all_legs_on",
+    "all_legs_loo",
+    "baseline_fts_only",
+    "fts_plus_description_vec",
+    "no_semantic_kg",
+}
 
 
 def _conn():
@@ -65,22 +72,31 @@ def _pct(value: str) -> float:
         return 0.0
 
 
+def _normalise_matrix_config(run_label: str, cfg: dict[str, Any]) -> dict[str, Any]:
+    normalised = dict(cfg)
+    if "use_curated" not in normalised and run_label in MATRIX_ROWS_WITH_IMPLICIT_REFERENCES:
+        normalised["use_curated"] = True
+    return normalised
+
+
 def _load_matrix_rows() -> list[dict[str, Any]]:
     with MATRIX_CSV.open(newline="") as f:
         rows = list(csv.DictReader(f))
     out: list[dict[str, Any]] = []
     for row in rows:
+        run_label = row.get("run_label", "")
         try:
             cfg = json.loads(row.get("config_json") or "{}")
         except json.JSONDecodeError:
             cfg = {}
+        cfg = _normalise_matrix_config(run_label, cfg)
         rank_raw = row.get("rank_by_code_macro_at_100") or ""
         rank = int(rank_raw) if rank_raw.isdigit() else None
-        title, description, caveats = describe_experiment(row.get("run_label", ""), cfg)
+        title, description, caveats = describe_experiment(run_label, cfg)
         out.append(
             {
                 "rank": rank,
-                "run_label": row.get("run_label"),
+                "run_label": run_label,
                 "run_id": row.get("run_id"),
                 "title": title,
                 "description": description,
@@ -135,7 +151,7 @@ def describe_experiment(run_label: str, cfg: dict[str, Any]) -> tuple[str, str, 
         "staging_ai": "Production-style AI staging baseline",
         "rw_g41_staging": "Staging rewrite upper-bound baseline",
         "no_curated_only": "Top overall: semantic + KG + facets, no Search References",
-        "all_legs_on": "Semantic + KG + facets",
+        "all_legs_on": "Semantic + KG + facets + Search References",
         "ai_semantic_composite_triage": "AI-enriched semantic search with query rewrite",
         "rw_g5_staging": "Staging rewrite with GPT-5-class rewrite model",
         "rw_g5_mine": "Eval rewrite with GPT-5-class rewrite model",
