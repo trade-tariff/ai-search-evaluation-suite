@@ -1,0 +1,743 @@
+{
+  "accuracy": 0.697,
+  "bucket_b_recall": 0.6333,
+  "bucket_b_precision": 0.6786,
+  "confusion": {
+    "A->A": 27,
+    "A->B": 9,
+    "B->A": 11,
+    "B->B": 19
+  },
+  "results": [
+    {
+      "code": "0101210000",
+      "query": "purebred horses for breeding",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "0101210000",
+      "query": "stud horse",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "0101210000",
+      "query": "breeding stallion",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "0901210000",
+      "query": "roasted coffee beans",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "0901210000",
+      "query": "coffee beans",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "0901210000",
+      "query": "ground coffee not decaffeinated",
+      "expected": "A",
+      "predicted": "B",
+      "predicted_action": "description.exclude",
+      "ok": false
+    },
+    {
+      "code": "0407210000",
+      "query": "fresh chicken eggs in shell",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "0407210000",
+      "query": "eggs in shell",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "2208300000",
+      "query": "whisky",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "2208300000",
+      "query": "scotch whisky",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "8471300000",
+      "query": "laptop",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "8471300000",
+      "query": "portable computer",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "8471300000",
+      "query": "notebook computer",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "8517130000",
+      "query": "smartphone",
+      "expected": "A",
+      "predicted": "B",
+      "predicted_action": null,
+      "ok": false
+    },
+    {
+      "code": "8517130000",
+      "query": "mobile phone",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "6109100010",
+      "query": "cotton t-shirt",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "6109100010",
+      "query": "men's cotton tee",
+      "expected": "A",
+      "predicted": "B",
+      "predicted_action": "description.guidance",
+      "ok": false
+    },
+    {
+      "code": "4901100000",
+      "query": "printed books in single sheets",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "4901100000",
+      "query": "loose printed sheets",
+      "expected": "A",
+      "predicted": "B",
+      "predicted_action": "description.exclude",
+      "ok": false
+    },
+    {
+      "code": "9504508000",
+      "query": "video game console",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "9504508000",
+      "query": "playstation",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "9504508000",
+      "query": "xbox",
+      "expected": "A",
+      "predicted": "B",
+      "predicted_action": "description.filter",
+      "ok": false
+    },
+    {
+      "code": "0710400099",
+      "query": "frozen sweetcorn",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "0710400099",
+      "query": "frozen sweetcorn kernels",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "3926909790",
+      "query": "plastic article",
+      "expected": "B",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": false
+    },
+    {
+      "code": "3926909790",
+      "query": "plastic part",
+      "expected": "B",
+      "predicted": "B",
+      "predicted_action": "description.exclude",
+      "ok": true
+    },
+    {
+      "code": "3926909790",
+      "query": "moulded plastic item",
+      "expected": "B",
+      "predicted": "B",
+      "predicted_action": "description.exclude",
+      "ok": true
+    },
+    {
+      "code": "8543900000",
+      "query": "part of electrical machine",
+      "expected": "B",
+      "predicted": "B",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "8543900000",
+      "query": "electrical component",
+      "expected": "B",
+      "predicted": "B",
+      "predicted_action": "description.exclude",
+      "ok": true
+    },
+    {
+      "code": "2106909850",
+      "query": "food preparation",
+      "expected": "B",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": false
+    },
+    {
+      "code": "2106909850",
+      "query": "dietary supplement",
+      "expected": "B",
+      "predicted": "B",
+      "predicted_action": "description.guidance",
+      "ok": true
+    },
+    {
+      "code": "9404909000",
+      "query": "bedding",
+      "expected": "B",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": false
+    },
+    {
+      "code": "9404909000",
+      "query": "cushion",
+      "expected": "B",
+      "predicted": "B",
+      "predicted_action": "description.exclude",
+      "ok": true
+    },
+    {
+      "code": "9404909000",
+      "query": "mattress topper",
+      "expected": "B",
+      "predicted": "B",
+      "predicted_action": "description.exclude",
+      "ok": true
+    },
+    {
+      "code": "2710198400",
+      "query": "lubricating oil",
+      "expected": "B",
+      "predicted": "B",
+      "predicted_action": "description.guidance",
+      "ok": true
+    },
+    {
+      "code": "2710198400",
+      "query": "motor oil",
+      "expected": "B",
+      "predicted": "B",
+      "predicted_action": "description.guidance",
+      "ok": true
+    },
+    {
+      "code": "7308909900",
+      "query": "steel structure",
+      "expected": "B",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": false
+    },
+    {
+      "code": "7308909900",
+      "query": "iron framework",
+      "expected": "B",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": false
+    },
+    {
+      "code": "8473309000",
+      "query": "computer accessory",
+      "expected": "B",
+      "predicted": "B",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "8473309000",
+      "query": "computer part",
+      "expected": "B",
+      "predicted": "B",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "9026108110",
+      "query": "flow meter",
+      "expected": "B",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": false
+    },
+    {
+      "code": "9026108110",
+      "query": "liquid flow gauge",
+      "expected": "B",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": false
+    },
+    {
+      "code": "3204170085",
+      "query": "blue pigment",
+      "expected": "B",
+      "predicted": "B",
+      "predicted_action": "description.guidance",
+      "ok": true
+    },
+    {
+      "code": "3204170085",
+      "query": "organic blue dye",
+      "expected": "B",
+      "predicted": "B",
+      "predicted_action": "description.guidance",
+      "ok": true
+    },
+    {
+      "code": "6217109000",
+      "query": "clothing accessory",
+      "expected": "B",
+      "predicted": "B",
+      "predicted_action": "description.exclude",
+      "ok": true
+    },
+    {
+      "code": "6217109000",
+      "query": "fashion accessory",
+      "expected": "B",
+      "predicted": "B",
+      "predicted_action": "description.exclude",
+      "ok": true
+    },
+    {
+      "code": "8536699999",
+      "query": "electrical plug socket",
+      "expected": "B",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": false
+    },
+    {
+      "code": "8536699999",
+      "query": "phone connector",
+      "expected": "B",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": false
+    },
+    {
+      "code": "9018906000",
+      "query": "medical instrument",
+      "expected": "B",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": false
+    },
+    {
+      "code": "9018906000",
+      "query": "diagnostic device",
+      "expected": "B",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": false
+    },
+    {
+      "code": "7113110000",
+      "query": "silver jewellery",
+      "expected": "A",
+      "predicted": "B",
+      "predicted_action": "description.exclude",
+      "ok": false
+    },
+    {
+      "code": "7113110000",
+      "query": "silver bracelet",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "8804000000",
+      "query": "parachute",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "8804000000",
+      "query": "paragliding parachute",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "9999999999",
+      "query": "nonexistent",
+      "expected": "B",
+      "predicted": "B",
+      "predicted_action": "description.guidance",
+      "ok": true
+    },
+    {
+      "code": "9999999999",
+      "query": "test code",
+      "expected": "B",
+      "predicted": "B",
+      "predicted_action": "description.guidance",
+      "ok": true
+    },
+    {
+      "code": "3304990000",
+      "query": "face cream",
+      "expected": "A",
+      "predicted": "B",
+      "predicted_action": "description.guidance",
+      "ok": false
+    },
+    {
+      "code": "3304990000",
+      "query": "skin moisturiser",
+      "expected": "A",
+      "predicted": "B",
+      "predicted_action": "description.exclude",
+      "ok": false
+    },
+    {
+      "code": "4202229000",
+      "query": "leather handbag",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "4202229000",
+      "query": "women's leather purse",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "8418500000",
+      "query": "commercial freezer",
+      "expected": "A",
+      "predicted": "B",
+      "predicted_action": "description.guidance",
+      "ok": false
+    },
+    {
+      "code": "8418500000",
+      "query": "refrigerated display case",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "9503007500",
+      "query": "toy puzzle",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "9503007500",
+      "query": "children's puzzle",
+      "expected": "A",
+      "predicted": "A",
+      "predicted_action": null,
+      "ok": true
+    },
+    {
+      "code": "9405401090",
+      "query": "lamp",
+      "expected": "B",
+      "predicted": "B",
+      "predicted_action": "description.exclude",
+      "ok": true
+    },
+    {
+      "code": "9405401090",
+      "query": "light fitting",
+      "expected": "B",
+      "predicted": "B",
+      "predicted_action": "description.guidance",
+      "ok": true
+    }
+  ],
+  "misses": [
+    {
+      "code": "0901210000",
+      "query": "ground coffee not decaffeinated",
+      "expected": "A",
+      "predicted": "B",
+      "expected_action": null,
+      "predicted_action": "description.exclude",
+      "reason": "cross-domain spread (4 sections)",
+      "rationale": "Well-described, narrow neighbourhood under Ch 09."
+    },
+    {
+      "code": "8517130000",
+      "query": "smartphone",
+      "expected": "A",
+      "predicted": "B",
+      "expected_action": null,
+      "predicted_action": null,
+      "reason": "75% of top-K are n.e.s. catch-alls",
+      "rationale": "Single product, distinctive."
+    },
+    {
+      "code": "6109100010",
+      "query": "men's cotton tee",
+      "expected": "A",
+      "predicted": "B",
+      "expected_action": null,
+      "predicted_action": "description.guidance",
+      "reason": "expert markers in 4/10 top-cosine candidates",
+      "rationale": "Narrow textile category. May get confused with other cotton garments — borderline."
+    },
+    {
+      "code": "4901100000",
+      "query": "loose printed sheets",
+      "expected": "A",
+      "predicted": "B",
+      "expected_action": null,
+      "predicted_action": "description.exclude",
+      "reason": "cross-domain spread (4 sections)",
+      "rationale": "Distinctive format."
+    },
+    {
+      "code": "9504508000",
+      "query": "xbox",
+      "expected": "A",
+      "predicted": "B",
+      "expected_action": null,
+      "predicted_action": "description.filter",
+      "reason": "two-section spread + flat scores (1.00)",
+      "rationale": "Strong product identity."
+    },
+    {
+      "code": "3926909790",
+      "query": "plastic article",
+      "expected": "B",
+      "predicted": "A",
+      "expected_action": "description.filter",
+      "predicted_action": null,
+      "reason": "retrieval converges on coherent narrow set",
+      "rationale": "Catch-all 'other articles of plastic'. Without product context, plastic alone retrieves across many chapters."
+    },
+    {
+      "code": "2106909850",
+      "query": "food preparation",
+      "expected": "B",
+      "predicted": "A",
+      "expected_action": "description.filter",
+      "predicted_action": null,
+      "reason": "retrieval converges on coherent narrow set",
+      "rationale": "Notorious catch-all for food preparations. Cross-section spread (Ch 21 vs Ch 30 supplement boundary)."
+    },
+    {
+      "code": "9404909000",
+      "query": "bedding",
+      "expected": "B",
+      "predicted": "A",
+      "expected_action": "description.filter",
+      "predicted_action": null,
+      "reason": "retrieval converges on coherent narrow set",
+      "rationale": "Cross-chapter — bedding spans many materials and forms."
+    },
+    {
+      "code": "7308909900",
+      "query": "steel structure",
+      "expected": "B",
+      "predicted": "A",
+      "expected_action": "description.filter",
+      "predicted_action": null,
+      "reason": "retrieval converges on coherent narrow set",
+      "rationale": "Catch-all structure of iron/steel. Material + use ambiguity."
+    },
+    {
+      "code": "7308909900",
+      "query": "iron framework",
+      "expected": "B",
+      "predicted": "A",
+      "expected_action": "description.filter",
+      "predicted_action": null,
+      "reason": "retrieval converges on coherent narrow set",
+      "rationale": "Catch-all structure of iron/steel. Material + use ambiguity."
+    },
+    {
+      "code": "9026108110",
+      "query": "flow meter",
+      "expected": "B",
+      "predicted": "A",
+      "expected_action": "description.guidance",
+      "predicted_action": null,
+      "reason": "retrieval converges on coherent narrow set",
+      "rationale": "Technical instrument with measurement-method differentiators (electronic vs mechanical, gas vs liquid)."
+    },
+    {
+      "code": "9026108110",
+      "query": "liquid flow gauge",
+      "expected": "B",
+      "predicted": "A",
+      "expected_action": "description.guidance",
+      "predicted_action": null,
+      "reason": "retrieval converges on coherent narrow set",
+      "rationale": "Technical instrument with measurement-method differentiators (electronic vs mechanical, gas vs liquid)."
+    },
+    {
+      "code": "8536699999",
+      "query": "electrical plug socket",
+      "expected": "B",
+      "predicted": "A",
+      "expected_action": "description.filter",
+      "predicted_action": null,
+      "reason": "retrieval converges on coherent narrow set",
+      "rationale": "AI-166 contextualised 'Other' — sibling crowding among connector types."
+    },
+    {
+      "code": "8536699999",
+      "query": "phone connector",
+      "expected": "B",
+      "predicted": "A",
+      "expected_action": "description.filter",
+      "predicted_action": null,
+      "reason": "retrieval converges on coherent narrow set",
+      "rationale": "AI-166 contextualised 'Other' — sibling crowding among connector types."
+    },
+    {
+      "code": "9018906000",
+      "query": "medical instrument",
+      "expected": "B",
+      "predicted": "A",
+      "expected_action": "description.guidance",
+      "predicted_action": null,
+      "reason": "retrieval converges on coherent narrow set",
+      "rationale": "Medical/therapeutic use is a legal/contextual condition."
+    },
+    {
+      "code": "9018906000",
+      "query": "diagnostic device",
+      "expected": "B",
+      "predicted": "A",
+      "expected_action": "description.guidance",
+      "predicted_action": null,
+      "reason": "retrieval converges on coherent narrow set",
+      "rationale": "Medical/therapeutic use is a legal/contextual condition."
+    },
+    {
+      "code": "7113110000",
+      "query": "silver jewellery",
+      "expected": "A",
+      "predicted": "B",
+      "expected_action": null,
+      "predicted_action": "description.exclude",
+      "reason": "cross-domain spread (5 sections)",
+      "rationale": "Narrow precious-metal category. Material observable."
+    },
+    {
+      "code": "3304990000",
+      "query": "face cream",
+      "expected": "A",
+      "predicted": "B",
+      "expected_action": null,
+      "predicted_action": "description.guidance",
+      "reason": "expert markers in 6/10 top-cosine candidates",
+      "rationale": "Distinctive cosmetics category. Should retrieve cleanly under Ch 33."
+    },
+    {
+      "code": "3304990000",
+      "query": "skin moisturiser",
+      "expected": "A",
+      "predicted": "B",
+      "expected_action": null,
+      "predicted_action": "description.exclude",
+      "reason": "cross-section spread (3) + flat scores (0.79)",
+      "rationale": "Distinctive cosmetics category. Should retrieve cleanly under Ch 33."
+    },
+    {
+      "code": "8418500000",
+      "query": "commercial freezer",
+      "expected": "A",
+      "predicted": "B",
+      "expected_action": null,
+      "predicted_action": "description.guidance",
+      "reason": "expert markers in 5/10 top-cosine candidates",
+      "rationale": "Specific equipment category. Retrieval should land cleanly."
+    }
+  ]
+}

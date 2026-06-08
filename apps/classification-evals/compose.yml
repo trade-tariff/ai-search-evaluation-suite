@@ -1,0 +1,72 @@
+services:
+  opensearch:
+    image: opensearchproject/opensearch:2.19.1
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: "true"
+      bootstrap.memory_lock: "false"
+      OPENSEARCH_JAVA_OPTS: ${OPENSEARCH_JAVA_OPTS:--Xms512m -Xmx512m}
+    ports:
+      - "127.0.0.1:${OPENSEARCH_PORT:-9200}:9200"
+    volumes:
+      - classification_eval_opensearch:/usr/share/opensearch/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9200/_cluster/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+
+  tariff-db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-tariff_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - classification_eval_postgres:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  classification-evals:
+    build:
+      context: ../..
+      dockerfile: apps/classification-evals/Dockerfile
+    env_file:
+      - .env
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AI_FAN_OUT_KG_LABEL_PROFILE: ${AI_FAN_OUT_KG_LABEL_PROFILE:-deployable}
+      TARIFF_DB_DSN: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@tariff-db:5432/${POSTGRES_DB:-tariff_db}
+      OPENSEARCH_URL: ${OPENSEARCH_URL:-http://opensearch:9200}
+      OPENSEARCH_INDEX: ${OPENSEARCH_INDEX:-tariff_commodities}
+    ports:
+      - "127.0.0.1:${CLASSIFY_EVAL_PORT:-8100}:8100"
+    volumes:
+      - classification_eval_state:/srv/ai-search-evaluation-suite/apps/classification-evals/var
+      - product_app_data:/srv/ai-search-evaluation-suite/apps/product/data
+      - product_app_results:/srv/ai-search-evaluation-suite/apps/product/results
+    depends_on:
+      tariff-db:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/api/health').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  classification_eval_postgres:
+  classification_eval_state:
+  product_app_data:
+  product_app_results:
+  classification_eval_opensearch:

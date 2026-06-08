@@ -1,0 +1,185 @@
+{
+  "_about": "Country list used for origin and preference-group context in classification experiments.",
+  "countries": [
+    {
+      "code": "FR",
+      "name": "France",
+      "groups": [
+        "EU_TCA"
+      ]
+    },
+    {
+      "code": "DE",
+      "name": "Germany",
+      "groups": [
+        "EU_TCA"
+      ]
+    },
+    {
+      "code": "IT",
+      "name": "Italy",
+      "groups": [
+        "EU_TCA"
+      ]
+    },
+    {
+      "code": "ES",
+      "name": "Spain",
+      "groups": [
+        "EU_TCA"
+      ]
+    },
+    {
+      "code": "NL",
+      "name": "Netherlands",
+      "groups": [
+        "EU_TCA"
+      ]
+    },
+    {
+      "code": "IE",
+      "name": "Ireland",
+      "groups": [
+        "EU_TCA"
+      ]
+    },
+    {
+      "code": "PT",
+      "name": "Portugal",
+      "groups": [
+        "EU_TCA"
+      ]
+    },
+    {
+      "code": "JP",
+      "name": "Japan",
+      "groups": [
+        "CPTPP",
+        "JP_FTA"
+      ]
+    },
+    {
+      "code": "AU",
+      "name": "Australia",
+      "groups": [
+        "CPTPP",
+        "AU_FTA"
+      ]
+    },
+    {
+      "code": "NZ",
+      "name": "New Zealand",
+      "groups": [
+        "CPTPP",
+        "NZ_FTA"
+      ]
+    },
+    {
+      "code": "CA",
+      "name": "Canada",
+      "groups": [
+        "CPTPP",
+        "CA_FTA"
+      ]
+    },
+    {
+      "code": "SG",
+      "name": "Singapore",
+      "groups": [
+        "CPTPP"
+      ]
+    },
+    {
+      "code": "VN",
+      "name": "Vietnam",
+      "groups": [
+        "CPTPP",
+        "DCTS_STD"
+      ]
+    },
+    {
+      "code": "MX",
+      "name": "Mexico",
+      "groups": [
+        "CPTPP"
+      ]
+    },
+    {
+      "code": "IN",
+      "name": "India",
+      "groups": [
+        "DCTS_STD"
+      ]
+    },
+    {
+      "code": "BD",
+      "name": "Bangladesh",
+      "groups": [
+        "DCTS_ENH"
+      ]
+    },
+    {
+      "code": "KH",
+      "name": "Cambodia",
+      "groups": [
+        "DCTS_LDC"
+      ]
+    },
+    {
+      "code": "PK",
+      "name": "Pakistan",
+      "groups": [
+        "DCTS_ENH"
+      ]
+    },
+    {
+      "code": "CN",
+      "name": "China",
+      "groups": [
+        "MFN"
+      ]
+    },
+    {
+      "code": "US",
+      "name": "United States",
+      "groups": [
+        "MFN"
+      ]
+    },
+    {
+      "code": "TR",
+      "name": "Turkey",
+      "groups": [
+        "TR_FTA"
+      ]
+    },
+    {
+      "code": "BR",
+      "name": "Brazil",
+      "groups": [
+        "MFN"
+      ]
+    },
+    {
+      "code": "ZA",
+      "name": "South Africa",
+      "groups": [
+        "SACU_FTA"
+      ]
+    }
+  ],
+  "preference_priority": [
+    "EU_TCA",
+    "JP_FTA",
+    "AU_FTA",
+    "NZ_FTA",
+    "CA_FTA",
+    "TR_FTA",
+    "SACU_FTA",
+    "CPTPP",
+    "DCTS_LDC",
+    "DCTS_ENH",
+    "DCTS_STD",
+    "MFN"
+  ]
+}

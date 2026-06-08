@@ -1,0 +1,209 @@
+{
+  "purpose": "Hand-curated calibration set for the per-code classification-difficulty pipeline. Each row is a real declarable commodity with manually-written ordinary-trader-style queries and the bucket we expect the classifier to predict. Used to spot-check that LLM-paraphrase + retrieval + action-bucket classifier agree with human intuition.",
+  "schema": {
+    "code": "10-digit commodity code",
+    "expected_bucket": "A (AI can classify) or B (needs operator intervention)",
+    "expected_intercept_type": "If bucket B, the recommended action type (description.exclude, description.filter, description.guidance, commodity.exclude, commodity.message, or lane:annotate_ai166_fix)",
+    "queries": "Hand-written trader-style search phrases. 2-8 words. No tariff jargon.",
+    "rationale": "Why we expect this bucket"
+  },
+  "rows": [
+    {
+      "code": "0101210000",
+      "expected_bucket": "A",
+      "queries": ["purebred horses for breeding", "stud horse", "breeding stallion"],
+      "rationale": "Narrow, well-defined product. Single section, retrieval converges."
+    },
+    {
+      "code": "0901210000",
+      "expected_bucket": "A",
+      "queries": ["roasted coffee beans", "coffee beans", "ground coffee not decaffeinated"],
+      "rationale": "Well-described, narrow neighbourhood under Ch 09."
+    },
+    {
+      "code": "0407210000",
+      "expected_bucket": "A",
+      "queries": ["fresh chicken eggs in shell", "eggs in shell"],
+      "rationale": "Single subheading, distinctive."
+    },
+    {
+      "code": "2208300000",
+      "expected_bucket": "A",
+      "queries": ["whisky", "scotch whisky"],
+      "rationale": "Highly recognisable, narrow product."
+    },
+    {
+      "code": "8471300000",
+      "expected_bucket": "A",
+      "queries": ["laptop", "portable computer", "notebook computer"],
+      "rationale": "Strong embedding, well-known product."
+    },
+    {
+      "code": "8517130000",
+      "expected_bucket": "A",
+      "queries": ["smartphone", "mobile phone"],
+      "rationale": "Single product, distinctive."
+    },
+    {
+      "code": "6109100010",
+      "expected_bucket": "A",
+      "queries": ["cotton t-shirt", "men's cotton tee"],
+      "rationale": "Narrow textile category. May get confused with other cotton garments — borderline."
+    },
+    {
+      "code": "4901100000",
+      "expected_bucket": "A",
+      "queries": ["printed books in single sheets", "loose printed sheets"],
+      "rationale": "Distinctive format."
+    },
+    {
+      "code": "9504508000",
+      "expected_bucket": "A",
+      "queries": ["video game console", "playstation", "xbox"],
+      "rationale": "Strong product identity."
+    },
+    {
+      "code": "0710400099",
+      "expected_bucket": "A",
+      "queries": ["frozen sweetcorn", "frozen sweetcorn kernels"],
+      "rationale": "Well-defined frozen food (subject of HMRC-2067 ticket on supplementary units, but classification itself is clear)."
+    },
+
+    {
+      "code": "3926909790",
+      "expected_bucket": "B",
+      "expected_intercept_type": "description.filter",
+      "queries": ["plastic article", "plastic part", "moulded plastic item"],
+      "rationale": "Catch-all 'other articles of plastic'. Without product context, plastic alone retrieves across many chapters."
+    },
+    {
+      "code": "8543900000",
+      "expected_bucket": "B",
+      "expected_intercept_type": "description.filter",
+      "queries": ["part of electrical machine", "electrical component"],
+      "rationale": "Catch-all parts. Vague input lands across many electrical/electronic chapters."
+    },
+    {
+      "code": "2106909850",
+      "expected_bucket": "B",
+      "expected_intercept_type": "description.filter",
+      "queries": ["food preparation", "dietary supplement"],
+      "rationale": "Notorious catch-all for food preparations. Cross-section spread (Ch 21 vs Ch 30 supplement boundary)."
+    },
+    {
+      "code": "9404909000",
+      "expected_bucket": "B",
+      "expected_intercept_type": "description.filter",
+      "queries": ["bedding", "cushion", "mattress topper"],
+      "rationale": "Cross-chapter — bedding spans many materials and forms."
+    },
+    {
+      "code": "2710198400",
+      "expected_bucket": "B",
+      "expected_intercept_type": "description.guidance",
+      "queries": ["lubricating oil", "motor oil"],
+      "rationale": "Petroleum oils need CAS/viscosity/composition specs — lab/expert attributes."
+    },
+    {
+      "code": "7308909900",
+      "expected_bucket": "B",
+      "expected_intercept_type": "description.filter",
+      "queries": ["steel structure", "iron framework"],
+      "rationale": "Catch-all structure of iron/steel. Material + use ambiguity."
+    },
+    {
+      "code": "8473309000",
+      "expected_bucket": "B",
+      "expected_intercept_type": "description.filter",
+      "queries": ["computer accessory", "computer part"],
+      "rationale": "Catch-all parts. AI Q&A struggles when input is just 'accessory'."
+    },
+    {
+      "code": "9026108110",
+      "expected_bucket": "B",
+      "expected_intercept_type": "description.guidance",
+      "queries": ["flow meter", "liquid flow gauge"],
+      "rationale": "Technical instrument with measurement-method differentiators (electronic vs mechanical, gas vs liquid)."
+    },
+    {
+      "code": "3204170085",
+      "expected_bucket": "B",
+      "expected_intercept_type": "description.guidance",
+      "queries": ["blue pigment", "organic blue dye"],
+      "rationale": "Pigments classified by CAS number. Lab/expert differentiator."
+    },
+    {
+      "code": "6217109000",
+      "expected_bucket": "B",
+      "expected_intercept_type": "description.filter",
+      "queries": ["clothing accessory", "fashion accessory"],
+      "rationale": "Catch-all 'other made-up clothing accessories'. Cross-section spread with leather accessories Ch 42."
+    },
+
+    {
+      "code": "8536699999",
+      "expected_bucket": "B",
+      "expected_intercept_type": "description.filter",
+      "queries": ["electrical plug socket", "phone connector"],
+      "rationale": "AI-166 contextualised 'Other' — sibling crowding among connector types."
+    },
+    {
+      "code": "9018906000",
+      "expected_bucket": "B",
+      "expected_intercept_type": "description.guidance",
+      "queries": ["medical instrument", "diagnostic device"],
+      "rationale": "Medical/therapeutic use is a legal/contextual condition."
+    },
+    {
+      "code": "7113110000",
+      "expected_bucket": "A",
+      "queries": ["silver jewellery", "silver bracelet"],
+      "rationale": "Narrow precious-metal category. Material observable."
+    },
+    {
+      "code": "8804000000",
+      "expected_bucket": "A",
+      "queries": ["parachute", "paragliding parachute"],
+      "rationale": "Very distinctive single-product code."
+    },
+    {
+      "code": "9999999999",
+      "expected_bucket": "B",
+      "expected_intercept_type": "commodity.exclude",
+      "queries": ["nonexistent", "test code"],
+      "rationale": "Sentinel for retrieval-miss behavior. Not a real code; classifier should hit bucket-1 fallback."
+    },
+
+    {
+      "code": "3304990000",
+      "expected_bucket": "A",
+      "queries": ["face cream", "skin moisturiser"],
+      "rationale": "Distinctive cosmetics category. Should retrieve cleanly under Ch 33."
+    },
+    {
+      "code": "4202229000",
+      "expected_bucket": "A",
+      "queries": ["leather handbag", "women's leather purse"],
+      "rationale": "Narrow product category — material observable, use observable."
+    },
+    {
+      "code": "8418500000",
+      "expected_bucket": "A",
+      "queries": ["commercial freezer", "refrigerated display case"],
+      "rationale": "Specific equipment category. Retrieval should land cleanly."
+    },
+    {
+      "code": "9503007500",
+      "expected_bucket": "A",
+      "queries": ["toy puzzle", "children's puzzle"],
+      "rationale": "Distinct toy category."
+    },
+    {
+      "code": "9405401090",
+      "expected_bucket": "B",
+      "expected_intercept_type": "description.filter",
+      "queries": ["lamp", "light fitting"],
+      "rationale": "Many lamp variants across chapters (electric, oil, gas)."
+    }
+  ]
+}

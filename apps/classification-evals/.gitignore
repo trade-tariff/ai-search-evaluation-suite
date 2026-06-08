@@ -1,0 +1,6 @@
+.env
+.venv/
+var/*
+!var/.gitkeep
+__pycache__/
+*.pyc

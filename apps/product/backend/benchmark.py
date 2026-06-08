@@ -1,0 +1,1053 @@
+from __future__ import annotations
+
+import asyncio
+import json
+import uuid
+from collections import defaultdict
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import AsyncIterator
+
+from judge import (
+    _extract_codes,
+    compute_consensus,
+    compute_gold_metrics,
+    detect_response_type,
+    evaluate_pair,
+)
+from llm_judge import judge_response
+from prompts import (
+    build_prompt_messages,
+    get_gold_code,
+    get_gold_facts,
+    get_oracle_text,
+    get_raw_query,
+)
+from providers import clear_provider_cache, get_provider
+from fact_store import FactStore
+from schemas import (
+    AppConfig,
+    BenchmarkRun,
+    CompletionResult,
+    EvaluationResult,
+    ModelConfig,
+    ModelSummary,
+    QARound,
+    SimulatorConfig,
+    SSEEvent,
+)
+from sections import section_for_code
+from simulator import simulate_answer
+
+MAX_ROUNDS = 5
+RESULTS_DIR = Path(__file__).parent.parent / "results"
+RESULTS_DIR.mkdir(exist_ok=True)
+
+_current_run: BenchmarkRun | None = None
+# Set when the user hits Stop; benchmark loop checks at drain boundaries and
+# cancels in-flight asyncio tasks so no more provider/judge calls are made.
+_cancel_event: asyncio.Event | None = None
+
+
+def get_current_run() -> BenchmarkRun | None:
+    return _current_run
+
+
+def cancel_current_run() -> bool:
+    """Signal the currently running benchmark to stop. Returns True if a run
+    was in progress and the signal was delivered. In-flight provider/judge
+    calls may still complete (API calls are not interruptible mid-flight),
+    but no new ones will be dispatched and the run will be marked cancelled."""
+    global _cancel_event
+    if _cancel_event is not None and not _cancel_event.is_set():
+        _cancel_event.set()
+        return True
+    return False
+
+
+def list_saved_runs() -> list[dict]:
+    """List saved benchmark runs (metadata only)."""
+    runs = []
+    for f in sorted(RESULTS_DIR.glob("benchmark_*.json"), reverse=True):
+        try:
+            data = json.loads(f.read_text())
+            runs.append({
+                "id": data["id"],
+                "timestamp": data["timestamp"],
+                "status": data["status"],
+                "opensearch_limit": data.get("opensearch_limit", 80),
+                "baseline_model_id": data.get("baseline_model_id"),
+                "panel_model_ids": data.get("panel_model_ids", []),
+                "prompt_count": len(data.get("prompt_indices", [])),
+                "model_count": len(data.get("model_ids", [])),
+                "summary_count": len(data.get("summaries", [])),
+                "filename": f.name,
+            })
+        except (json.JSONDecodeError, KeyError):
+            continue
+    return runs
+
+
+def load_saved_run(run_id: str) -> BenchmarkRun | None:
+    """Load a saved run by ID."""
+    path = RESULTS_DIR / f"benchmark_{run_id}.json"
+    if not path.exists():
+        return None
+    return BenchmarkRun.model_validate_json(path.read_text())
+
+
+def _save_run(run: BenchmarkRun) -> None:
+    """Save a completed run to disk."""
+    path = RESULTS_DIR / f"benchmark_{run.id}.json"
+    path.write_text(run.model_dump_json(indent=2))
+
+
+def _parse_questions(response_text: str) -> list[dict]:
+    """Extract questions and options from an LLM response."""
+    try:
+        parsed = json.loads(response_text)
+        if isinstance(parsed, dict) and "questions" in parsed:
+            return parsed["questions"]
+    except (json.JSONDecodeError, TypeError):
+        pass
+    return []
+
+
+def _extract_top_code(response_text: str) -> str | None:
+    """Pull the strongest commodity_code from an 'answers' JSON response, for UI."""
+    if not response_text:
+        return None
+    try:
+        parsed = json.loads(response_text)
+        if isinstance(parsed, dict) and parsed.get("answers"):
+            first = parsed["answers"][0]
+            if isinstance(first, dict):
+                return first.get("commodity_code")
+    except (json.JSONDecodeError, TypeError, KeyError, IndexError):
+        pass
+    return None
+
+
+def _auto_answer(questions: list[dict]) -> list[dict]:
+    """Legacy: pick options[0] for each question.
+
+    Kept as the graceful-degradation path when the simulator is disabled or
+    the OpenAI key is missing. The active path is _simulate_answers_for_round.
+    """
+    qa_entries = []
+    for q in questions:
+        question_text = q.get("question", "")
+        options = q.get("options", [])
+        answer = options[0] if options else "Yes"
+        qa_entries.append({
+            "question": question_text,
+            "options": options,
+            "answer": answer,
+        })
+    return qa_entries
+
+
+async def _simulate_answers_for_round(
+    simulator_client,
+    simulator_config: SimulatorConfig,
+    fact_store: FactStore,
+    prompt_index: int,
+    round_number: int,
+    model_id: str,
+    raw_query: str,
+    questions: list[dict],
+    oracle_text: str | None = None,
+    event_bus: "asyncio.Queue | None" = None,
+) -> tuple[list[dict], list[dict], float, float, int]:
+    """Ask the fact-store-backed trader simulator to answer every question.
+
+    Sibling questions serialise through the per-prompt lock so slot writes are
+    visible to later sibling calls; this is a deliberate correctness choice
+    (we do not want two concurrent calls inventing two different values for
+    the same slot).
+
+    `oracle_text` (if set, e.g. an ATaR ruling body) is passed to the
+    simulator as the authoritative product description for any question the
+    seeded facts don't cover.
+
+    Returns (qa_entries, simulator_trace, total_cost, total_latency_ms,
+             store_hit_count).
+    """
+    if not questions:
+        return [], [], 0.0, 0.0, 0
+
+    lock = await fact_store.lock_for(prompt_index)
+    qa_entries: list[dict] = []
+    trace: list[dict] = []
+    total_cost = 0.0
+    total_latency = 0.0
+    store_hits = 0
+
+    # Serialise sibling questions under the per-prompt lock so a fact committed
+    # for question 1 is visible by the time question 2 is resolved.
+    async with lock:
+        for q in questions:
+            question_text = q.get("question", "")
+            options = q.get("options", []) or []
+            sim = await simulate_answer(
+                client=simulator_client,
+                fact_store=fact_store,
+                prompt_index=prompt_index,
+                round_number=round_number,
+                model_id=model_id,
+                query=raw_query,
+                question=question_text,
+                options=options,
+                config=simulator_config,
+                oracle_text=oracle_text,
+                event_bus=event_bus,
+            )
+            qa_entries.append({
+                "question": question_text,
+                "options": options,
+                "answer": sim["chosen"] if options else "Yes",
+            })
+            trace.append({
+                "question": question_text,
+                "chosen": sim["chosen"],
+                "slot": sim["slot"],
+                "reasoning": sim["reasoning"],
+                "consistent_with_prior": sim["consistent_with_prior"],
+                "from_store": sim["from_store"],
+                "cost": sim["cost"],
+                "latency_ms": sim["latency_ms"],
+            })
+            total_cost += sim["cost"]
+            total_latency += sim["latency_ms"]
+            if sim["consistent_with_prior"]:
+                store_hits += 1
+    return qa_entries, trace, total_cost, total_latency, store_hits
+
+
+async def _run_qa_loop(
+    provider,
+    model_config: ModelConfig,
+    prompt_index: int,
+    api_keys: dict,
+    opensearch_limit: int = 80,
+    simulator_client=None,
+    simulator_config: SimulatorConfig | None = None,
+    fact_store: FactStore | None = None,
+    oracle_text: str | None = None,
+    event_bus: "asyncio.Queue | None" = None,
+    is_panel: bool = False,
+) -> CompletionResult:
+    """Run the full Q&A loop until confident answer or MAX_ROUNDS.
+
+    When simulator_client + config + fact_store are all provided, clarifying
+    answers come from the fact-store-backed trader simulator - consistent
+    across all models for this prompt. Otherwise falls back to options[0].
+
+    `oracle_text` (e.g. an ATaR ruling body) is forwarded to the simulator as
+    an authoritative product description for any question the seeded fact
+    sheet does not already cover.
+    """
+    qa_history: list[dict] = []
+    rounds: list[QARound] = []
+    total_latency = 0.0
+    total_input = 0
+    total_output = 0
+    total_cost = 0.0
+    total_sim_cost = 0.0
+    total_sim_latency = 0.0
+    total_sim_store_hits = 0
+    final_text = ""
+    final_type = "unknown"
+    error = None
+
+    raw_query = get_raw_query(prompt_index)
+    use_simulator = (
+        simulator_client is not None
+        and simulator_config is not None
+        and simulator_config.enabled
+        and fact_store is not None
+    )
+
+    for round_num in range(1, MAX_ROUNDS + 1):
+        messages = build_prompt_messages(
+            prompt_index,
+            qa_history if qa_history else None,
+            opensearch_limit=opensearch_limit,
+        )
+        result = await provider.complete(messages, model_config, prompt_index)
+
+        if result.error:
+            error = result.error
+            rounds.append(QARound(
+                round_number=round_num,
+                response_text="",
+                response_type="error",
+                latency_ms=result.latency_ms,
+                cost=result.cost,
+            ))
+            total_latency += result.latency_ms
+            total_cost += result.cost
+            break
+
+        resp_type = detect_response_type(result)
+        questions_asked = _parse_questions(result.response_text)
+
+        # Push the questions live BEFORE the simulator answers them, so the
+        # UI sees the model thinking out loud while the slow path runs.
+        if event_bus is not None and questions_asked:
+            try:
+                event_bus.put_nowait((
+                    "live",
+                    "model:question",
+                    {
+                        "model_id": model_config.id,
+                        "prompt_index": prompt_index,
+                        "round_number": round_num,
+                        "is_panel": is_panel,
+                        "questions": questions_asked,
+                    },
+                ))
+            except asyncio.QueueFull:
+                pass
+
+        if questions_asked and use_simulator:
+            answers_given, sim_trace, sim_cost, sim_latency, sim_hits = (
+                await _simulate_answers_for_round(
+                    simulator_client=simulator_client,
+                    simulator_config=simulator_config,
+                    fact_store=fact_store,
+                    prompt_index=prompt_index,
+                    round_number=round_num,
+                    model_id=model_config.id,
+                    raw_query=raw_query,
+                    questions=questions_asked,
+                    oracle_text=oracle_text,
+                    event_bus=event_bus,
+                )
+            )
+        elif questions_asked:
+            answers_given = _auto_answer(questions_asked)
+            sim_trace, sim_cost, sim_latency, sim_hits = [], 0.0, 0.0, 0
+        else:
+            answers_given, sim_trace, sim_cost, sim_latency, sim_hits = (
+                [], [], 0.0, 0.0, 0
+            )
+
+        rounds.append(QARound(
+            round_number=round_num,
+            response_text=result.response_text,
+            response_type=resp_type,
+            questions_asked=questions_asked,
+            answers_given=answers_given,
+            simulator_trace=sim_trace,
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
+            latency_ms=result.latency_ms,
+            cost=result.cost,
+            simulator_cost=round(sim_cost, 6),
+            simulator_latency_ms=round(sim_latency, 1),
+        ))
+
+        # End-of-round live event: the UI uses this to advance the per-model
+        # round counter without waiting for the full task to complete.
+        if event_bus is not None:
+            try:
+                event_bus.put_nowait((
+                    "live",
+                    "model:round",
+                    {
+                        "model_id": model_config.id,
+                        "prompt_index": prompt_index,
+                        "round_number": round_num,
+                        "is_panel": is_panel,
+                        "response_type": resp_type,
+                        "questions_asked": questions_asked,
+                        "answers_given": answers_given,
+                        "latency_ms": result.latency_ms,
+                        "cost": result.cost,
+                        "input_tokens": result.input_tokens,
+                        "output_tokens": result.output_tokens,
+                        "top_code": _extract_top_code(result.response_text),
+                    },
+                ))
+            except asyncio.QueueFull:
+                pass
+
+        total_latency += result.latency_ms
+        total_input += result.input_tokens
+        total_output += result.output_tokens
+        total_cost += result.cost
+        total_sim_cost += sim_cost
+        total_sim_latency += sim_latency
+        total_sim_store_hits += sim_hits
+        final_text = result.response_text
+        final_type = resp_type
+
+        if resp_type == "answers":
+            break
+
+        if resp_type == "questions" and answers_given:
+            qa_history.extend(answers_given)
+        else:
+            break
+
+    return CompletionResult(
+        model_id=model_config.id,
+        prompt_index=prompt_index,
+        response_text=final_text,
+        response_type=final_type,
+        rounds=rounds,
+        total_rounds=len(rounds),
+        total_latency_ms=round(total_latency, 1),
+        total_input_tokens=total_input,
+        total_output_tokens=total_output,
+        total_cost=round(total_cost, 6),
+        input_tokens=total_input,
+        output_tokens=total_output,
+        latency_ms=round(total_latency, 1),
+        cost=round(total_cost, 6),
+        total_simulator_cost=round(total_sim_cost, 6),
+        total_simulator_latency_ms=round(total_sim_latency, 1),
+        simulator_store_hits=total_sim_store_hits,
+        error=error,
+    )
+
+
+async def run_benchmark(
+    prompt_indices: list[int],
+    model_ids: list[str],
+    config: AppConfig,
+    opensearch_limit: int = 80,
+) -> AsyncIterator[SSEEvent]:
+    global _current_run, _cancel_event
+    clear_provider_cache()
+    _cancel_event = asyncio.Event()
+    all_tasks: list[asyncio.Task] = []
+
+    def check_cancelled() -> bool:
+        """Call at drain boundaries. Returns True if run should abort."""
+        if _cancel_event is not None and _cancel_event.is_set():
+            for t in all_tasks:
+                if not t.done():
+                    t.cancel()
+            return True
+        return False
+
+    run_id = uuid.uuid4().hex[:12]
+    # Fresh fact store per run. Per-prompt scope is enforced inside FactStore.
+    fact_store = FactStore()
+    # Pre-seed the fact store with any user-approved gold facts (typically
+    # extracted from ATaR rulings and approved in the AtarPanel UI). These land
+    # before any model runs, so candidate Q&A hits a warm store for the most
+    # common slots and burns no LLM calls re-deriving them.
+    seeded_facts: dict[int, int] = {}
+    for pi in prompt_indices:
+        n = fact_store.seed(pi, get_gold_facts(pi))
+        if n:
+            seeded_facts[pi] = n
+    # Per-prompt oracle text (e.g. ATaR ruling body) cached up-front so we
+    # avoid re-reading the JSON file inside every Q&A loop.
+    oracle_by_prompt: dict[int, str | None] = {
+        pi: get_oracle_text(pi) for pi in prompt_indices
+    }
+    _current_run = BenchmarkRun(
+        id=run_id,
+        timestamp=datetime.now(timezone.utc).isoformat(),
+        status="running",
+        opensearch_limit=opensearch_limit,
+        prompt_indices=prompt_indices,
+        model_ids=model_ids,
+    )
+
+    api_keys = config.api_keys.model_dump()
+    model_map: dict[str, ModelConfig] = {m.id: m for m in config.models}
+
+    # Reference is pinned via ReferenceConfig. Three modes:
+    #   single     -> [ref_model]               (1 task per prompt)
+    #   multi_pass -> [ref_model] * passes      (N tasks per prompt, same model)
+    #   panel      -> [model_map[i] for i in panel_model_ids]
+    #
+    # All three feed into compute_consensus which handles pairwise similarity
+    # + majority vote on final codes and emits a panel_agreement score. When
+    # agreement is high, the reference is self-consistent. When low, the
+    # prompt is genuinely ambiguous for the reference - useful signal.
+    ref_cfg = config.reference_config
+    panel_mcs: list[ModelConfig] = []
+    ref_err: str | None = None
+
+    if ref_cfg.mode == "single":
+        ref_model = model_map.get(ref_cfg.model_id)
+        if ref_model is None:
+            ref_err = f"Reference model '{ref_cfg.model_id}' not found"
+        else:
+            panel_mcs = [ref_model]
+    elif ref_cfg.mode == "multi_pass":
+        ref_model = model_map.get(ref_cfg.model_id)
+        if ref_model is None:
+            ref_err = f"Reference model '{ref_cfg.model_id}' not found"
+        elif ref_cfg.passes < 1:
+            ref_err = f"multi_pass requires passes >= 1, got {ref_cfg.passes}"
+        else:
+            panel_mcs = [ref_model] * ref_cfg.passes
+    elif ref_cfg.mode == "panel":
+        panel_models = [model_map.get(mid) for mid in ref_cfg.panel_model_ids]
+        missing = [
+            mid for mid, m in zip(ref_cfg.panel_model_ids, panel_models) if m is None
+        ]
+        if missing:
+            ref_err = f"Panel models not found: {missing}"
+        elif len(panel_models) < 2:
+            ref_err = "panel mode requires at least 2 models"
+        else:
+            panel_mcs = [m for m in panel_models if m is not None]
+    else:
+        ref_err = f"Unknown reference mode: {ref_cfg.mode!r}"
+
+    if ref_err is not None:
+        _current_run.status = "error"
+        yield SSEEvent(event="error", data={"message": ref_err})
+        return
+
+    # Candidates = user-selected minus any that are already in the reference set
+    # (de-dupes the case where a user explicitly picks the reference model).
+    panel_ids = {mc.id for mc in panel_mcs}
+    candidate_mcs: list[ModelConfig] = []
+    for mid in model_ids:
+        mc = model_map.get(mid)
+        if mc is None or mc.id in panel_ids:
+            continue
+        candidate_mcs.append(mc)
+
+    if not panel_mcs and not candidate_mcs:
+        _current_run.status = "error"
+        yield SSEEvent(
+            event="error",
+            data={"message": "No models to run."},
+        )
+        return
+
+    _current_run.panel_model_ids = [mc.id for mc in panel_mcs]
+    _current_run.baseline_model_id = panel_mcs[0].id  # backward compat
+    panel_count = len(panel_mcs)
+    candidate_count = len(candidate_mcs)
+    total_tasks = len(prompt_indices) * (panel_count + candidate_count)
+    completed = 0
+
+    # Trader simulator: one shared client, used by every model's Q&A loop so
+    # that answer selection is consistent across the fan-out.
+    sim_cfg = config.simulator_config
+    sim_openai_key = api_keys.get("openai")
+    simulator_client = None
+    if sim_cfg.enabled and sim_openai_key:
+        from openai import AsyncOpenAI
+        simulator_client = AsyncOpenAI(api_key=sim_openai_key)
+
+    yield SSEEvent(
+        event="benchmark:start",
+        data={
+            "run_id": run_id,
+            "total_prompts": len(prompt_indices),
+            "total_models": panel_count + candidate_count,
+            "panel_models": [mc.id for mc in panel_mcs],
+            "candidate_models": [mc.id for mc in candidate_mcs],
+            "seeded_facts": seeded_facts,  # {prompt_index: count}
+            "oracle_prompts": [pi for pi, t in oracle_by_prompt.items() if t],
+            "max_rounds": MAX_ROUNDS,
+            "simulator_enabled": simulator_client is not None,
+            "simulator_model": sim_cfg.model if simulator_client else None,
+        },
+    )
+
+    # Single event bus: simulator + Q&A loops + task wrappers all push into
+    # this. The orchestrator drains it serially in each phase loop, yielding
+    # ("live", ...) items as SSE immediately and handling phase-completion
+    # items (panel_done/candidate_done/judge_done) inline.
+    event_bus: asyncio.Queue = asyncio.Queue()
+
+    def snapshot_fact_store_to_run() -> None:
+        """Update _current_run.fact_store so Analysis tab mid-run shows live
+        state if the user switches tabs while the run is still going."""
+        _current_run.fact_store = {
+            str(pi): fact_store.as_dict(pi) for pi in prompt_indices
+        }
+
+    # Push any pre-seeded fact commits onto the bus so they stream as
+    # simulator:commit SSE events at the start of phase 1. drain_new_commits
+    # gives us the list captured during fact_store.seed() above.
+    seeded_commits, _seed_idx = fact_store.drain_new_commits(0)
+    for c in seeded_commits:
+        event_bus.put_nowait(("live", "simulator:commit", c))
+
+    # ── Phase 1: Run all panel models on all prompts in parallel ──
+    panel_task_count = len(prompt_indices) * panel_count
+
+    async def run_panel_prompt(mc: ModelConfig, pi: int) -> None:
+        try:
+            result = await _run_qa_loop(
+                get_provider(mc, api_keys), mc, pi, api_keys, opensearch_limit,
+                simulator_client=simulator_client, simulator_config=sim_cfg,
+                fact_store=fact_store,
+                oracle_text=oracle_by_prompt.get(pi),
+                event_bus=event_bus,
+                is_panel=True,
+            )
+            await event_bus.put(("panel_done", mc.id, pi, result))
+        except Exception as exc:
+            await event_bus.put(("panel_done", mc.id, pi, exc))
+
+    yield SSEEvent(event="panel:start", data={
+        "panel_models": [mc.id for mc in panel_mcs],
+        "total_tasks": panel_task_count,
+    })
+
+    for mc in panel_mcs:
+        for pi in prompt_indices:
+            all_tasks.append(asyncio.create_task(run_panel_prompt(mc, pi)))
+
+    panel_done = 0
+    while panel_done < panel_task_count:
+        if check_cancelled():
+            _current_run.status = "cancelled"
+            _save_run(_current_run)
+            yield SSEEvent(event="benchmark:cancelled", data={"phase": "panel", "reason": "user"})
+            return
+        item = await event_bus.get()
+        kind = item[0]
+        if kind == "live":
+            _, name, data = item
+            yield SSEEvent(event=name, data=data)
+            continue
+        if kind != "panel_done":
+            # Defensive: stray item from a prior phase shouldn't reach here,
+            # but if it does, drop it rather than deadlock.
+            continue
+
+        _, mid, pi, result = item
+
+        if isinstance(result, Exception):
+            result = CompletionResult(
+                model_id=mid,
+                prompt_index=pi,
+                response_text="",
+                response_type="error",
+                error=str(result),
+            )
+
+        _current_run.panel_results.append(result)
+        completed += 1
+        _current_run.progress = completed / total_tasks
+
+        # Surface any task-level errors (reached after retries were exhausted
+        # in the provider layer) into the run's issues log + SSE so the UI
+        # can display them without having to grep response_text for errors.
+        if result.error:
+            issue = {
+                "kind": "error",
+                "source": "reference",
+                "model_id": result.model_id,
+                "prompt_index": result.prompt_index,
+                "message": result.error[:240],
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            _current_run.issues.append(issue)
+            yield SSEEvent(event="task:failed", data=issue)
+
+        snapshot_fact_store_to_run()
+
+        yield SSEEvent(
+            event="panel:complete",
+            data={
+                "model_id": mid,
+                "prompt_index": pi,
+                "response_type": result.response_type,
+                "total_rounds": result.total_rounds,
+                "total_latency_ms": result.total_latency_ms,
+                "total_tokens": result.total_input_tokens + result.total_output_tokens,
+                "total_cost": result.total_cost,
+                "top_code": _extract_top_code(result.response_text),
+                "error": result.error,
+            },
+        )
+        panel_done += 1
+
+    # ── Phase 1.5: Compute consensus per prompt + tag each prompt's OTT section ──
+    consensus_results: dict[int, CompletionResult] = {}
+    panel_agreements: dict[int, float] = {}
+
+    for pi in prompt_indices:
+        consensus, agreement = compute_consensus(_current_run.panel_results, pi)
+        consensus_results[pi] = consensus
+        panel_agreements[pi] = agreement
+        _current_run.consensus_results.append(consensus)
+        # Backward compat: also populate baseline_results
+        _current_run.baseline_results.append(consensus)
+
+        # Tag this prompt with its OTT section derived from the reference's
+        # top commodity code. Stratified summary views use this.
+        ref_top = _extract_top_code(consensus.response_text)
+        section = section_for_code(ref_top)
+        if section is not None:
+            _current_run.prompt_sections[str(pi)] = section
+            yield SSEEvent(event="prompt:section", data={
+                "prompt_index": pi,
+                "section_number": section["number"],
+                "section_title": section["title"],
+                "roman": section["roman"],
+                "reference_top_code": ref_top,
+            })
+
+    yield SSEEvent(event="consensus:complete", data={
+        "prompt_count": len(prompt_indices),
+        "avg_panel_agreement": round(
+            sum(panel_agreements.values()) / len(panel_agreements), 4
+        ) if panel_agreements else 0.0,
+    })
+
+    # ── Setup judge infrastructure (runs in parallel with candidates) ──
+    judge_cfg = config.judge_config
+    openai_key = api_keys.get("openai")
+    judge_enabled = bool(openai_key and judge_cfg.enabled)
+    judge_client = None
+    judge_count = 0
+
+    if judge_enabled:
+        from openai import AsyncOpenAI
+
+        judge_client = AsyncOpenAI(api_key=openai_key)
+
+        async def run_judge(eval_idx: int, ev: EvaluationResult) -> None:
+            consensus = consensus_results.get(ev.prompt_index)
+            target = None
+            if ev.model_id == "consensus":
+                target = consensus
+            else:
+                for r in _current_run.model_results:
+                    if r.model_id == ev.model_id and r.prompt_index == ev.prompt_index:
+                        target = r
+                        break
+            if not consensus or not target:
+                await event_bus.put(("judge_done", eval_idx, {}))
+                return
+            query = get_raw_query(ev.prompt_index)
+            # Pass the per-prompt fact store snapshot so the judge can score
+            # fact_consistency and understand the apples-to-apples property.
+            facts = fact_store.as_dict(ev.prompt_index)
+            scores = await judge_response(
+                judge_client, query, consensus.response_text, target.response_text, judge_cfg,
+                baseline_rounds=consensus.total_rounds, target_rounds=target.total_rounds,
+                is_baseline=(ev.model_id == "consensus"),
+                facts=facts,
+            )
+            await event_bus.put(("judge_done", eval_idx, scores))
+
+    # ── Phase 2a: Baseline judge evals fire immediately ──
+    # These start running now, overlapping with candidate model calls below.
+    for pi in prompt_indices:
+        consensus = consensus_results.get(pi)
+        if consensus is None or consensus.error:
+            continue
+        # The reference's self-evaluation: it matches itself on every deterministic
+        # code-agreement dimension by construction. Gold-truth scoring is NOT
+        # by-construction - the reference may disagree with gold, which is
+        # the single most valuable signal when a gold set is available.
+        gold = get_gold_code(pi)
+        ref_codes = _extract_codes(consensus.response_text)
+        ref_gold = compute_gold_metrics(ref_codes, gold)
+        baseline_eval = EvaluationResult(
+            model_id="consensus",
+            prompt_index=pi,
+            cosine_similarity=1.0,
+            code_match_score=1.0,
+            top1_match=True,
+            top3_hit=True,
+            top5_overlap=1.0,
+            mean_reciprocal_rank=1.0,
+            heading_match=True,
+            chapter_match=True,
+            hierarchical_score=1.0,
+            schema_valid=1.0 if consensus.response_type == "answers" else 0.0,
+            total_questions=sum(len(r.questions_asked) for r in consensus.rounds),
+            new_slots_set=sum(
+                1 for r in consensus.rounds
+                for t in (r.simulator_trace or [])
+                if isinstance(t, dict) and not t.get("consistent_with_prior", False)
+            ),
+            question_efficiency=1.0,  # reference sets everything it asks about
+            rounds_efficiency=max(
+                0.0, 1.0 - (consensus.total_rounds - 1) / 4.0,
+            ),
+            gold_code=str(gold) if gold else None,
+            gold_top1_match=ref_gold["gold_top1_match"],
+            gold_heading_match=ref_gold["gold_heading_match"],
+            gold_chapter_match=ref_gold["gold_chapter_match"],
+            gold_hierarchical_score=ref_gold["gold_hierarchical_score"],
+            delta_score=0.0,
+            total_latency_ms=round(consensus.total_latency_ms, 1),
+            baseline_total_latency_ms=round(consensus.total_latency_ms, 1),
+            speed_factor=1.0,
+            total_cost=round(consensus.total_cost, 6),
+            baseline_total_cost=round(consensus.total_cost, 6),
+            total_rounds=consensus.total_rounds,
+            baseline_total_rounds=consensus.total_rounds,
+        )
+        baseline_eval.panel_agreement = panel_agreements.get(pi)
+        _current_run.evaluations.append(baseline_eval)
+        # The reference IS the answer key by construction - do NOT judge it.
+        # Circular self-scoring was producing misleadingly low numbers (2.33)
+        # on the consensus row whenever the reference had a weaker prompt.
+        # In future panel mode, individual panel members will still be judged
+        # vs consensus for intra-panel disagreement analysis.
+
+    # ── Phase 2b: Fan-out candidates + evaluate + judge as each completes ──
+    fan_out_count = 0
+
+    async def run_model_prompt(mc: ModelConfig, pi: int) -> None:
+        try:
+            result = await _run_qa_loop(
+                get_provider(mc, api_keys), mc, pi, api_keys, opensearch_limit,
+                simulator_client=simulator_client, simulator_config=sim_cfg,
+                fact_store=fact_store,
+                oracle_text=oracle_by_prompt.get(pi),
+                event_bus=event_bus,
+                is_panel=False,
+            )
+            await event_bus.put(("candidate_done", mc.id, pi, result))
+        except Exception as exc:
+            await event_bus.put(("candidate_done", mc.id, pi, exc))
+
+    for mc in candidate_mcs:
+        for pi in prompt_indices:
+            all_tasks.append(asyncio.create_task(run_model_prompt(mc, pi)))
+            fan_out_count += 1
+
+    yield SSEEvent(event="fanout:start", data={"total_tasks": fan_out_count})
+
+    candidate_done_count = 0
+    while candidate_done_count < fan_out_count:
+        if check_cancelled():
+            _current_run.status = "cancelled"
+            _save_run(_current_run)
+            yield SSEEvent(event="benchmark:cancelled", data={"phase": "fanout", "reason": "user"})
+            return
+        item = await event_bus.get()
+        kind = item[0]
+        if kind == "live":
+            _, name, data = item
+            yield SSEEvent(event=name, data=data)
+            continue
+        if kind != "candidate_done":
+            # Defensive: ignore stray items from other phases.
+            continue
+
+        _, mid, pi, result = item
+
+        if isinstance(result, Exception):
+            result = CompletionResult(
+                model_id=mid,
+                prompt_index=pi,
+                response_text="",
+                response_type="error",
+                error=str(result),
+            )
+
+        _current_run.model_results.append(result)
+        completed += 1
+        _current_run.progress = completed / total_tasks
+
+        # Evaluate against consensus and fire judge immediately. Pass the
+        # prompt's gold_code (if any) so candidates get scored against the
+        # known-correct answer in addition to the reference.
+        consensus = consensus_results.get(result.prompt_index)
+        if consensus and not result.error:
+            evaluation = evaluate_pair(
+                consensus, result, gold_code=get_gold_code(result.prompt_index),
+            )
+            evaluation.panel_agreement = panel_agreements.get(result.prompt_index)
+            _current_run.evaluations.append(evaluation)
+            if judge_enabled:
+                asyncio.create_task(run_judge(len(_current_run.evaluations) - 1, evaluation))
+                judge_count += 1
+
+        snapshot_fact_store_to_run()
+
+        yield SSEEvent(
+            event="model:complete",
+            data={
+                "model_id": mid,
+                "prompt_index": pi,
+                "response_type": result.response_type,
+                "total_rounds": result.total_rounds,
+                "total_latency_ms": result.total_latency_ms,
+                "total_tokens": result.total_input_tokens + result.total_output_tokens,
+                "total_cost": result.total_cost,
+                "top_code": _extract_top_code(result.response_text),
+                "error": result.error,
+            },
+        )
+        candidate_done_count += 1
+
+    # ── Phase 3: Drain judge results (many may already be done) ──
+    if judge_enabled and judge_count > 0:
+        yield SSEEvent(event="judge:start", data={"total": judge_count, "model": judge_cfg.model})
+
+        judge_done = 0
+        while judge_done < judge_count:
+            if check_cancelled():
+                _current_run.status = "cancelled"
+                _save_run(_current_run)
+                yield SSEEvent(event="benchmark:cancelled", data={"phase": "judge", "reason": "user"})
+                return
+            item = await event_bus.get()
+            kind = item[0]
+            if kind == "live":
+                _, name, data = item
+                yield SSEEvent(event=name, data=data)
+                continue
+            if kind != "judge_done":
+                continue
+            _, eval_idx, scores = item
+            if scores:
+                ev = _current_run.evaluations[eval_idx]
+                # Judge now scores TWO dimensions: fact_consistency and
+                # question_quality. Legacy judge fields (classification_accuracy,
+                # structured_output, overall) are left as None - their
+                # deterministic equivalents in EvaluationResult replace them:
+                #   classification_accuracy -> top1_match/heading_match/chapter_match/top5_overlap
+                #   structured_output       -> schema_valid
+                #   overall                 -> composite computed from scoring_weights
+                ev.judge_fact_consistency = scores.get("fact_consistency")
+                ev.judge_question_quality = scores.get("question_quality")
+                ev.judge_reasoning = scores.get("reasoning")
+                ev.judge_cost = scores.get("cost", 0.0)
+                ev.judge_error = bool(scores.get("error", False))
+                # delta_score is no longer derived from judge; it's computed
+                # from the full composite in the frontend verdict math.
+            judge_done += 1
+            yield SSEEvent(event="judge:complete", data={
+                "done": judge_done,
+                "total": judge_count,
+                "model_id": _current_run.evaluations[eval_idx].model_id if scores else "",
+            })
+
+    # ── Phase 4: Summaries ──
+    evals_by_model: dict[str, list[EvaluationResult]] = defaultdict(list)
+    for ev in _current_run.evaluations:
+        evals_by_model[ev.model_id].append(ev)
+
+    # Index completion results by model_id so we can attribute simulator stats.
+    # Consensus rows aggregate across all panel members.
+    completions_by_model: dict[str, list[CompletionResult]] = defaultdict(list)
+    for r in _current_run.model_results:
+        completions_by_model[r.model_id].append(r)
+    for r in _current_run.panel_results:
+        completions_by_model[r.model_id].append(r)
+        completions_by_model["consensus"].append(r)
+
+    for mid, evals in evals_by_model.items():
+        mc = model_map.get(mid)
+        if mid == "consensus":
+            bl_id = _current_run.baseline_model_id or "panel"
+            name = f"Consensus ({bl_id})"
+        else:
+            name = mc.name if mc else mid
+        n = len(evals)
+        if n == 0:
+            continue
+
+        # Judge now scores fact_consistency + question_quality only. Any
+        # eval with a non-None fact_consistency had a successful judge call.
+        judged_fc = [e for e in evals if e.judge_fact_consistency is not None]
+        judged_qq = [e for e in evals if e.judge_question_quality is not None]
+        jn = len(judged_fc)
+        err_count = sum(1 for e in evals if e.judge_error)
+
+        sim_completions = completions_by_model.get(mid, [])
+        sim_total_cost = sum(c.total_simulator_cost for c in sim_completions)
+        total_questions = sum(
+            sum(len(r.questions_asked) for r in c.rounds) for c in sim_completions
+        )
+        total_store_hits = sum(c.simulator_store_hits for c in sim_completions)
+        store_hit_rate = (
+            round(total_store_hits / total_questions, 4) if total_questions else 0.0
+        )
+
+        # Gold-truth aggregates: only average over evals that had a gold_code.
+        # A model with 0 gold-evaluated prompts gets gold_evaluated_count=0 and
+        # None for all rates, which the UI renders as "-".
+        gold_evals = [e for e in evals if e.gold_code is not None]
+        gold_n = len(gold_evals)
+        if gold_n > 0:
+            gold_top1_rate = round(
+                sum(1 for e in gold_evals if e.gold_top1_match) / gold_n, 4
+            )
+            gold_heading_rate = round(
+                sum(1 for e in gold_evals if e.gold_heading_match) / gold_n, 4
+            )
+            gold_chapter_rate = round(
+                sum(1 for e in gold_evals if e.gold_chapter_match) / gold_n, 4
+            )
+            avg_gold_hier = round(
+                sum(
+                    e.gold_hierarchical_score or 0.0 for e in gold_evals
+                ) / gold_n,
+                4,
+            )
+        else:
+            gold_top1_rate = None
+            gold_heading_rate = None
+            gold_chapter_rate = None
+            avg_gold_hier = None
+
+        summary = ModelSummary(
+            model_id=mid,
+            model_name=name,
+            avg_cosine_similarity=round(sum(e.cosine_similarity for e in evals) / n, 4),
+            avg_code_match_score=round(sum(e.code_match_score for e in evals) / n, 4),
+            avg_delta_score=round(sum(e.delta_score for e in evals) / n, 4),
+            avg_total_latency_ms=round(sum(e.total_latency_ms for e in evals) / n, 1),
+            avg_speed_factor=round(sum(e.speed_factor for e in evals) / n, 3),
+            total_cost=round(sum(e.total_cost for e in evals), 6),
+            avg_cost_per_classification=round(sum(e.total_cost for e in evals) / n, 6),
+            top1_accuracy=round(sum(1 for e in evals if e.top1_match) / n, 4),
+            avg_top5_overlap=round(sum(e.top5_overlap for e in evals) / n, 4),
+            avg_rounds=round(sum(e.total_rounds for e in evals) / n, 2),
+            heading_match_rate=round(sum(1 for e in evals if e.heading_match) / n, 4),
+            chapter_match_rate=round(sum(1 for e in evals if e.chapter_match) / n, 4),
+            top3_hit_rate=round(sum(1 for e in evals if e.top3_hit) / n, 4),
+            avg_mean_reciprocal_rank=round(sum(e.mean_reciprocal_rank for e in evals) / n, 4),
+            avg_hierarchical_score=round(sum(e.hierarchical_score for e in evals) / n, 4),
+            avg_schema_valid=round(sum(e.schema_valid for e in evals) / n, 4),
+            avg_question_efficiency=round(sum(e.question_efficiency for e in evals) / n, 4),
+            avg_rounds_efficiency=round(sum(e.rounds_efficiency for e in evals) / n, 4),
+            # Legacy judge dimensions are None (replaced by deterministic metrics)
+            avg_judge_score=None,
+            avg_judge_classification_accuracy=None,
+            avg_judge_structured_output=None,
+            avg_judge_fact_consistency=round(sum(e.judge_fact_consistency for e in judged_fc) / len(judged_fc), 2) if judged_fc else None,
+            avg_judge_question_quality=round(sum(e.judge_question_quality for e in judged_qq) / len(judged_qq), 2) if judged_qq else None,
+            judge_scored_count=jn,
+            judge_error_count=err_count,
+            total_judge_cost=round(sum(e.judge_cost for e in evals), 6),
+            total_simulator_cost=round(sim_total_cost, 6),
+            avg_simulator_store_hit_rate=store_hit_rate,
+            gold_evaluated_count=gold_n,
+            gold_top1_rate=gold_top1_rate,
+            gold_heading_rate=gold_heading_rate,
+            gold_chapter_rate=gold_chapter_rate,
+            avg_gold_hierarchical_score=avg_gold_hier,
+        )
+        _current_run.summaries.append(summary)
+
+    # Persist the per-prompt fact store snapshot so the UI can render it.
+    _current_run.fact_store = {
+        str(pi): fact_store.as_dict(pi) for pi in prompt_indices
+    }
+
+    _current_run.status = "complete"
+    _current_run.progress = 1.0
+    _save_run(_current_run)
+
+    yield SSEEvent(
+        event="benchmark:complete",
+        data={"run_id": run_id, "summary_count": len(_current_run.summaries)},
+    )
