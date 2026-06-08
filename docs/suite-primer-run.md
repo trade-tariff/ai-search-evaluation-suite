@@ -41,7 +41,7 @@ Default dry-run plan:
 - Judge and simulator: `gpt-5-nano`, low effort, temperature 0.
 - Output folder: `apps/product/data/primer_runs/`.
 
-The production model id is not hardcoded in app config. Pass it explicitly once the model exists in the app model list:
+The production check defaults to `gpt-5.5`. Pass it explicitly when you want the manifest to make the production reference obvious, or override it for another reference model:
 
 ```bash
 python apps/product/backend/suite_primer.py --url http://127.0.0.1:8000 --prod-model gpt-5.5 --dry-run
