@@ -279,7 +279,7 @@ def _validate_request(req: JobCreate) -> None:
     if sessions > max_sessions:
         raise HTTPException(422, f"Estimated sessions {sessions} exceeds server cap CLASSIFY_EVAL_MAX_SESSIONS={max_sessions}.")
     estimated_cost = _estimated_cost_usd(req)
-    max_cost = _env_float("CLASSIFY_EVAL_MAX_EST_USD", 5.0)
+    max_cost = _env_float("CLASSIFY_EVAL_MAX_EST_USD", 10.0)
     if estimated_cost > max_cost:
         raise HTTPException(422, f"Estimated cost ${estimated_cost:.2f} exceeds server cap CLASSIFY_EVAL_MAX_EST_USD=${max_cost:.2f}.")
     if not req.allow_spend:
@@ -339,7 +339,7 @@ def health() -> dict:
             "allowed_models": _allowed_models(),
             "max_running_jobs": _env_int("CLASSIFY_EVAL_MAX_RUNNING_JOBS", 1),
             "max_sessions": _env_int("CLASSIFY_EVAL_MAX_SESSIONS", 50),
-            "max_est_usd": _env_float("CLASSIFY_EVAL_MAX_EST_USD", 5.0),
+            "max_est_usd": _env_float("CLASSIFY_EVAL_MAX_EST_USD", 10.0),
         },
     }
 
@@ -363,7 +363,7 @@ def options() -> dict:
             "max_rounds": _env_int("CLASSIFY_EVAL_MAX_ROUNDS", 8),
             "max_candidate_limit": _env_int("CLASSIFY_EVAL_MAX_CANDIDATE_LIMIT", 200),
             "max_sessions": _env_int("CLASSIFY_EVAL_MAX_SESSIONS", 50),
-            "max_est_usd": _env_float("CLASSIFY_EVAL_MAX_EST_USD", 5.0),
+            "max_est_usd": _env_float("CLASSIFY_EVAL_MAX_EST_USD", 10.0),
             "allow_sweep": _env_bool("CLASSIFY_EVAL_ALLOW_SWEEP"),
         },
     }

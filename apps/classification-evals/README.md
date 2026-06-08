@@ -278,7 +278,7 @@ These are server-side operator controls, not client hints:
 | `CLASSIFY_EVAL_MAX_CANDIDATE_LIMIT` | `200` | Max retrieved candidates per session. |
 | `CLASSIFY_EVAL_MAX_SESSIONS` | `50` | Max estimated sessions per submitted job. |
 | `CLASSIFY_EVAL_EST_USD_PER_SESSION` | `0.05` | Conservative estimate used for budget gating. |
-| `CLASSIFY_EVAL_MAX_EST_USD` | `5.00` | Max estimated spend for one job. |
+| `CLASSIFY_EVAL_MAX_EST_USD` | `10.00` | Max estimated spend for one job. |
 | `CLASSIFY_EVAL_ALLOW_SWEEP` | `0` | Sweeps are rejected unless explicitly enabled. |
 
 When a job passes these gates, the runner sets
