@@ -215,6 +215,7 @@ async def judge_response(
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
+            "timeout": 60.0,
         }
         if cfg.reasoning_effort:
             # Reasoning models (o-series, gpt-5.x) don't support temperature
