@@ -231,14 +231,59 @@ def observed_cost(event: str, data: dict[str, Any]) -> float:
 def reported_results_cost(results: Any) -> float:
     if not isinstance(results, dict):
         return 0.0
+    summary_total = 0.0
     total = 0.0
     for summary in results.get("summaries", []) or []:
         if not isinstance(summary, dict):
             continue
-        total += float(summary.get("total_cost") or 0)
-        total += float(summary.get("total_judge_cost") or 0)
-        total += float(summary.get("total_simulator_cost") or 0)
+        summary_total += float(summary.get("total_cost") or 0)
+        summary_total += float(summary.get("total_judge_cost") or 0)
+        summary_total += float(summary.get("total_simulator_cost") or 0)
+    if summary_total:
+        return summary_total
+    for result in (results.get("baseline_results", []) or []) + (results.get("model_results", []) or []):
+        if not isinstance(result, dict):
+            continue
+        total += float(result.get("total_cost") or 0)
+        total += float(result.get("total_simulator_cost") or 0)
+    for evaluation in results.get("evaluations", []) or []:
+        if isinstance(evaluation, dict):
+            total += float(evaluation.get("judge_cost") or 0)
     return total
+
+
+def cancel_and_wait(client: ApiClient, seconds: int = 30) -> dict[str, Any]:
+    outcome: dict[str, Any] = {}
+    try:
+        outcome["cancel"] = client.request_json("POST", "/api/benchmark/cancel", {})
+    except Exception as exc:
+        outcome["cancel_error"] = str(exc)
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        try:
+            status = client.request_json("GET", "/api/benchmark/status")
+            outcome["last_status"] = status
+            if status.get("status") != "running":
+                break
+        except Exception as exc:
+            outcome["status_error"] = str(exc)
+            break
+        time.sleep(1)
+    return outcome
+
+
+def fetch_stage_results(client: ApiClient, run_id: str | None) -> Any:
+    paths = []
+    if run_id:
+        paths.append(f"/api/benchmark/runs/{run_id}")
+    paths.append("/api/benchmark/results")
+    last_exc: Exception | None = None
+    for path in paths:
+        try:
+            return client.request_json("GET", path)
+        except Exception as exc:
+            last_exc = exc
+    return {"error": str(last_exc) if last_exc else "No benchmark results available"}
 
 
 def run_stage(
@@ -258,40 +303,71 @@ def run_stage(
     }
     events_path = run_dir / f"{stage['name']}.events.jsonl"
     observed = 0.0
-    status = "complete"
+    status = "running"
     run_id = None
-    with events_path.open("w") as f:
-        for event, data in client.stream_benchmark(payload):
-            record = {"event": event, "data": data, "at": datetime.now(timezone.utc).isoformat()}
-            f.write(json.dumps(record, sort_keys=True) + "\n")
-            f.flush()
-            run_id = data.get("run_id") or run_id
-            if event == "error":
-                status = "error"
-                break
-            observed += observed_cost(event, data)
-            if observed > stage_cap_usd:
-                client.request_json("POST", "/api/benchmark/cancel", {})
-                status = "cancelled_cap"
-                break
-    results = None
+    terminal_event = None
+    error_message = None
+    cancel_outcome = None
     try:
-        result_path = f"/api/benchmark/runs/{run_id}" if run_id else "/api/benchmark/results"
-        results = client.request_json("GET", result_path)
+        with events_path.open("w") as f:
+            for event, data in client.stream_benchmark(payload):
+                record = {"event": event, "data": data, "at": datetime.now(timezone.utc).isoformat()}
+                f.write(json.dumps(record, sort_keys=True) + "\n")
+                f.flush()
+                run_id = data.get("run_id") or run_id
+                observed += observed_cost(event, data)
+                if event == "benchmark:complete":
+                    terminal_event = event
+                    status = "complete"
+                elif event == "benchmark:cancelled":
+                    terminal_event = event
+                    status = "cancelled"
+                elif event == "error":
+                    terminal_event = event
+                    status = "error"
+                    error_message = str(data.get("message") or data)
+                    cancel_outcome = cancel_and_wait(client)
+                    break
+                if observed > stage_cap_usd:
+                    terminal_event = "cap"
+                    status = "cancelled_cap"
+                    cancel_outcome = cancel_and_wait(client)
+                    break
     except Exception as exc:
-        results = {"error": str(exc)}
+        status = "stream_error_cancelled"
+        error_message = f"{type(exc).__name__}: {str(exc)[:300]}"
+        try:
+            current = client.request_json("GET", "/api/benchmark/status")
+            run_id = run_id or current.get("id")
+        except Exception:
+            pass
+        cancel_outcome = cancel_and_wait(client)
+
+    if status == "running":
+        status = "stream_closed_without_terminal_event"
+        cancel_outcome = cancel_and_wait(client)
+
+    results = fetch_stage_results(client, run_id)
+    if isinstance(results, dict):
+        write_json(run_dir / f"{stage['name']}.results.json", results)
     reported_cost = reported_results_cost(results)
     if reported_cost > stage_cap_usd and status == "complete":
         status = "over_cap_after_stage"
-    return {
+    summary = {
         "name": stage["name"],
         "status": status,
         "run_id": run_id,
+        "terminal_event": terminal_event,
         "observed_stream_cost_usd": round(observed, 6),
         "reported_results_cost_usd": round(reported_cost, 6),
         "events_file": str(events_path),
         "results_summary_count": len(results.get("summaries", [])) if isinstance(results, dict) else 0,
     }
+    if error_message:
+        summary["error"] = error_message
+    if cancel_outcome:
+        summary["cancel_outcome"] = cancel_outcome
+    return summary
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -336,6 +412,7 @@ def main(argv: list[str]) -> int:
     }
     stage_summaries: list[dict[str, Any]] = []
     cumulative_cost = 0.0
+    restore_error = None
     try:
         for stage in plan["stages"]:
             if not stage["prompt_indices"]:
@@ -358,10 +435,13 @@ def main(argv: list[str]) -> int:
                 float(summary.get("reported_results_cost_usd") or 0),
             )
             stage_summaries.append(summary)
-            if cumulative_cost >= args.max_usd:
+            if cumulative_cost >= args.max_usd or summary.get("status") != "complete":
                 break
     finally:
-        restore_config(client, original_config)
+        try:
+            restore_config(client, original_config)
+        except Exception as exc:
+            restore_error = f"{type(exc).__name__}: {str(exc)[:300]}"
 
     summary = {
         "completed_at": datetime.now(timezone.utc).isoformat(),
@@ -369,6 +449,8 @@ def main(argv: list[str]) -> int:
         "cumulative_reported_or_observed_usd": round(cumulative_cost, 6),
         "stages": stage_summaries,
     }
+    if restore_error:
+        summary["restore_error"] = restore_error
     write_json(run_dir / "summary.json", summary)
     print(json.dumps(summary, indent=2))
     return 0
