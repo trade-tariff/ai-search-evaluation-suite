@@ -64,6 +64,33 @@ def _kg_use_scope_filter(alias: str, table: str, scope: str) -> str:
     return f"AND '{scope}' = ANY({alias}.use_scopes)"
 
 
+_FACT_SOURCE_FAMILY_SQL = """
+CASE
+  WHEN {alias}.source LIKE 'atar:%%' THEN 'atar'
+  WHEN {alias}.source = 'search_reference' THEN 'search_references'
+  WHEN {alias}.source = 'description_llm' THEN 'description_llm'
+  WHEN {alias}.source = 'hand' THEN 'hand'
+  ELSE 'other'
+END
+"""
+
+_EDGE_SOURCE_FAMILY_SQL = """
+CASE
+  WHEN {alias}.id LIKE 'atar\\_%%' THEN 'atar'
+  WHEN {alias}.id LIKE 'hsen:%%' OR {alias}.source LIKE 'hsen:%%' THEN 'hsen'
+  WHEN {alias}.source LIKE 'UK Tariff Chapter %% Notes' THEN 'chapter_notes'
+  WHEN {alias}.source LIKE 'UK Tariff Section %% Notes' THEN 'section_notes'
+  WHEN {alias}.type = 'classification_order' THEN 'girs'
+  WHEN {alias}.type = 'footnote' OR {alias}.source ILIKE '%%footnote%%' THEN 'footnotes'
+  ELSE 'other'
+END
+"""
+
+
+def _family_list(values: Optional[list[str]]) -> list[str]:
+    return [str(v).strip() for v in (values or []) if str(v).strip()]
+
+
 def health() -> dict:
     try:
         with _conn() as c, c.cursor() as cur:
@@ -213,7 +240,13 @@ _TIER_RETRIEVAL_WEIGHT = {
 }
 
 
-def _facts_leg(query: str, limit: int, exclude_sources: Optional[list[str]] = None) -> list[dict]:
+def _facts_leg(
+    query: str,
+    limit: int,
+    exclude_sources: Optional[list[str]] = None,
+    include_families: Optional[list[str]] = None,
+    exclude_families: Optional[list[str]] = None,
+) -> list[dict]:
     """Retrieve codes whose structured facts have token overlap with the query.
 
     Builds a tsvector over (facet_key || ' ' || facet_value || ' ' || evidence)
@@ -228,6 +261,9 @@ def _facts_leg(query: str, limit: int, exclude_sources: Optional[list[str]] = No
     if not query.strip():
         return []
     excl = exclude_sources or []
+    include = _family_list(include_families)
+    exclude = _family_list(exclude_families)
+    family_sql = _FACT_SOURCE_FAMILY_SQL.format(alias="cf")
     with _conn() as c, c.cursor() as cur:
         cur.execute(
             f"""
@@ -255,12 +291,20 @@ def _facts_leg(query: str, limit: int, exclude_sources: Optional[list[str]] = No
             FROM {KG_SCHEMA}.commodity_facets cf, q
             WHERE to_tsvector('english', cf.facet_key || ' ' || cf.facet_value || ' ' || COALESCE(cf.evidence, '')) @@ q.tsq
               AND ( %s::text[] IS NULL OR cf.source <> ALL(%s::text[]) )
+              AND ( %s::text[] IS NULL OR ({family_sql}) = ANY(%s::text[]) )
+              AND ( %s::text[] IS NULL OR NOT (({family_sql}) = ANY(%s::text[])) )
               {_kg_use_scope_filter("cf", "commodity_facets", "retrieval")}
             GROUP BY cf.commodity_code
             ORDER BY score DESC
             LIMIT %s
             """,
-            (query, excl or None, excl or None, limit),
+            (
+                query,
+                excl or None, excl or None,
+                include or None, include or None,
+                exclude or None, exclude or None,
+                limit,
+            ),
         )
         return [
             {
@@ -274,7 +318,13 @@ def _facts_leg(query: str, limit: int, exclude_sources: Optional[list[str]] = No
         ]
 
 
-def _kg_context_leg(query: str, limit: int, exclude_edge_ids: Optional[list[str]] = None) -> list[dict]:
+def _kg_context_leg(
+    query: str,
+    limit: int,
+    exclude_edge_ids: Optional[list[str]] = None,
+    include_families: Optional[list[str]] = None,
+    exclude_families: Optional[list[str]] = None,
+) -> list[dict]:
     """Retrieve codes via KG edges whose body matches the query.
 
     Captures the case where the trader's query language matches a chapter note,
@@ -285,6 +335,9 @@ def _kg_context_leg(query: str, limit: int, exclude_edge_ids: Optional[list[str]
     if not query.strip():
         return []
     excl = exclude_edge_ids or []
+    include = _family_list(include_families)
+    exclude = _family_list(exclude_families)
+    family_sql = _EDGE_SOURCE_FAMILY_SQL.format(alias="e")
     with _conn() as c, c.cursor() as cur:
         cur.execute(
             f"""
@@ -312,12 +365,20 @@ def _kg_context_leg(query: str, limit: int, exclude_edge_ids: Optional[list[str]
             CROSS JOIN q
             WHERE to_tsvector('english', e.title || ' ' || e.body) @@ q.tsq
               AND ( %s::text[] IS NULL OR e.id <> ALL(%s::text[]) )
+              AND ( %s::text[] IS NULL OR ({family_sql}) = ANY(%s::text[]) )
+              AND ( %s::text[] IS NULL OR NOT (({family_sql}) = ANY(%s::text[])) )
               {_kg_use_scope_filter("e", "kg_edges", "retrieval")}
             GROUP BY kec.commodity_code
             ORDER BY score DESC
             LIMIT %s
             """,
-            (query, excl or None, excl or None, limit),
+            (
+                query,
+                excl or None, excl or None,
+                include or None, include or None,
+                exclude or None, exclude or None,
+                limit,
+            ),
         )
         return [
             {
@@ -359,7 +420,13 @@ def _vector_leg(query_embedding: list[float], limit: int) -> list[dict]:
         ]
 
 
-def _facts_vec_leg(query_embedding: list[float], limit: int, exclude_sources: Optional[list[str]] = None) -> list[dict]:
+def _facts_vec_leg(
+    query_embedding: list[float],
+    limit: int,
+    exclude_sources: Optional[list[str]] = None,
+    include_families: Optional[list[str]] = None,
+    exclude_families: Optional[list[str]] = None,
+) -> list[dict]:
     """Semantic match against per-fact embeddings.
 
     Per codex's review: per-fact embeddings are more honest than per-code
@@ -376,6 +443,9 @@ def _facts_vec_leg(query_embedding: list[float], limit: int, exclude_sources: Op
         return []
     literal = "[" + ",".join(f"{x:.6f}" for x in query_embedding) + "]"
     excl = exclude_sources or []
+    include = _family_list(include_families)
+    exclude = _family_list(exclude_families)
+    family_sql = _FACT_SOURCE_FAMILY_SQL.format(alias="cf")
     # Over-fetch facts so the per-commodity aggregation has plenty of choice
     # AND so the exclusion has plenty of fallback candidates.
     fact_pool = limit * 4
@@ -389,6 +459,8 @@ def _facts_vec_leg(query_embedding: list[float], limit: int, exclude_sources: Op
                 FROM {KG_SCHEMA}.commodity_facets cf
                 WHERE cf.embedding IS NOT NULL
                   AND ( %s::text[] IS NULL OR cf.source <> ALL(%s::text[]) )
+                  AND ( %s::text[] IS NULL OR ({family_sql}) = ANY(%s::text[]) )
+                  AND ( %s::text[] IS NULL OR NOT (({family_sql}) = ANY(%s::text[])) )
                   {_kg_use_scope_filter("cf", "commodity_facets", "retrieval")}
                 ORDER BY cf.embedding <=> %s::vector
                 LIMIT %s
@@ -413,7 +485,13 @@ def _facts_vec_leg(query_embedding: list[float], limit: int, exclude_sources: Op
             ORDER BY score DESC
             LIMIT %s
             """,
-            (literal, excl or None, excl or None, literal, fact_pool, limit),
+            (
+                literal,
+                excl or None, excl or None,
+                include or None, include or None,
+                exclude or None, exclude or None,
+                literal, fact_pool, limit,
+            ),
         )
         return [
             {
@@ -427,7 +505,13 @@ def _facts_vec_leg(query_embedding: list[float], limit: int, exclude_sources: Op
         ]
 
 
-def _kg_vec_leg(query_embedding: list[float], limit: int, exclude_edge_ids: Optional[list[str]] = None) -> list[dict]:
+def _kg_vec_leg(
+    query_embedding: list[float],
+    limit: int,
+    exclude_edge_ids: Optional[list[str]] = None,
+    include_families: Optional[list[str]] = None,
+    exclude_families: Optional[list[str]] = None,
+) -> list[dict]:
     """Semantic match against per-edge embeddings, then join to commodities.
 
     Pre-filters edges with the HNSW index, then aggregates by linked commodity.
@@ -438,6 +522,9 @@ def _kg_vec_leg(query_embedding: list[float], limit: int, exclude_edge_ids: Opti
         return []
     literal = "[" + ",".join(f"{x:.6f}" for x in query_embedding) + "]"
     excl = exclude_edge_ids or []
+    include = _family_list(include_families)
+    exclude = _family_list(exclude_families)
+    family_sql = _EDGE_SOURCE_FAMILY_SQL.format(alias="e")
     edge_pool = limit * 4
     with _conn() as c, c.cursor() as cur:
         cur.execute(
@@ -448,6 +535,8 @@ def _kg_vec_leg(query_embedding: list[float], limit: int, exclude_edge_ids: Opti
                 FROM {KG_SCHEMA}.kg_edges e
                 WHERE e.embedding IS NOT NULL
                   AND ( %s::text[] IS NULL OR e.id <> ALL(%s::text[]) )
+                  AND ( %s::text[] IS NULL OR ({family_sql}) = ANY(%s::text[]) )
+                  AND ( %s::text[] IS NULL OR NOT (({family_sql}) = ANY(%s::text[])) )
                   {_kg_use_scope_filter("e", "kg_edges", "retrieval")}
                 ORDER BY e.embedding <=> %s::vector
                 LIMIT %s
@@ -471,7 +560,13 @@ def _kg_vec_leg(query_embedding: list[float], limit: int, exclude_edge_ids: Opti
             ORDER BY score DESC
             LIMIT %s
             """,
-            (literal, excl or None, excl or None, literal, edge_pool, limit),
+            (
+                literal,
+                excl or None, excl or None,
+                include or None, include or None,
+                exclude or None, exclude or None,
+                literal, edge_pool, limit,
+            ),
         )
         return [
             {
@@ -590,8 +685,13 @@ def retrieve_candidates(
     rrf_k: int = 60,
     exclude_fact_sources: Optional[list[str]] = None,
     exclude_edge_ids: Optional[list[str]] = None,
+    include_fact_families: Optional[list[str]] = None,
+    exclude_fact_families: Optional[list[str]] = None,
+    include_edge_families: Optional[list[str]] = None,
+    exclude_edge_families: Optional[list[str]] = None,
     use_vec_adapter: bool = False,
     use_composite: bool = False,
+    query_embedding: Optional[list[float]] = None,
 ) -> list[dict]:
     """Hybrid retrieval. Same shape as fan-out's search.retrieve_candidates,
     plus optional facts + KG-context legs (lexical) and facts_vec + kg_vec
@@ -627,7 +727,9 @@ def retrieve_candidates(
     except Exception as e:
         print(f"[retrieval substring] {e}")
     # Embed once, reuse for all vector legs.
-    emb = embed_query(query) if (use_vector or use_facts_vec or use_kg_vec) else None
+    emb = query_embedding if query_embedding is not None else (
+        embed_query(query) if (use_vector or use_facts_vec or use_kg_vec) else None
+    )
     if use_vector and emb:
         try:
             # Adapter (Path A1) maps the QUERY vector toward code self-text
@@ -642,25 +744,49 @@ def retrieve_candidates(
             print(f"[retrieval vector] {e}")
     if use_facts:
         try:
-            legs.append(_facts_leg(query, limit, exclude_sources=exclude_fact_sources))
+            legs.append(_facts_leg(
+                query,
+                limit,
+                exclude_sources=exclude_fact_sources,
+                include_families=include_fact_families,
+                exclude_families=exclude_fact_families,
+            ))
             caps.append(facts_cap)
         except Exception as e:
             print(f"[retrieval facts] {e}")
     if use_kg_context:
         try:
-            legs.append(_kg_context_leg(query, limit, exclude_edge_ids=exclude_edge_ids))
+            legs.append(_kg_context_leg(
+                query,
+                limit,
+                exclude_edge_ids=exclude_edge_ids,
+                include_families=include_edge_families,
+                exclude_families=exclude_edge_families,
+            ))
             caps.append(kg_cap)
         except Exception as e:
             print(f"[retrieval kg_context] {e}")
     if use_facts_vec and emb:
         try:
-            legs.append(_facts_vec_leg(emb, limit, exclude_sources=exclude_fact_sources))
+            legs.append(_facts_vec_leg(
+                emb,
+                limit,
+                exclude_sources=exclude_fact_sources,
+                include_families=include_fact_families,
+                exclude_families=exclude_fact_families,
+            ))
             caps.append(facts_vec_cap)
         except Exception as e:
             print(f"[retrieval facts_vec] {e}")
     if use_kg_vec and emb:
         try:
-            legs.append(_kg_vec_leg(emb, limit, exclude_edge_ids=exclude_edge_ids))
+            legs.append(_kg_vec_leg(
+                emb,
+                limit,
+                exclude_edge_ids=exclude_edge_ids,
+                include_families=include_edge_families,
+                exclude_families=exclude_edge_families,
+            ))
             caps.append(kg_vec_cap)
         except Exception as e:
             print(f"[retrieval kg_vec] {e}")

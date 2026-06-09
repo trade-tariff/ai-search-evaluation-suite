@@ -22,6 +22,7 @@ apps/product/data/config.json
 apps/product/data/complexity_chart_cache/
 apps/product/data/intercept_runs/
 apps/product/data/primer_runs/
+apps/product/data/source_ablation/
 apps/product/frontend/node_modules/
 apps/product/frontend/dist/
 apps/product/frontend/test-results/
