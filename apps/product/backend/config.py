@@ -16,16 +16,6 @@ DEFAULT_MODELS: list[ModelConfig] = [
     # ── OpenAI: GPT-5.x series (thinking models) ────────────
     # Each thinking model has low/medium/high variants. Only medium enabled by default.
     ModelConfig(
-        id="gpt-5.5",
-        name="GPT-5.5",
-        provider=ProviderType.OPENAI,
-        model_id="gpt-5.5",
-        reasoning_effort="medium",
-        category="tier1_paid",
-        input_cost_per_million=5.00,
-        output_cost_per_million=30.00,
-    ),
-    ModelConfig(
         id="gpt-5.4",
         name="GPT-5.4",
         provider=ProviderType.OPENAI,

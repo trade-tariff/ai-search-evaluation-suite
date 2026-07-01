@@ -1,0 +1,282 @@
+[
+ {
+  "id": 683,
+  "persona": "naive_vague",
+  "query": "dried fruit",
+  "expected_code": "0804209000",
+  "source_id": "atar_600015708"
+ },
+ {
+  "id": 709,
+  "persona": "naive_specific",
+  "query": "freeze dried apple slices in small resealable bags",
+  "expected_code": "0813300000",
+  "source_id": "atar_600015746"
+ },
+ {
+  "id": 556,
+  "persona": "naive_branded",
+  "query": "peach fruit crisps pouch",
+  "expected_code": "0813401000",
+  "source_id": "atar_600015747"
+ },
+ {
+  "id": 917,
+  "persona": "emu_generic",
+  "query": "dried strawberries",
+  "expected_code": "0813409580",
+  "source_id": "atar_600015706"
+ },
+ {
+  "id": 2728,
+  "persona": "emu_ordinary",
+  "query": "frozen boneless marinated chicken fillets",
+  "expected_code": "1602321190",
+  "source_id": "atar_600015633"
+ },
+ {
+  "id": 377,
+  "persona": "emu_specific",
+  "query": "ready-to-mix chocolate protein powder with soy isolate and maltodextrin",
+  "expected_code": "1806907090",
+  "source_id": "atar_600015483"
+ },
+ {
+  "id": 2102,
+  "persona": "original",
+  "query": "product: the product are frozen, uncooked gluten-free cheese dough balls  that are made for human consumption. it is made from cassava flour, milk, cheddar cheese, sunflower oil, egg, water and salt. presented as approximately 20 individual portions (approx. 20g each) in a 400g a food-grade plastic bag. the product is not ready-to-eat and requires baking prior to consumption.\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\nfor the purposes of determin",
+  "expected_code": "1901200000",
+  "source_id": "atar_600015343"
+ },
+ {
+  "id": 2111,
+  "persona": "naive_vague",
+  "query": "snack nuts",
+  "expected_code": "1905907000",
+  "source_id": "atar_600015141"
+ },
+ {
+  "id": 221,
+  "persona": "naive_specific",
+  "query": "fried sliced tomato chips in foil bags",
+  "expected_code": "2002109000",
+  "source_id": "atar_600015628"
+ },
+ {
+  "id": 2260,
+  "persona": "naive_branded",
+  "query": "nameko mushrooms in a jar",
+  "expected_code": "2003909000",
+  "source_id": "atar_600015601"
+ },
+ {
+  "id": 2808,
+  "persona": "emu_generic",
+  "query": "corn fritters",
+  "expected_code": "2004909810",
+  "source_id": "atar_600015433"
+ },
+ {
+  "id": 409,
+  "persona": "emu_ordinary",
+  "query": "mixed red green yellow pepper crisps",
+  "expected_code": "2005998094",
+  "source_id": "atar_600015558"
+ },
+ {
+  "id": 437,
+  "persona": "emu_specific",
+  "query": "white and purple onion crisps vacuum fried in rapeseed oil",
+  "expected_code": "2005998098",
+  "source_id": "atar_600015626"
+ },
+ {
+  "id": 614,
+  "persona": "original",
+  "query": "product: the product is a apple and strawberry puree snack. it is packaged in a box of 16x 90g pouches made from pet, aluminium, nylon and pe. the puree is made from apple, strawberry, apple juice concentrate, ascorbic acid, malic acid and flavouring. it is fully smooth with no chunks but is not homogenised. product is cooked to 95\u00b0c, cooled to 75\u00b0c and then filtered and put into pouches which are then sealed and then sterilised. it is not cooked in a vacuum. product has over 13% sugars but less",
+  "expected_code": "2007995099",
+  "source_id": "atar_600015678"
+ },
+ {
+  "id": 151,
+  "persona": "naive_vague",
+  "query": "tomato sauce",
+  "expected_code": "2103909019",
+  "source_id": "atar_600015535"
+ },
+ {
+  "id": 149,
+  "persona": "naive_specific",
+  "query": "mango chilli chutney in plastic squeeze bottle",
+  "expected_code": "2103909089",
+  "source_id": "atar_600015534"
+ },
+ {
+  "id": 696,
+  "persona": "naive_branded",
+  "query": "pre workout powder tub",
+  "expected_code": "2106909849",
+  "source_id": "atar_600015484"
+ },
+ {
+  "id": 411,
+  "persona": "emu_generic",
+  "query": "water additive",
+  "expected_code": "2201900000",
+  "source_id": "atar_600015563"
+ },
+ {
+  "id": 340,
+  "persona": "emu_ordinary",
+  "query": "denatured ethanol 1 litre bottles",
+  "expected_code": "2207200019",
+  "source_id": "atar_600015198"
+ },
+ {
+  "id": 2669,
+  "persona": "emu_specific",
+  "query": "turmeric and black pepper powder for horses in plastic bag",
+  "expected_code": "2309909696",
+  "source_id": "atar_600015501"
+ },
+ {
+  "id": 2202,
+  "persona": "original",
+  "query": "product: face peptide cre\u0300me, to be gently applied to the face.\r\npackaged in a 50ml glass bottle.\r\ningredients: aqua, prunus armeniaca kernel oil, pentylene glycol, glyceryl stearate citrate, olus oil, glycerin, macadamia integrifolia seed oil, oenothera biennis oil, silica, cetearyl alcohol, xylityl glucosides, butyrospermum parkii butter, avena sativa kernel oil, anhydroxylitol, avena sativa kernel extract, hippophae rhamnoides fruit oil, palmitoyl grape seed extract, triolein, hydrogenated co",
+  "expected_code": "3304990000",
+  "source_id": "atar_600015611"
+ },
+ {
+  "id": 2199,
+  "persona": "naive_vague",
+  "query": "face cleansing oil",
+  "expected_code": "3401300000",
+  "source_id": "atar_600015612"
+ },
+ {
+  "id": 2177,
+  "persona": "naive_specific",
+  "query": "detergent tablets for baby bottle washer machine",
+  "expected_code": "3402501000",
+  "source_id": "atar_600015470"
+ },
+ {
+  "id": 2132,
+  "persona": "naive_branded",
+  "query": "white blu tack wall adhesive",
+  "expected_code": "3506100000",
+  "source_id": "atar_600015380"
+ },
+ {
+  "id": 2799,
+  "persona": "emu_generic",
+  "query": "plastic profile",
+  "expected_code": "3916100090",
+  "source_id": "atar_600015147"
+ },
+ {
+  "id": 2776,
+  "persona": "emu_ordinary",
+  "query": "stiff polyethylene connector tube",
+  "expected_code": "3917211090",
+  "source_id": "atar_600015153"
+ },
+ {
+  "id": 2774,
+  "persona": "emu_specific",
+  "query": "1 metre roll 30 mm clear double-sided nano gel tape",
+  "expected_code": "3919108090",
+  "source_id": "atar_600015368"
+ },
+ {
+  "id": 2302,
+  "persona": "original",
+  "query": "product: a cool box designed for indoor and outdoor use. the item has 50 hrs chilling chilling capacity, with a 5 year warranty. the product has a shock absorbent abs plastic outer cabinet and an inner high performance removable and zero ozone-depleting foam insulation. the product has a leather handle.\n\nhmrc justification: classification has been determined in accordance with the following: \r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3",
+  "expected_code": "3923109090",
+  "source_id": "atar_600015462"
+ },
+ {
+  "id": 27,
+  "persona": "naive_vague",
+  "query": "kids plastic cup",
+  "expected_code": "3924100090",
+  "source_id": "atar_600014923"
+ },
+ {
+  "id": 261,
+  "persona": "naive_specific",
+  "query": "45 litre plastic rubbish bin with foot pedal",
+  "expected_code": "3924900090",
+  "source_id": "atar_600015682"
+ },
+ {
+  "id": 44,
+  "persona": "naive_branded",
+  "query": "driveway reinforcement grid fabric",
+  "expected_code": "3926909790",
+  "source_id": "atar_600015150"
+ },
+ {
+  "id": 285,
+  "persona": "emu_generic",
+  "query": "rubber bellow",
+  "expected_code": "4016999790",
+  "source_id": "atar_600014701"
+ },
+ {
+  "id": 2818,
+  "persona": "emu_ordinary",
+  "query": "plastic-surfaced carry case",
+  "expected_code": "4202921900",
+  "source_id": "atar_600015427"
+ },
+ {
+  "id": 2681,
+  "persona": "emu_specific",
+  "query": "zippered handheld console case with lift strap and pocket",
+  "expected_code": "4202929890",
+  "source_id": "atar_600015035"
+ },
+ {
+  "id": 2234,
+  "persona": "original",
+  "query": "product: 300pc bamboo skewers.\r\nthey are 10cm in size, 2mm wide and are natural in colour. \r\ncan be used for canapes, chocolate fountains, cheeseboards and much more.\r\nsuitable for family dinners, parties, gatherings and all things bbq...\r\nthey come in a polypropylene bag with an insert card and headed card.\n\nhmrc justification: classification has been determined in accordance with the following: \r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall,",
+  "expected_code": "4421910000",
+  "source_id": "atar_600015378"
+ },
+ {
+  "id": 2243,
+  "persona": "naive_vague",
+  "query": "clothes pegs",
+  "expected_code": "4421999999",
+  "source_id": "atar_600015373"
+ },
+ {
+  "id": 2225,
+  "persona": "naive_specific",
+  "query": "14 inch tall cake box with silver round board",
+  "expected_code": "4819200000",
+  "source_id": "atar_600015401"
+ },
+ {
+  "id": 136,
+  "persona": "naive_branded",
+  "query": "mini brag book photo album",
+  "expected_code": "4820500000",
+  "source_id": "atar_600015482"
+ },
+ {
+  "id": 2703,
+  "persona": "emu_generic",
+  "query": "takeaway pot",
+  "expected_code": "4823699000",
+  "source_id": "atar_600015717"
+ },
+ {
+  "id": 2767,
+  "persona": "emu_ordinary",
+  "query": "party invites with envelopes",
+  "expected_code": "4909000000",
+  "source_id": "atar_600015372"
+ }
+]

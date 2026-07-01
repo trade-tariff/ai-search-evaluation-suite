@@ -309,7 +309,7 @@ export default function FinancialPanel() {
               <ZAxis range={[80, 80]} />
               <Tooltip
                 contentStyle={{ backgroundColor: "#1f2937", border: "none" }}
-                formatter={(value, name) => {
+                formatter={(value: unknown, name: unknown) => {
                   const numericValue = typeof value === "number" ? value : Number(value ?? 0);
                   const label = String(name ?? "");
                   return [

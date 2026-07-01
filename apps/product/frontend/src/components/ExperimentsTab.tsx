@@ -25,10 +25,21 @@ type Candidate = {
   sources?: string[];
 };
 
+type QuestionMode = "facet_rules" | "facet_rules_llm_wording" | "llm_generated";
+
+type QaHistoryEntry = {
+  question: string;
+  answer: string;
+  facet_key?: string;
+  answer_value?: string;
+  mode?: QuestionMode | string;
+};
+
 type TrialResult = {
   query: string;
   expected_code: string;
   expected_code_normalized: string;
+  evaluated?: boolean;
   experiment: Experiment;
   retrieval_limit: number;
   rank: number | null;
@@ -37,6 +48,78 @@ type TrialResult = {
   hit_within_limit: boolean;
   leg_counts: Record<string, number>;
   top_candidates: Candidate[];
+  candidates?: Candidate[];
+};
+
+type HydrationEvidence = {
+  kind: string;
+  id: string;
+  title: string;
+  body: string;
+  source: string;
+  authority_tier?: number | null;
+  scope?: string;
+};
+
+type CommodityHydration = {
+  commodity_code: string;
+  code_dotted?: string;
+  coverage?: {
+    counts_by_kind?: Record<string, number>;
+  };
+  summary?: {
+    bullets?: string[];
+    llm?: {
+      enabled: boolean;
+      model?: string;
+      text?: string;
+      reason?: string;
+    };
+  };
+  evidence?: HydrationEvidence[];
+};
+
+type HydratedCandidate = {
+  candidate: Candidate;
+  hydration: CommodityHydration;
+};
+
+type CandidateHydrationRun = {
+  query: string;
+  candidate_count: number;
+  hydrate_limit: number;
+  coverage_totals: Record<string, number>;
+  cache_hit_count?: number;
+  cache_write_count?: number;
+  cache_version?: string;
+  question_hint?: {
+    question: string;
+    options: string[];
+    source?: string;
+    mode?: QuestionMode | string;
+    requested_mode?: QuestionMode | string;
+    model?: string;
+    provider_used?: boolean;
+    facet_key?: string;
+    facet_label?: string;
+    entropy?: number;
+    fallback_reason?: string;
+    options_meta?: {
+      value: string;
+      label: string;
+      candidate_count: number;
+      codes?: string[];
+    }[];
+  };
+  qa_state?: {
+    qa_history?: QaHistoryEntry[];
+    round?: number;
+    in_scope_count?: number;
+    out_of_scope_count?: number;
+    in_scope_codes?: string[];
+    out_of_scope_codes?: string[];
+  };
+  hydrated: HydratedCandidate[];
 };
 
 const TOP_RUN_LABEL = "no_curated_only";
@@ -46,7 +129,7 @@ const DEMO_EXPERIMENTS: Experiment[] = [
     rank: 1,
     run_label: TOP_RUN_LABEL,
     run_id: "demo-no-curated-only",
-    title: "Top overall: semantic + KG + facets, no Search References",
+    title: "Top overall: semantic + KG + commodity facts, no Search References",
     description:
       "Demo fallback for the shipped retrieval stack: commodity text plus semantic vector search, structured facts, and KG evidence. The live catalogue normally supplies the full matrix.",
     caveats: ["Fallback row shown only when the experiment catalogue is unavailable."],
@@ -68,7 +151,7 @@ const DEMO_EXPERIMENTS: Experiment[] = [
     rank: 2,
     run_label: "all_legs_on",
     run_id: "demo-all-legs-on",
-    title: "Semantic + KG + facets",
+    title: "Semantic + KG + commodity facts",
     description:
       "Reference fallback for the full evidence stack when Search References are present in the matrix setup.",
     caveats: ["Fallback row shown only when the experiment catalogue is unavailable."],
@@ -112,8 +195,8 @@ function retrievalSourceLabel(source: string) {
     fts: "Keyword text",
     substring: "Description substring",
     reference: "Search References",
-    facts: "Facet FTS",
-    facts_vec: "Facet vector",
+    facts: "Fact FTS",
+    facts_vec: "Fact vector",
     kg_context: "KG FTS",
     kg_vec: "KG vector",
     vector: "Semantic vector",
@@ -121,6 +204,61 @@ function retrievalSourceLabel(source: string) {
     vector_composite: "AI-enriched text vector",
   };
   return labels[source] ?? source.replace(/_/g, " ");
+}
+
+function questionSourceLabel(source?: string) {
+  const labels: Record<string, string> = {
+    facet_rules: "Facet rules",
+    facet_rules_llm_wording: "Facet rules + LLM wording",
+    llm_generated_hydrated_shortlist: "LLM generated",
+    llm_generated_retrieval_shortlist: "LLM generated",
+    facet_hydrated_shortlist: "Hydrated facets",
+    facet_retrieval_shortlist: "Retrieved facets",
+    hydrated_shortlist: "Hydrated facets",
+    retrieval_shortlist: "Retrieved shortlist",
+    llm_hydrated_shortlist: "LLM from hydrated shortlist",
+    llm_retrieval_shortlist: "LLM from retrieved shortlist",
+  };
+  return source ? labels[source] ?? source.replace(/_/g, " ") : "Hydrated shortlist";
+}
+
+function questionModeLabel(mode: QuestionMode | string) {
+  const labels: Record<string, string> = {
+    facet_rules: "Facet rules",
+    facet_rules_llm_wording: "Rules + LLM wording",
+    llm_generated: "LLM generated",
+  };
+  return labels[mode] ?? mode.replace(/_/g, " ");
+}
+
+function codeDotted(code: string) {
+  const digits = code.replace(/\D/g, "");
+  return digits.length === 10
+    ? `${digits.slice(0, 4)}.${digits.slice(4, 6)}.${digits.slice(6, 8)}.${digits.slice(8)}`
+    : code;
+}
+
+function candidatePool(trial: TrialResult | null) {
+  return trial?.candidates?.length ? trial.candidates : trial?.top_candidates || [];
+}
+
+function asHydrationCandidate(candidate: Candidate) {
+  return {
+    ...candidate,
+    code_dotted: codeDotted(candidate.commodity_code),
+    in_slice: true,
+    sources: candidate.sources || [],
+  };
+}
+
+function evidenceCounts(hydration: CommodityHydration) {
+  return hydration.coverage?.counts_by_kind || {};
+}
+
+function topFacetEvidence(hydration: CommodityHydration) {
+  return (hydration.evidence || [])
+    .filter((item) => item.kind === "facet")
+    .slice(0, 4);
 }
 
 function providerSteps(experiment: Experiment | null) {
@@ -229,6 +367,12 @@ export default function ExperimentsTab() {
   const [notice, setNotice] = useState<string | null>(null);
   const [trialError, setTrialError] = useState<string | null>(null);
   const [trial, setTrial] = useState<TrialResult | null>(null);
+  const [hydrating, setHydrating] = useState(false);
+  const [hydrateLimit, setHydrateLimit] = useState(80);
+  const [questionMode, setQuestionMode] = useState<QuestionMode>("facet_rules");
+  const [qaHistory, setQaHistory] = useState<QaHistoryEntry[]>([]);
+  const [hydrationError, setHydrationError] = useState<string | null>(null);
+  const [hydration, setHydration] = useState<CandidateHydrationRun | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -287,10 +431,37 @@ export default function ExperimentsTab() {
   const selectedRequiresProvider = selectedProviderSteps.length > 0;
   const canRun =
     Boolean(query.trim()) &&
-    Boolean(expectedNormalized) &&
     Boolean(selectedExperiment?.runnable) &&
     (!selectedRequiresProvider || allowProviderCalls) &&
     !running;
+  const currentCandidatePool = candidatePool(trial);
+  const canHydrate =
+    Boolean(trial) &&
+    currentCandidatePool.length > 0 &&
+    (questionMode === "facet_rules" || allowProviderCalls) &&
+    !running &&
+    !hydrating;
+  const hydrationStatusTone = hydrating
+    ? "border-emerald-800 bg-emerald-950/40 text-emerald-100"
+    : hydrationError
+      ? "border-red-900 bg-red-950/40 text-red-100"
+      : hydration
+        ? "border-emerald-900 bg-emerald-950/30 text-emerald-100"
+        : "border-gray-800 bg-gray-900 text-gray-300";
+  const hydrationStatusLabel = hydrating
+    ? "Hydrating"
+    : hydrationError
+      ? "Hydration failed"
+      : hydration
+        ? "Hydrated"
+        : "Not hydrated";
+  const hydrationStatusDetail = hydrating
+    ? `Loading evidence for up to ${Math.min(hydrateLimit, currentCandidatePool.length || hydrateLimit)} candidates`
+      : hydration
+      ? `${hydration.qa_state?.in_scope_count ?? hydration.hydrated.length} active of ${hydration.candidate_count}, cache ${hydration.cache_hit_count ?? 0}/${hydration.cache_write_count ?? 0}, ${questionSourceLabel(hydration.question_hint?.source)}`
+      : questionMode !== "facet_rules" && !allowProviderCalls
+        ? "LLM Q&A needs Provider calls"
+        : "Ready to build Q&A";
 
   async function runTrial(event: FormEvent) {
     event.preventDefault();
@@ -298,6 +469,9 @@ export default function ExperimentsTab() {
     setRunning(true);
     setTrialError(null);
     setTrial(null);
+    setHydration(null);
+    setQaHistory([]);
+    setHydrationError(null);
     try {
       const response = await fetchApi("/api/retrieval/try", {
         method: "POST",
@@ -323,7 +497,85 @@ export default function ExperimentsTab() {
     }
   }
 
-  const rankTone = trial?.rank ? "good" : trial ? "bad" : "neutral";
+  async function hydrateTrial(history: QaHistoryEntry[] = qaHistory) {
+    if (!trial || !canHydrate) return;
+    const candidates = currentCandidatePool.map(asHydrationCandidate);
+    const limit = Math.max(1, Math.min(hydrateLimit, candidates.length, retrievalLimit));
+    setHydrating(true);
+    setHydration(null);
+    setHydrationError(null);
+    try {
+      const response = await fetchApi("/api/hydration/candidates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          query: trial.query,
+          candidates,
+          candidate_limit: candidates.length,
+          hydrate_limit: limit,
+          question_mode: questionMode,
+          qa_history: history,
+          summarize: false,
+          allow_spend: allowProviderCalls && questionMode !== "facet_rules",
+          config: {
+            retrieval: { limit: trial.retrieval_limit },
+            use_llm_question_wording: allowProviderCalls && questionMode !== "facet_rules",
+            question_wording_model: "gpt-5-nano",
+          },
+          sources: {
+            facets: true,
+            footnotes: true,
+            measures: true,
+            section_notes: true,
+            chapter_notes: true,
+            hsen: true,
+            atar: true,
+            girs: true,
+          },
+        }),
+      });
+      const result = await readJson<CandidateHydrationRun>(response);
+      setHydration(result);
+    } catch (err) {
+      setHydrationError(
+        err instanceof Error
+          ? `Hydrated Q&A unavailable: ${err.message}`
+          : "Hydrated Q&A unavailable.",
+      );
+    } finally {
+      setHydrating(false);
+    }
+  }
+
+  function resetHydratedQa() {
+    setQaHistory([]);
+    setHydration(null);
+    setHydrationError(null);
+  }
+
+  async function buildFreshQa() {
+    setQaHistory([]);
+    await hydrateTrial([]);
+  }
+
+  async function answerHydratedQuestion(option: string) {
+    if (!hydration?.question_hint || !canHydrate) return;
+    const meta = hydration.question_hint.options_meta?.find((item) => item.label === option);
+    const nextHistory = [
+      ...qaHistory,
+      {
+        question: hydration.question_hint.question,
+        answer: option,
+        facet_key: hydration.question_hint.facet_key,
+        answer_value: meta?.value,
+        mode: hydration.question_hint.mode || questionMode,
+      },
+    ];
+    setQaHistory(nextHistory);
+    await hydrateTrial(nextHistory);
+  }
+
+  const rankTone = trial?.rank ? "good" : trial?.evaluated ? "bad" : "neutral";
 
   return (
     <div className="space-y-6" data-testid="experiments-tab">
@@ -378,6 +630,12 @@ export default function ExperimentsTab() {
                 onChange={(event) => {
                   setSelectedRunLabel(event.target.value);
                   setAllowProviderCalls(false);
+                  setQuestionMode("facet_rules");
+                  setTrial(null);
+                  setHydration(null);
+                  setQaHistory([]);
+                  setTrialError(null);
+                  setHydrationError(null);
                 }}
                 className="mt-2 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100"
               >
@@ -397,7 +655,14 @@ export default function ExperimentsTab() {
                 </label>
                 <input
                   value={query}
-                  onChange={(event) => setQuery(event.target.value)}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                    setTrial(null);
+                    setHydration(null);
+                    setQaHistory([]);
+                    setTrialError(null);
+                    setHydrationError(null);
+                  }}
                   className="mt-2 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100"
                   placeholder="fresh goods description"
                 />
@@ -410,8 +675,11 @@ export default function ExperimentsTab() {
                   value={expectedCode}
                   onChange={(event) => setExpectedCode(event.target.value)}
                   className="mt-2 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100"
-                  placeholder="10 digit code"
+                  placeholder="optional 10 digit code"
                 />
+                <div className="mt-1 text-xs text-gray-500">
+                  Leave blank to explore retrieval without scoring a gold code.
+                </div>
               </div>
             </div>
 
@@ -434,8 +702,14 @@ export default function ExperimentsTab() {
                 <input
                   type="checkbox"
                   checked={allowProviderCalls}
-                  disabled={!selectedRequiresProvider}
-                  onChange={(event) => setAllowProviderCalls(event.target.checked)}
+                  onChange={(event) => {
+                    const enabled = event.target.checked;
+                    setAllowProviderCalls(enabled);
+                    if (!enabled && questionMode !== "facet_rules") {
+                      setQuestionMode("facet_rules");
+                      resetHydratedQa();
+                    }
+                  }}
                   className="h-4 w-4 rounded border-gray-700 bg-gray-950"
                 />
                 Provider calls
@@ -506,22 +780,35 @@ export default function ExperimentsTab() {
             <div>
               <h3 className="text-lg font-semibold text-gray-100">Trial result</h3>
               <div className="mt-1 text-sm text-gray-400">
-                {trial.experiment.title} against {trial.expected_code_normalized}
+                {trial.evaluated
+                  ? `${trial.experiment.title} against ${trial.expected_code_normalized}`
+                  : `${trial.experiment.title} for "${trial.query}"`}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <Metric
-                label="Gold rank"
-                value={trial.rank ? `#${trial.rank}` : "Miss"}
-                tone={rankTone}
-              />
-              <Metric label="Hit@10" value={trial.hit_at_10 ? "Yes" : "No"} tone={trial.hit_at_10 ? "good" : "bad"} />
-              <Metric label="Hit@100" value={trial.hit_at_100 ? "Yes" : "No"} tone={trial.hit_at_100 ? "good" : "bad"} />
-              <Metric
-                label={`Within ${trial.retrieval_limit}`}
-                value={trial.hit_within_limit ? "Yes" : "No"}
-                tone={trial.hit_within_limit ? "good" : "bad"}
-              />
+              {trial.evaluated ? (
+                <>
+                  <Metric
+                    label="Gold rank"
+                    value={trial.rank ? `#${trial.rank}` : "Miss"}
+                    tone={rankTone}
+                  />
+                  <Metric label="Hit@10" value={trial.hit_at_10 ? "Yes" : "No"} tone={trial.hit_at_10 ? "good" : "bad"} />
+                  <Metric label="Hit@100" value={trial.hit_at_100 ? "Yes" : "No"} tone={trial.hit_at_100 ? "good" : "bad"} />
+                  <Metric
+                    label={`Within ${trial.retrieval_limit}`}
+                    value={trial.hit_within_limit ? "Yes" : "No"}
+                    tone={trial.hit_within_limit ? "good" : "bad"}
+                  />
+                </>
+              ) : (
+                <>
+                  <Metric label="Candidate pool" value={`${currentCandidatePool.length}`} />
+                  <Metric label="Displayed" value={`${trial.top_candidates.length}`} />
+                  <Metric label="Retrieval limit" value={`${trial.retrieval_limit}`} />
+                  <Metric label="Gold scoring" value="Skipped" />
+                </>
+              )}
             </div>
           </div>
 
@@ -535,6 +822,247 @@ export default function ExperimentsTab() {
               </span>
             ))}
           </div>
+
+          <div className="mt-5 rounded border border-gray-800 bg-gray-950 p-4">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+              <div>
+                <div className="text-sm font-medium text-gray-100">Hydrated facet Q&A</div>
+                <p className="mt-1 text-sm leading-6 text-gray-400">
+                  Builds the trader-facing question from the retrieved candidates plus live facet/KG/ATAR evidence.
+                </p>
+              </div>
+              <div className={`rounded border px-3 py-2 text-sm ${hydrationStatusTone}`}>
+                <div className="flex items-center gap-2 font-medium">
+                  <span
+                    className={`h-2.5 w-2.5 rounded-full ${
+                      hydrating
+                        ? "animate-pulse bg-emerald-300"
+                        : hydrationError
+                          ? "bg-red-300"
+                          : hydration
+                            ? "bg-emerald-300"
+                            : "bg-gray-500"
+                    }`}
+                  />
+                  {hydrationStatusLabel}
+                </div>
+                <div className="mt-1 text-xs opacity-80">{hydrationStatusDetail}</div>
+              </div>
+              <div className="flex flex-wrap items-end gap-3">
+                <div>
+                  <span className="block text-xs font-medium text-gray-400">Question mode</span>
+                  <div className="mt-2 flex rounded border border-gray-800 bg-gray-900 p-1">
+                    {(["facet_rules", "facet_rules_llm_wording", "llm_generated"] as QuestionMode[]).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => {
+                          setQuestionMode(mode);
+                          resetHydratedQa();
+                        }}
+                        className={`px-3 py-1.5 text-xs font-medium ${
+                          questionMode === mode
+                            ? "rounded bg-emerald-700 text-white"
+                            : "text-gray-400 hover:text-gray-200"
+                        }`}
+                      >
+                        {questionModeLabel(mode)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <label className="block">
+                  <span className="block text-xs font-medium text-gray-400">Hydrate candidates</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={500}
+                    step={10}
+                    value={hydrateLimit}
+                    onChange={(event) => setHydrateLimit(Number(event.target.value))}
+                    className="mt-2 w-28 rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100"
+                  />
+                </label>
+                <button
+                  type="button"
+                  disabled={!canHydrate}
+                  onClick={buildFreshQa}
+                  className="rounded bg-emerald-700 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
+                >
+                  {hydrating ? "Hydrating..." : qaHistory.length ? "Restart Q&A" : "Build Q&A"}
+                </button>
+              </div>
+            </div>
+            {!allowProviderCalls && questionMode !== "facet_rules" && (
+              <div className="mt-3 text-xs text-gray-500">
+                Provider calls are required for {questionModeLabel(questionMode)}.
+              </div>
+            )}
+            {hydrationError && (
+              <div className="mt-4 rounded border border-red-900 bg-red-950/40 p-3 text-sm text-red-100">
+                {hydrationError}
+              </div>
+            )}
+          </div>
+
+          {hydration && (
+            <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+              <section className="rounded border border-emerald-900/70 bg-emerald-950/20 p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-emerald-300">
+                  Q&A from hydrated shortlist
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                  <div className="rounded border border-gray-800 bg-gray-950 p-2">
+                    <div className="text-gray-500">Round</div>
+                    <div className="mt-1 text-lg font-semibold text-gray-100">
+                      {hydration.qa_state?.round ?? 1}
+                    </div>
+                  </div>
+                  <div className="rounded border border-gray-800 bg-gray-950 p-2">
+                    <div className="text-gray-500">In scope</div>
+                    <div className="mt-1 text-lg font-semibold text-emerald-200">
+                      {hydration.qa_state?.in_scope_count ?? hydration.candidate_count}
+                    </div>
+                  </div>
+                  <div className="rounded border border-gray-800 bg-gray-950 p-2">
+                    <div className="text-gray-500">Out</div>
+                    <div className="mt-1 text-lg font-semibold text-gray-300">
+                      {hydration.qa_state?.out_of_scope_count ?? 0}
+                    </div>
+                  </div>
+                </div>
+                {qaHistory.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    {qaHistory.map((entry, index) => (
+                      <div key={`${entry.question}-${index}`} className="rounded border border-gray-800 bg-gray-950 p-2 text-xs text-gray-300">
+                        <div className="text-gray-500">Q{index + 1}: {entry.question}</div>
+                        <div className="mt-1 text-gray-100">A{index + 1}: {entry.answer}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {hydration.question_hint ? (
+                  <>
+                    <h4 className="mt-3 text-lg font-semibold text-gray-100">
+                      {hydration.question_hint.question}
+                    </h4>
+                    <div className="mt-4 space-y-2">
+                      {hydration.question_hint.options.map((option) => (
+                        <button
+                          key={option}
+                          type="button"
+                          onClick={() => answerHydratedQuestion(option)}
+                          disabled={!canHydrate}
+                          className="w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-left text-sm text-gray-200 hover:border-emerald-700 hover:bg-emerald-950/30 disabled:cursor-not-allowed disabled:border-gray-800 disabled:text-gray-500"
+                        >
+                          <span>{option}</span>
+                          {hydration.question_hint?.options_meta?.find((item) => item.label === option)?.candidate_count ? (
+                            <span className="ml-2 text-xs text-gray-500">
+                              {hydration.question_hint.options_meta.find((item) => item.label === option)?.candidate_count} candidates
+                            </span>
+                          ) : null}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mt-3 text-xs text-gray-500">
+                      Source: {questionSourceLabel(hydration.question_hint.source)}
+                      {hydration.question_hint.facet_label ? ` | Facet: ${hydration.question_hint.facet_label}` : ""}
+                      {hydration.question_hint.provider_used && hydration.question_hint.model ? ` | Model: ${hydration.question_hint.model}` : ""}
+                    </div>
+                    {hydration.question_hint.fallback_reason && (
+                      <div className="mt-2 text-xs text-amber-200">
+                        {hydration.question_hint.fallback_reason}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="mt-3 text-sm text-gray-400">
+                    Hydration completed, but no Q&A hint was returned.
+                  </div>
+                )}
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <span className="rounded border border-gray-800 bg-gray-950 px-2 py-1 text-xs text-gray-300">
+                    cache hits: {hydration.cache_hit_count ?? 0}
+                  </span>
+                  <span className="rounded border border-gray-800 bg-gray-950 px-2 py-1 text-xs text-gray-300">
+                    cache writes: {hydration.cache_write_count ?? 0}
+                  </span>
+                  {Object.entries(hydration.coverage_totals || {}).map(([kind, count]) => (
+                    <span
+                      key={kind}
+                      className="rounded border border-gray-800 bg-gray-950 px-2 py-1 text-xs text-gray-300"
+                    >
+                      {kind}: {count}
+                    </span>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded border border-gray-800 bg-gray-950 p-4">
+                <div className="flex items-baseline justify-between gap-3">
+                  <div className="text-sm font-medium text-gray-100">
+                    Hydrated candidates
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {hydration.hydrated.length} of {hydration.candidate_count}
+                  </div>
+                </div>
+                <div className="mt-3 max-h-[520px] space-y-3 overflow-auto pr-1">
+                  {hydration.hydrated.map(({ candidate, hydration: h }) => {
+                    const counts = evidenceCounts(h);
+                    const facets = topFacetEvidence(h);
+                    const outOfScope = (hydration.qa_state?.out_of_scope_codes || []).includes(candidate.commodity_code);
+                    return (
+                      <article
+                        key={`${candidate.rank}-${candidate.commodity_code}`}
+                        className={`rounded border p-3 ${
+                          outOfScope
+                            ? "border-gray-900 bg-gray-950/60 opacity-60"
+                            : "border-gray-800 bg-gray-900/70"
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded bg-gray-800 px-2 py-1 text-xs text-gray-300">
+                            #{candidate.rank}
+                          </span>
+                          <span className="font-mono text-sm text-gray-100">
+                            {codeDotted(candidate.commodity_code)}
+                          </span>
+                          <span className={`rounded px-2 py-1 text-xs ${outOfScope ? "bg-gray-900 text-gray-500" : "bg-emerald-950/60 text-emerald-200"}`}>
+                            {outOfScope ? "Out of scope" : "In scope"}
+                          </span>
+                          {Object.entries(counts).slice(0, 4).map(([kind, count]) => (
+                            <span
+                              key={kind}
+                              className="rounded border border-gray-800 px-2 py-1 text-xs text-gray-400"
+                            >
+                              {kind}: {count}
+                            </span>
+                          ))}
+                        </div>
+                        <p className="mt-2 text-sm leading-5 text-gray-300">
+                          {candidate.description}
+                        </p>
+                        {facets.length > 0 && (
+                          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                            {facets.map((item) => (
+                              <div
+                                key={`${item.kind}-${item.id}`}
+                                className="rounded border border-gray-800 bg-gray-950 p-2 text-xs text-gray-300"
+                              >
+                                <div className="font-medium text-gray-100">{item.title}</div>
+                                <div className="mt-1 line-clamp-2 text-gray-500">{item.body}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            </div>
+          )}
 
           <div className="mt-5 overflow-x-auto">
             <table className="w-full min-w-[760px] border-collapse text-left text-sm">

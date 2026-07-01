@@ -224,7 +224,7 @@ def api_retrieval_top_experiment():
 
 @app.post("/api/retrieval/try")
 def api_retrieval_try(payload: dict):
-    from experiment_retrieval import run_trial
+    from experiment_retrieval import experiment_requires_provider, run_trial
 
     query = str(payload.get("query") or "").strip()
     expected_code = str(payload.get("expected_code") or "").strip()
@@ -234,8 +234,10 @@ def api_retrieval_try(payload: dict):
     except (TypeError, ValueError):
         raise HTTPException(400, "retrieval_limit must be an integer")
 
+    if experiment_requires_provider(str(run_label) if run_label else None):
+        _require_workbench_spend(payload)
+
     cfg = load_config()
-    _require_workbench_spend(payload)
     try:
         return run_trial(
             query=query,
@@ -1164,6 +1166,17 @@ def exported_matrix_csv():
     if not csv_path.exists():
         raise HTTPException(404, "Exported matrix CSV is missing")
     return FileResponse(csv_path, media_type="text/csv", filename="retrieval_matrix.csv")
+
+
+# --- Single-backend consolidation: mount the trader-journey routes ------
+
+from journey import main as _journey_main  # noqa: E402
+
+_existing_paths = {getattr(r, "path", None) for r in app.router.routes}
+for _r in _journey_main.app.router.routes:
+    _p = getattr(_r, "path", "")
+    if _p.startswith(("/api/", "/eval")) and _p not in _existing_paths:
+        app.router.routes.append(_r)
 
 
 if __name__ == "__main__":

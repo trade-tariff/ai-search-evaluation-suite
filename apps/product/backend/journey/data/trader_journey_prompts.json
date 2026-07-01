@@ -1,0 +1,112 @@
+{
+ "_about": "Fallback e2e trader journey prompts. The app prefers live kg.eval_gold and kg.commodity_facets examples from tariff_db; these prompts are only for offline review when a live database is unavailable.",
+ "config": {
+  "strategy": "eliminate",
+  "qa_process_mode": "ott_staging_kg",
+  "prompt_mode": "facet_soft_score",
+  "use_query_expansion": true,
+  "query_expansion_model": "gpt-4.1-mini-2025-04-14",
+  "query_expansion_prompt_variant": "staging",
+  "use_facets": true,
+  "use_session_facts": true,
+  "use_kg_prompt_context": true,
+  "use_entropy_picker": false,
+  "use_llm_candidate_selection": true,
+  "candidate_selection_model": "gpt-5.5",
+  "use_llm_question_wording": true,
+  "kg_include": {
+   "chapter_notes": true,
+   "section_notes": true,
+   "legacy_blob_notes": false,
+   "girs": true,
+   "atar_rationales": true,
+   "heading_rules": true,
+   "other_global": true
+  },
+  "retrieval": {
+   "use_labels": true,
+   "use_curated": true,
+   "use_vector": true,
+   "use_composite": true,
+   "use_facts_leg": true,
+   "use_kg_context_leg": true,
+   "use_facts_vec_leg": true,
+   "use_kg_vec_leg": true,
+   "facts_cap": 0.5,
+   "kg_cap": 0.5,
+   "facts_vec_cap": 0.9,
+   "kg_vec_cap": 0.9,
+   "rrf_k": 60,
+   "limit": 80
+  }
+ },
+ "examples": [
+  {
+   "id": "flip_flops",
+   "label": "Flip-flops",
+   "query": "Rubber flip flops with thong straps assembled to the sole by plugs, 120 pairs.",
+   "expected_code": "6402200000",
+   "expected_code_dotted": "6402.20.00",
+   "description": "Footwear with rubber/plastic straps assembled by plugs.",
+   "seed": {
+    "quantity_units": 120,
+    "quantity_unit_type": "PR",
+    "description_of_goods": "Rubber flip flops with thong straps assembled by plugs"
+   }
+  },
+  {
+   "id": "trainers",
+   "label": "Running trainers",
+   "query": "Mesh running trainers with rubber soles and laces, 80 pairs.",
+   "expected_code": "6404110000",
+   "expected_code_dotted": "6404.11.00",
+   "description": "Sports footwear with textile uppers and rubber/plastic soles.",
+   "seed": {
+    "quantity_units": 80,
+    "quantity_unit_type": "PR",
+    "description_of_goods": "Mesh running trainers with rubber soles and laces"
+   }
+  },
+  {
+   "id": "still_wine",
+   "label": "Still wine",
+   "query": "12 bottles of still red wine, 750ml each, 12.5% ABV.",
+   "expected_code": "2204210600",
+   "expected_code_dotted": "2204.21.06",
+   "description": "Still wine in containers of 2 litres or less.",
+   "seed": {
+    "quantity_units": 9,
+    "quantity_unit_type": "LTR",
+    "excise_volume_litres": 9,
+    "abv": 12.5,
+    "description_of_goods": "Still red wine in 750ml bottles"
+   }
+  },
+  {
+   "id": "single_malt",
+   "label": "Single malt whisky",
+   "query": "24 bottles of single malt whisky, 700ml each, 40% ABV.",
+   "expected_code": "2208303000",
+   "expected_code_dotted": "2208.30.30",
+   "description": "Single malt whisky in containers of 2 litres or less.",
+   "seed": {
+    "quantity_units": 6.72,
+    "quantity_unit_type": "LPA",
+    "excise_volume_litres": 16.8,
+    "abv": 40,
+    "description_of_goods": "Single malt whisky in 700ml bottles"
+   }
+  },
+  {
+   "id": "stainless_sink",
+   "label": "Stainless steel sinks",
+   "query": "Stainless steel kitchen sinks for domestic kitchens.",
+   "expected_code": "7324100000",
+   "expected_code_dotted": "7324.10.00",
+   "description": "Sinks and wash basins of stainless steel.",
+   "seed": {
+    "description_of_goods": "Stainless steel kitchen sinks for domestic kitchens"
+   }
+  }
+ ]
+}

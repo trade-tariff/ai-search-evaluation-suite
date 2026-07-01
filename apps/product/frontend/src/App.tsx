@@ -14,12 +14,13 @@ import ComplexityPanel from "./components/ComplexityPanel";
 import KnowledgePanel from "./components/KnowledgePanel";
 import MatrixTab from "./components/MatrixTab";
 import ExperimentsTab from "./components/ExperimentsTab";
+import TraderJourneyTab from "./components/TraderJourneyTab";
 
-const TABS = ["Experiments", "Matrix", "Configuration", "Prompts", "ATaR", "Search References", "Simulator", "Judge", "Benchmark", "Analysis", "Financial", "Intercepts", "Complexity", "Knowledge"] as const;
+const TABS = ["Trader Journey"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>("Experiments");
+  const [tab, setTab] = useState<Tab>("Trader Journey");
   const [selectedPrompts, setSelectedPrompts] = useState<number[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [opensearchLimit, setOpensearchLimit] = useState(80);
@@ -39,7 +40,7 @@ export default function App() {
     <div className="min-h-screen bg-gray-950 text-gray-100">
       <header className="border-b border-gray-800 px-6 py-4">
         <h1 className="text-xl font-semibold">
-          AI Search Evaluation Suite
+          Trade Tariff AI Assistant <span className="text-sm font-normal text-gray-400">(demo)</span>
         </h1>
       </header>
 
@@ -99,6 +100,7 @@ export default function App() {
         {tab === "Complexity" && <ComplexityPanel />}
         {tab === "Knowledge" && <KnowledgePanel />}
         {tab === "Experiments" && <ExperimentsTab />}
+        {tab === "Trader Journey" && <TraderJourneyTab />}
         {tab === "Matrix" && <MatrixTab />}
       </main>
     </div>

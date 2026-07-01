@@ -56,6 +56,8 @@ COPY apps/product/backend/classification_core/__init__.py \
      apps/product/backend/classification_core/recall_curve.py \
      apps/product/backend/classification_core/run_classify_matrix.py \
      apps/product/backend/classification_core/run_eval.py \
+     apps/product/backend/classification_core/run_hydrated_e2e_matrix.py \
+     apps/product/backend/classification_core/run_qna_mode_comparison.py \
      apps/product/backend/classification_core/session_facts.py \
      apps/product/backend/classification_core/triage.py \
      apps/product/backend/classification_core/

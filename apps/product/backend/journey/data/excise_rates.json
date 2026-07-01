@@ -1,0 +1,75 @@
+{
+  "_about": "UK Alcohol Duty Reform 2023 rate matrix. Rates per litre of pure alcohol (LPA). The system asks for ABV and product type, picks the right band, then applies Small Producer Relief (SPR) and/or Draught Relief if eligible. Rates use pre-Feb-2025 baseline values for stability.",
+  "bands": [
+    {
+      "id": "below_min",
+      "abv_min": 0.0,
+      "abv_max": 1.2,
+      "rate_per_lpa_gbp": 0.0,
+      "label": "Below 1.2% ABV - not chargeable with alcohol duty"
+    },
+    {
+      "id": "reduced",
+      "abv_min": 1.2,
+      "abv_max": 3.5,
+      "rate_per_lpa_gbp": 9.27,
+      "label": "1.2% to less than 3.5% ABV (reduced rate, all products)"
+    },
+    {
+      "id": "standard_beer",
+      "abv_min": 3.5,
+      "abv_max": 8.5,
+      "applies_to": ["beer"],
+      "rate_per_lpa_gbp": 21.78,
+      "label": "Beer, 3.5% to less than 8.5% ABV (standard rate)"
+    },
+    {
+      "id": "standard_cider",
+      "abv_min": 3.5,
+      "abv_max": 8.5,
+      "applies_to": ["cider"],
+      "rate_per_lpa_gbp": 10.02,
+      "label": "Cider, 3.5% to less than 8.5% ABV (standard rate)"
+    },
+    {
+      "id": "standard_wine",
+      "abv_min": 3.5,
+      "abv_max": 8.5,
+      "applies_to": ["wine", "spirits", "soft_drink"],
+      "rate_per_lpa_gbp": 24.77,
+      "label": "Wine, spirits and other fermented products, 3.5% to less than 8.5% ABV"
+    },
+    {
+      "id": "high",
+      "abv_min": 8.5,
+      "abv_max": 22.0,
+      "rate_per_lpa_gbp": 28.50,
+      "label": "8.5% to less than 22% ABV (all products at this strength)"
+    },
+    {
+      "id": "spirits",
+      "abv_min": 22.0,
+      "abv_max": 100.0,
+      "rate_per_lpa_gbp": 31.64,
+      "label": "22%+ ABV (spirits and high-strength wines)"
+    }
+  ],
+  "small_producer_relief": {
+    "applies_to_bands": ["reduced", "standard_beer", "standard_cider", "standard_wine"],
+    "annual_alcohol_production_limit_hl": 4500,
+    "indicative_discount_pct": 50,
+    "label": "Small Producer Relief - producers making under 4,500 hL pure alcohol per year qualify for a reduced rate. POC applies a flat 50% discount; the real scheme tapers the discount with production volume."
+  },
+  "draught_relief": {
+    "applies_to_bands": ["reduced", "standard_beer", "standard_cider", "standard_wine"],
+    "container_min_litres": 20,
+    "discount_pct": 9.2,
+    "label": "Draught Relief - applies when the product is packaged in a container of 20 litres or more designed for dispensing on-trade. Discount is 9.2% off the standard rate."
+  },
+  "_vat_rates": {
+    "standard": 20.0,
+    "reduced": 5.0,
+    "zero": 0.0,
+    "label_default": "standard"
+  }
+}

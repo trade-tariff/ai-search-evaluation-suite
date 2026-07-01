@@ -1,0 +1,1682 @@
+[
+ {
+  "id": 683,
+  "persona": "naive_vague",
+  "query": "dried fruit",
+  "expected_code": "0804209000",
+  "source_id": "atar_600015708",
+  "oracle_text": "product: freeze dried fig slices\r\npackaging: 30g re-sealable stand-up pouches\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013 a. part two (goods classification table rules of interpretation) of the tarif"
+ },
+ {
+  "id": 708,
+  "persona": "naive_branded",
+  "query": "apple crisps snack pouches",
+  "expected_code": "0813300000",
+  "source_id": "atar_600015746",
+  "oracle_text": "product: freeze dried apple slices\r\npackaging: 30g re-sealable stand-up pouches\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013 a. part two (goods classification table rules of interpretation) of the tar"
+ },
+ {
+  "id": 557,
+  "persona": "naive_specific",
+  "query": "freeze dried peach slices in small resealable bags",
+  "expected_code": "0813401000",
+  "source_id": "atar_600015747",
+  "oracle_text": "product: freeze dried peach slices\r\npackaging: 30g re-sealable stand-up pouches\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013 a. part two (goods classification table rules of interpretation) of the tar"
+ },
+ {
+  "id": 562,
+  "persona": "original",
+  "query": "product: freeze dried strawberry slices\r\npackaging: 30g re-sealable stand-up pouches\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013 a. part two (goods classification table rules of interpretation) of th",
+  "expected_code": "0813409580",
+  "source_id": "atar_600015706",
+  "oracle_text": "product: freeze dried strawberry slices\r\npackaging: 30g re-sealable stand-up pouches\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013 a. part two (goods classification table rules of interpretation) of th"
+ },
+ {
+  "id": 2727,
+  "persona": "emu_generic",
+  "query": "frozen chicken fillets",
+  "expected_code": "1602321190",
+  "source_id": "atar_600015633",
+  "oracle_text": "product: marinated chicken fillets\r\nuncooked, frozen, boneless, skinless\r\npackaging: vacuo polybag\n\nhmrc justification: classification has been determined in accordance with the following:- \r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013 a. part two (goods classification table rules of inter"
+ },
+ {
+  "id": 376,
+  "persona": "emu_ordinary",
+  "query": "chocolate protein powder",
+  "expected_code": "1806907090",
+  "source_id": "atar_600015483",
+  "oracle_text": "product: the product is a chocolate and soy protein isolate based protein powder, intended to be mixed with water (300g serving) for human consumption. it contains the following ingredients: maltodextrin, wheat gluten, soy protein isolate, cocoa, glycine, fat powder [refined vegetable oil (palm fruit), glucose syrup, milk protein, anti-caking agent], taurine, sodium chloride, flavouring, calcium lactate, disodium phosphate, tricalcium phosphate, potassium chloride, dimagnesium phosphate, digezym"
+ },
+ {
+  "id": 2660,
+  "persona": "emu_specific",
+  "query": "frozen uncooked cassava-based cheese dough portions for baking",
+  "expected_code": "1901200000",
+  "source_id": "atar_600015343",
+  "oracle_text": "product: the product are frozen, uncooked gluten-free cheese dough balls  that are made for human consumption. it is made from cassava flour, milk, cheddar cheese, sunflower oil, egg, water and salt. presented as approximately 20 individual portions (approx. 20g each) in a 400g a food-grade plastic bag. the product is not ready-to-eat and requires baking prior to consumption.\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\nfor the purposes of determin"
+ },
+ {
+  "id": 2111,
+  "persona": "naive_vague",
+  "query": "snack nuts",
+  "expected_code": "1905907000",
+  "source_id": "atar_600015141",
+  "oracle_text": "product: roasted peanuts coated in a thick, crunchy dough coating that is used as a bar-snack. it contains the following ingredients: peanuts, wheat flour, cane sugar, modified corn starch, corn starch, sesame seeds, maltodextrin, soy sauce (water, wheat, soy, salt), sunflower oil, maltose syrup, salt, raising agent: e503, e500; seaweed, colour: e150c, e160c. the roasted peanut is rolled into multiple layers of flavoured dough and baked. they are packed in 10kg polyamide and polyethylene plastic"
+ },
+ {
+  "id": 220,
+  "persona": "naive_branded",
+  "query": "healthy tomato veggie chips",
+  "expected_code": "2002109000",
+  "source_id": "atar_600015628",
+  "oracle_text": "product: the product is sliced whole tomato crisps that are vacuum\u2011fried in rapeseed oil. they  are packaged in 2.0 lb vacuum\u2011packed aluminium foil bags bags, with six bags per carton.\r\n\r\nfresh tomatoes are tested, washed, sliced, steam\u2011disinfected and iqf frozen, then lightly coated in a tapioca starch solution and vacuum\u2011fried at low temperature in rapeseed oil, preserving the tomato\u2019s colour and shape. excess oil is removed by centrifugation before the products are quality\u2011checked, metal\u2011dete"
+ },
+ {
+  "id": 2261,
+  "persona": "naive_specific",
+  "query": "pickled nameko mushrooms in 580ml glass jar",
+  "expected_code": "2003909000",
+  "source_id": "atar_600015601",
+  "oracle_text": "product: preserved nameko mushrooms\r\ningredients: nameko mushroom, water, salt, garlic, acetic acid, bay leaves, black pepper, cloves, dill\r\npackaging: 580ml glass jar\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following h"
+ },
+ {
+  "id": 2298,
+  "persona": "original",
+  "query": "product: frozen sweetcorn fritters and onion and sweetcorn fritters with a sweet chilli dip. these are frozen. there are 8 x20g fritters\r\ningredients:\r\nsweetcorn , onion, cottonseed oil, corn starch, dried potato, wheat flour, coriander leaf, shallot, lemon juice, garlic, dried red chilli, lemongrass, salt, red chilli powder, makrut lime leaf, galangal, makrut lime peel, cumin. sweet chilli dip [water, sugar, distilled vinegar, modified maize starch, red chilli, salt, garlic powder, red bell pep",
+  "expected_code": "2004909810",
+  "source_id": "atar_600015433",
+  "oracle_text": "product: frozen sweetcorn fritters and onion and sweetcorn fritters with a sweet chilli dip. these are frozen. there are 8 x20g fritters\r\ningredients:\r\nsweetcorn , onion, cottonseed oil, corn starch, dried potato, wheat flour, coriander leaf, shallot, lemon juice, garlic, dried red chilli, lemongrass, salt, red chilli powder, makrut lime leaf, galangal, makrut lime peel, cumin. sweet chilli dip [water, sugar, distilled vinegar, modified maize starch, red chilli, salt, garlic powder, red bell pep"
+ },
+ {
+  "id": 408,
+  "persona": "emu_generic",
+  "query": "bell pepper chips",
+  "expected_code": "2005998094",
+  "source_id": "atar_600015558",
+  "oracle_text": "product: the product consists of mixed bell pepper crisps made from sliced red, green, and yellow peppers. the peppers are vacuum\u2011fried in rapeseed oil. the product is packaged in 2.0 lb bags, with six bags per carton.\r\n\r\nproduction process: fresh vegetables are tested for pesticide residues, washed under high-pressure water, and sliced. the slices are steam-disinfected, rapidly cooled, and individually quick frozen before being coated in a light tapioca starch solution to enhance crispness. the"
+ },
+ {
+  "id": 436,
+  "persona": "emu_ordinary",
+  "query": "vacuum fried onion crisps",
+  "expected_code": "2005998098",
+  "source_id": "atar_600015626",
+  "oracle_text": "product: the product consists of onion crisps made from white and purple onion slices. the onions are vacuum fried in rapeseed oil. the product is packaged in 2.0 lb bags, with six bags per carton.\r\n\r\nfresh onions are tested for pesticide residues, thoroughly washed, and sliced before undergoing steam disinfection and rapid cooling. the slices are then individually quick frozen and coated in a light tapioca starch solution to enhance crispiness during frying. they are vacuum\u2011fried at low tempera"
+ },
+ {
+  "id": 952,
+  "persona": "emu_specific",
+  "query": "smooth apple and strawberry puree in laminated 90g pouches",
+  "expected_code": "2007995099",
+  "source_id": "atar_600015678",
+  "oracle_text": "product: the product is a apple and strawberry puree snack. it is packaged in a box of 16x 90g pouches made from pet, aluminium, nylon and pe. the puree is made from apple, strawberry, apple juice concentrate, ascorbic acid, malic acid and flavouring. it is fully smooth with no chunks but is not homogenised. product is cooked to 95\u00b0c, cooled to 75\u00b0c and then filtered and put into pouches which are then sealed and then sterilised. it is not cooked in a vacuum. product has over 13% sugars but less"
+ },
+ {
+  "id": 151,
+  "persona": "naive_vague",
+  "query": "tomato sauce",
+  "expected_code": "2103909019",
+  "source_id": "atar_600015535",
+  "oracle_text": "product: a tomato based table sauce, with spices, used for human consumption and packaged in plastic squeeze bottle of 320g per unit.\r\ningredients: water, tomato paste, jaggery, sugar, salt, stabilisers: tapioca starch, stabilisers: xanthan gum, ginger, clove, red chilli, onion powder, garlic powder, cumin powder, black pepper, green cardamom, turmeric, nutmeg, cassia bark, acidity regulators: acetic acid, acidity regulators: citric acid, preservative: sodium benzoate.\n\nhmrc classification ratio"
+ },
+ {
+  "id": 148,
+  "persona": "naive_branded",
+  "query": "indian mango chilli chutney bottle",
+  "expected_code": "2103909089",
+  "source_id": "atar_600015534",
+  "oracle_text": "product: mango chilli chutney. \r\na flavourful condiment made primarily from mangoes and spiced with chilli and other spices. for human consumption and packaged in plastic squeeze bottle of 340g per unit.\r\ningredients: raw mango, sugar, water, salt, ginger, garlic, cumin powder, red chilli powder, dry mango powder, stabilisers: tapioca starch, xanthan gum, acidity regulator: citric acid, preservative: sodium benzoate.\n\nhmrc classification rationale: classification has been determined in accordanc"
+ },
+ {
+  "id": 697,
+  "persona": "naive_specific",
+  "query": "caffeinated gym drink powder in 500g tub",
+  "expected_code": "2106909849",
+  "source_id": "atar_600015484",
+  "oracle_text": "product: the product is a sports powder, intended for mixing with water, for human consumption, with the following ingredients: sucrose, maltodextrin, dextrose monohydrate, l-citrulline malate, beta alanine, fructose, glycine, potassium chloride, l-tyrosine, anti-caking agent, malic acid, flavouring, caffeine anhydrous, citric acid, vitamin c, vitamin b3, non-nutritive sweetener (sucralose, acesulfame-k), colourant. it is packaged in a 500g plastic container.\n\nhmrc justification: classification"
+ },
+ {
+  "id": 186,
+  "persona": "original",
+  "query": "product: a water and mineral solution. this is added to purified water. to be used with a water mineralizer system. available in 1l and 5l.\n\nhmrc justification: classification has been determined in accordance with the following: \r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013 \r\n\r\na. part",
+  "expected_code": "2201900000",
+  "source_id": "atar_600015563",
+  "oracle_text": "product: a water and mineral solution. this is added to purified water. to be used with a water mineralizer system. available in 1l and 5l.\n\nhmrc justification: classification has been determined in accordance with the following: \r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013 \r\n\r\na. part"
+ },
+ {
+  "id": 339,
+  "persona": "emu_generic",
+  "query": "denatured alcohol",
+  "expected_code": "2207200019",
+  "source_id": "atar_600015198",
+  "oracle_text": "product: bioethanol denatured alcohol\r\nit is packaged in 1 ltr bottles packed in cases of 12 bottles\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013 a. part two (goods classification table rules of inter"
+ },
+ {
+  "id": 2668,
+  "persona": "emu_ordinary",
+  "query": "turmeric horse supplement",
+  "expected_code": "2309909696",
+  "source_id": "atar_600015501",
+  "oracle_text": "product: the product is a complementary daily feed for equine use only. it is used to maintain general health and soundness in horses. it is made of turmeric and black pepper powder mix. it is packaged in 2 kg bags that are made from polyethylene\u00a0and\u00a0polyamide plastic.\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establis"
+ },
+ {
+  "id": 2735,
+  "persona": "emu_specific",
+  "query": "light peptide facial cream in 50ml glass bottle",
+  "expected_code": "3304990000",
+  "source_id": "atar_600015611",
+  "oracle_text": "product: face peptide cre\u0300me, to be gently applied to the face.\r\npackaged in a 50ml glass bottle.\r\ningredients: aqua, prunus armeniaca kernel oil, pentylene glycol, glyceryl stearate citrate, olus oil, glycerin, macadamia integrifolia seed oil, oenothera biennis oil, silica, cetearyl alcohol, xylityl glucosides, butyrospermum parkii butter, avena sativa kernel oil, anhydroxylitol, avena sativa kernel extract, hippophae rhamnoides fruit oil, palmitoyl grape seed extract, triolein, hydrogenated co"
+ },
+ {
+  "id": 2199,
+  "persona": "naive_vague",
+  "query": "face cleansing oil",
+  "expected_code": "3401300000",
+  "source_id": "atar_600015612",
+  "oracle_text": "product: a renewal oil to use and clean the skin that can also be used for makeup removal. \r\ningredients: helianthus annuus seed oil olus oil c9-12-isoalkanes acanthosicyos horridus seed oil avena sativa kernel oil caryodendron orinocense seed oil coco-caprylate/caprate glyceryl citrate/lactate/linoleate/oleate bakuchiol tocopheryl acetate tocopherol hippophae rhamnoides fruit oil beta-caryophyllene.\r\n\r\nput  up for retail sale in a 30ml glass bottle\n\nhmrc justification: classification has been d"
+ },
+ {
+  "id": 2176,
+  "persona": "naive_branded",
+  "query": "baby bottle dishwasher tablets",
+  "expected_code": "3402501000",
+  "source_id": "atar_600015470",
+  "oracle_text": "product: detergent tablets used to clean baby bottles within a washer steriliser dryer electrical unit. the tablets are added to unit prior to washing, in a similar way to dishwasher tablets. \r\ningredients: sodium percarbonate, sodium bicarbonate, sodium dodecyl sulfate, citric acid anhydrous, protease, sodium carboxymethyl cellulose, ethylenediaminetetraacetic, acid disodium salt, peg-6000, sodium benzoate.\r\npackaged in doypacks within a larger cardboard box.  \r\nput up for retail sale.\n\nhmrc ju"
+ },
+ {
+  "id": 2133,
+  "persona": "naive_specific",
+  "query": "150g white sticky putty for hanging pictures on walls",
+  "expected_code": "3506100000",
+  "source_id": "atar_600015380",
+  "oracle_text": "product: a 150g white tough tack. the package contains 2 x 75g packs of putty adhesive. ideal for mounting items on walls. suitable for use on glass, wood, metal (including aluminium), and other polished surfaces.\n\nhmrc justification: classification has been determined in accordance with the following: \r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3(1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rule"
+ },
+ {
+  "id": 2294,
+  "persona": "original",
+  "query": "product: a profile shape of polyethylene, measuring 4 cm in width with rounded edges and a consistent cross-section from one end to the other, used to connect continuous lengths of uniaxial geogrids in the principle strength direction. used in civil engineering.\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\n for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment)",
+  "expected_code": "3916100090",
+  "source_id": "atar_600015147",
+  "oracle_text": "product: a profile shape of polyethylene, measuring 4 cm in width with rounded edges and a consistent cross-section from one end to the other, used to connect continuous lengths of uniaxial geogrids in the principle strength direction. used in civil engineering.\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\n for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment)"
+ },
+ {
+  "id": 2775,
+  "persona": "emu_generic",
+  "query": "plastic tube",
+  "expected_code": "3917211090",
+  "source_id": "atar_600015153",
+  "oracle_text": "product: rigid polymer tube\r\nmaterial: polyethylene (high density)\r\nlength: 155 mm\r\nuse: to connect continuous lengths of uniaxial geogrid\n\nhmrc justification: classification has been determined in accordance with the following:- \r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013 a. part two (g"
+ },
+ {
+  "id": 2773,
+  "persona": "emu_ordinary",
+  "query": "polyurethane gel tape",
+  "expected_code": "3919108090",
+  "source_id": "atar_600015368",
+  "oracle_text": "product: 1m x 30mm nano gel double -sided clear tape.\r\npolyurethane gel, packaged in a blue box.\n\nhmrc justification: classification has been determined in accordance with the following:\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013\r\na. part two (goods classification table rules of interpre"
+ },
+ {
+  "id": 2804,
+  "persona": "emu_specific",
+  "query": "cool box with removable foam insulation and leather handle",
+  "expected_code": "3923109090",
+  "source_id": "atar_600015462",
+  "oracle_text": "product: a cool box designed for indoor and outdoor use. the item has 50 hrs chilling chilling capacity, with a 5 year warranty. the product has a shock absorbent abs plastic outer cabinet and an inner high performance removable and zero ozone-depleting foam insulation. the product has a leather handle.\n\nhmrc justification: classification has been determined in accordance with the following: \r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3"
+ },
+ {
+  "id": 27,
+  "persona": "naive_vague",
+  "query": "kids plastic cup",
+  "expected_code": "3924100090",
+  "source_id": "atar_600014923",
+  "oracle_text": "product: a plastic mug made from abs plastic, which is pink and red in colour. it has inscriptions on it stating \"ava\" and \"giggle monster\", with a face containing eyes and a mouth with three teeth (one on top, two on bottom) depicting a \"monster\" style face. there are two feet at the bottom of the mug, each with three toes coming off it, with black toenails designed in the shape of triangles. the mug can be personalised to replace the name at the top of the mug above the monster to whatever nam"
+ },
+ {
+  "id": 260,
+  "persona": "naive_branded",
+  "query": "45 litre kitchen pedal bin",
+  "expected_code": "3924900090",
+  "source_id": "atar_600015682",
+  "oracle_text": "product: pedal bin made of polypropylene with a flip up lid. available in yellow or grey, it is used to store domestic waste. \r\nthe item has 45 litre capacity. \r\nsize: 41cm x 39.8 x 60 cm. \r\nthe item is packaged in cardboard box by three items in a box, each item is packaged in plastic bag; sold to retail and janitorial markets.\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\nfor the purposes of determining the commodity codes within which goods most"
+ },
+ {
+  "id": 45,
+  "persona": "naive_specific",
+  "query": "polypropylene paving grid mesh with fabric backing",
+  "expected_code": "3926909790",
+  "source_id": "atar_600015150",
+  "oracle_text": "product: plastic bioxial geogrid mesh \r\npolypropylene sheet which has been punched and drawn into a square grid/mesh, (61-65mm between each rib of the grid. each rib minimum of 4mm wide), with raised moulded nodes. grid is bonded to a non-woven polypropylene paving fabric\r\nuse: in civil engineering\n\nhmrc justification: classification has been determined in accordance with the following:- \r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) o"
+ },
+ {
+  "id": 6,
+  "persona": "original",
+  "query": "product: the product is a rubber bellow, a component for a mechanical seal assembly. the black moulded elastomer forms the secondary sealing interface between the mechanical seal assembly and the equipment being sealed. \r\n\r\nthe bellow (without the metal spring) is manufactured from nitrile butadiene rubber (nbr) a vulcanised synthetic fluoroelastomer copolymer.  each nbr moulded part is manufactured by compression moulding and is custom designed for its specific mechanical seal application. the",
+  "expected_code": "4016999790",
+  "source_id": "atar_600014701",
+  "oracle_text": "product: the product is a rubber bellow, a component for a mechanical seal assembly. the black moulded elastomer forms the secondary sealing interface between the mechanical seal assembly and the equipment being sealed. \r\n\r\nthe bellow (without the metal spring) is manufactured from nitrile butadiene rubber (nbr) a vulcanised synthetic fluoroelastomer copolymer.  each nbr moulded part is manufactured by compression moulding and is custom designed for its specific mechanical seal application. the"
+ },
+ {
+  "id": 2817,
+  "persona": "emu_generic",
+  "query": "carry case",
+  "expected_code": "4202921900",
+  "source_id": "atar_600015427",
+  "oracle_text": "product: rucksack\r\nmaterials: polyester with coating of pu on outer surface\r\ninternal gusset with draw cord closure\r\nbuckle down lid\r\nzipped pockets\r\nexternal water bottle pockets\r\nshoulder straps\r\ngrab handle at rear\r\ncapacity: 20 litres\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020"
+ },
+ {
+  "id": 2680,
+  "persona": "emu_ordinary",
+  "query": "padded handheld console case",
+  "expected_code": "4202929890",
+  "source_id": "atar_600015035",
+  "oracle_text": "product: the product is a zip\u2011up case designed to securely store a gaming console for portable use. it includes a lift strap to assist with removal and an internal velcro pouch for storage. the outer surface of the case is made from woven grey polyester (90%) and black polyurethane (pu) leatherette (10%). the zip, mesh netting and lining are made of polyester, with nylon, eva foam padding on the interior and a red rubber handle. the product is packaged with a cardboard sleeve.\r\n\r\nmanufacturing p"
+ },
+ {
+  "id": 2765,
+  "persona": "emu_specific",
+  "query": "pack of 300 bamboo skewers 10 cm in plastic bag",
+  "expected_code": "4421910000",
+  "source_id": "atar_600015378",
+  "oracle_text": "product: 300pc bamboo skewers.\r\nthey are 10cm in size, 2mm wide and are natural in colour. \r\ncan be used for canapes, chocolate fountains, cheeseboards and much more.\r\nsuitable for family dinners, parties, gatherings and all things bbq...\r\nthey come in a polypropylene bag with an insert card and headed card.\n\nhmrc justification: classification has been determined in accordance with the following: \r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall,"
+ },
+ {
+  "id": 2243,
+  "persona": "naive_vague",
+  "query": "clothes pegs",
+  "expected_code": "4421999999",
+  "source_id": "atar_600015373",
+  "oracle_text": "product: 24 wooden clothes pegs\r\nmade of pinewood with a coil spring for firm grip\r\n72 x 9 x 13mm approx.\r\npackaged in a plastic bag with a cardboard hanging tab\n\nhmrc justification: classification has been determined in accordance with the following: \r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs\r\ntariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following hav"
+ },
+ {
+  "id": 2224,
+  "persona": "naive_branded",
+  "query": "silver cake drum and box",
+  "expected_code": "4819200000",
+  "source_id": "atar_600015401",
+  "oracle_text": "product: an 14\" round silver cake board and tall box.\r\nthese are perfect for all types of baking. ideal to use for an 8\" cake.\r\n\r\n14\" cake box\r\nround cake board -  14\" 12mm thick silver board\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation co"
+ },
+ {
+  "id": 137,
+  "persona": "naive_specific",
+  "query": "small plastic covered album for 36 photos",
+  "expected_code": "4820500000",
+  "source_id": "atar_600015482",
+  "oracle_text": "product: the product is a mini photo album designed to hold and display 36 photographs. the album has a  paperboard cover/structure, incorporating a polyurethane (pu) foam padding layer, and is fully wrapped in an outer covering of polyvinyl chloride (pvc). the internal clear plastic pages are made of polypropylene (pp) with black centre sheets of polypropylene (pp). the packaging containing 72 units per outer carton. the album is intended for the storage, protection and display of printed photo"
+ },
+ {
+  "id": 2166,
+  "persona": "original",
+  "query": "product: food service product (food packaging) pot: 13g pe coated + 210gsm white paper + 15g pe coated lid:\r\npp lid is applied to pot to provide secure packaging of take away type food. \r\nalso maintains short-term freshness of the food and it's heat, (if hot product e.g. gravy, curry sauce at a fish and chip shop). \r\nfor 4oz, 50 pcs lid/bag, 25 pcs pot/bag in a box. lid and pot stand side by side. for 7oz, 25 pcs lid/bag, 25 pcs pot/bag in a box. pot at the bottom, lid on the top\n\nhmrc justifica",
+  "expected_code": "4823699000",
+  "source_id": "atar_600015717",
+  "oracle_text": "product: food service product (food packaging) pot: 13g pe coated + 210gsm white paper + 15g pe coated lid:\r\npp lid is applied to pot to provide secure packaging of take away type food. \r\nalso maintains short-term freshness of the food and it's heat, (if hot product e.g. gravy, curry sauce at a fish and chip shop). \r\nfor 4oz, 50 pcs lid/bag, 25 pcs pot/bag in a box. lid and pot stand side by side. for 7oz, 25 pcs lid/bag, 25 pcs pot/bag in a box. pot at the bottom, lid on the top\n\nhmrc justifica"
+ },
+ {
+  "id": 2766,
+  "persona": "emu_generic",
+  "query": "party invitations",
+  "expected_code": "4909000000",
+  "source_id": "atar_600015372",
+  "oracle_text": "product: 16pk party invites set \r\nlets party invites include -\r\n16x invites\r\n16x white envelopes\r\nsize -15cm x 10cm\n\nhmrc justification: classification has been determined in accordance with the following:-\r\n\r\nfor the purposes of determining the commodity codes within which\r\ngoods most appropriately fall, reg 3 (1) of the customs tariff\r\n(establishment) (eu exit) regulations 2020 sets out that the rules of\r\ninterpretation contained in the following have effect \u2013\r\n\r\na. part two (goods classificat"
+ },
+ {
+  "id": 2812,
+  "persona": "emu_ordinary",
+  "query": "printed plastic road sign",
+  "expected_code": "4911990000",
+  "source_id": "atar_600015340",
+  "oracle_text": "product: various road traffic signs 1050mm x 750mm, use silk printing to apply ink via a mesh stencil and squeegee. \r\nthey are made from 50% recycled abs plastic and 750mm50% virgin hdpe material.\r\nsilk screen printing produces crisp, vibrant images that remain clear over time, making them highly visible to road users. the blend of recycled abs and virgin hdpe gives the signs strength while promoting sustainability and environmental responsibility. \r\ntypically, these signs are used for regulator"
+ },
+ {
+  "id": 2762,
+  "persona": "emu_specific",
+  "query": "3-pack twisted natural jute yarn 40m each single ply",
+  "expected_code": "5307100000",
+  "source_id": "atar_600015376",
+  "oracle_text": "product: 3pk natural twisted jute yarn (3 x 40m), 1 ply. weight per ball 30g. put up for retail sale and packaged in plastic.\r\n 7,500 dtex\n\nhmrc justification: classification has been determined in accordance with the following:\r\n  \r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3(1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013  \r\na part two"
+ },
+ {
+  "id": 175,
+  "persona": "naive_vague",
+  "query": "craft flowers",
+  "expected_code": "5602101900",
+  "source_id": "atar_600015554",
+  "oracle_text": "product: the pack contains 250 felt flowers in assorted colours, intended for arts and crafts used by children aged 3 years and above. the needleloom felt is made from polyester and measures approximately 2.54 cm \u00d7 2.54 cm \u00d7 1 mm. the  felt flowers are packaged in a plastic polybag.\r\n\r\nthe manufacturing process includes cutting, stamping, laminating/assembly, and packaging.\n\nhmrc justification: classification has been determined in accordance with the following: \r\n\r\nfor the purposes of determini"
+ },
+ {
+  "id": 576,
+  "persona": "naive_branded",
+  "query": "string mop refill head",
+  "expected_code": "5609000000",
+  "source_id": "atar_600015527",
+  "oracle_text": "product: twine mop head\r\nmaterials: cotton 85% and polyester 15%\r\nit does not have any attachment to attach the mop head to the handle\r\nmeasures 820-890mm\r\nproduct will be packed 30 items per carton\n\nhmrc justification: classification has been determined in accordance with the following:\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretati"
+ },
+ {
+  "id": 233,
+  "persona": "naive_specific",
+  "query": "mixed colour polyester ribbon rolls for crafts",
+  "expected_code": "5806321000",
+  "source_id": "atar_600015636",
+  "oracle_text": "product: a pack of assorted polyester woven ribbons. they can be used for crafting projects.\r\n\r\neach pack contains various ribbons measuring 6 mm x 1 m & 12 mm x 1 m, totalling 100 g in weight.  the ribbons are of different colours.  for ages 3 years plus.\r\n\r\nthe packs measure 200 mm x 150 mm x 50 mm, 60 packs are packaged together within a case.\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within w"
+ },
+ {
+  "id": 2290,
+  "persona": "original",
+  "query": "product: polyester geotextile\r\nmaterials: high tenacity polyester manufactured using the weft insertion process\r\nthe load bearing yarns are laid across one another and then stitch bonded\r\nuse: for technical use in the reinforcement of soil in the construction of structures such as embankments \r\npackaging: on rolls\n\nhmrc justification: classification has been determined in accordance with the following:- \r\nfor the purposes of determining the commodity codes within which goods most appropriately f",
+  "expected_code": "5911909990",
+  "source_id": "atar_600015148",
+  "oracle_text": "product: polyester geotextile\r\nmaterials: high tenacity polyester manufactured using the weft insertion process\r\nthe load bearing yarns are laid across one another and then stitch bonded\r\nuse: for technical use in the reinforcement of soil in the construction of structures such as embankments \r\npackaging: on rolls\n\nhmrc justification: classification has been determined in accordance with the following:- \r\nfor the purposes of determining the commodity codes within which goods most appropriately f"
+ },
+ {
+  "id": 438,
+  "persona": "emu_generic",
+  "query": "polyester lace",
+  "expected_code": "6003301000",
+  "source_id": "atar_600015635",
+  "oracle_text": "product: a pack of assorted multi-coloured polyester lace used for crafting activities.\r\n\r\nthe strips of lace vary in textures, designs & colours. the lace strips are less than 30 cm in width and are approximately 5 m in length.  they are manufactured using a raschel warp knitting machine.  for ages 3 years plus.\r\n\r\neach pack contains 10 x 5 m strips.\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes wit"
+ },
+ {
+  "id": 2815,
+  "persona": "emu_ordinary",
+  "query": "neoprene wetsuit",
+  "expected_code": "6113001000",
+  "source_id": "atar_600014875",
+  "oracle_text": "product: wetsuit\r\nmade up of neoprene rubber covered on both sides with a knitted textile\r\nmaterials: neoprene 65-70% and textile 30-35%\r\ncovers torso, arms and legs\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following hav"
+ },
+ {
+  "id": 2702,
+  "persona": "emu_specific",
+  "query": "men's knitted polyester zip jacket, polyurethane coated, ribbed hem",
+  "expected_code": "6113009000",
+  "source_id": "atar_600015559",
+  "oracle_text": "product: men's jacket\r\nmaterials: knitted polyester, coated on one side with polyurethane.  woven polyester inner lining\r\nribbed cuffs and waistband\r\n2 patch pockets at front above waistband\r\nzip fastening\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of inter"
+ },
+ {
+  "id": 2207,
+  "persona": "naive_vague",
+  "query": "baby sleeping bag",
+  "expected_code": "6114200000",
+  "source_id": "atar_600015560",
+  "oracle_text": "product: toddler sleep bag.\r\nit is made from soft cotton jersey knit, elastane, recycled polyester.\r\nit has metal poppers on the shoulders and a plastic zip fastening. the filling is 1.5 tog. \r\nmeasurements: length from centre back neck to bottom edge is 94.5cm and max body height is 92cm which is 18/24mths.\r\nput up for retail sale.\n\nhmrc justification: classification has been determined in accordance with the following:\r\nfor the purposes of determining the commodity codes within which goods mos"
+ },
+ {
+  "id": 32,
+  "persona": "naive_branded",
+  "query": "orange print hair scrunchies",
+  "expected_code": "6217100090",
+  "source_id": "atar_600014924",
+  "oracle_text": "product: the scrunchie is a woven hair accessory made from polyester with a cotton stitching thread, with an inside made from rubber and spandex. it is blue and orange in colour and is primarily used to fasten medium to long length hair, while doubling as a fashion item. there are 3 scrunchies which are light blue, darker blue and orange in colour. packaged with a backing card made of foil matt laminated paper. there are patterns of oranges, stars and text decorating the scrunchies on the outsid"
+ },
+ {
+  "id": 2281,
+  "persona": "naive_specific",
+  "query": "cotton baby towel with hood and lion ears",
+  "expected_code": "6302600090",
+  "source_id": "atar_600015481",
+  "oracle_text": "product: a baby towel with hood. this is decorated with an embroidered lion face and 3d ears. the towel is made from cotton.\r\nsize l76cm x w76cm. packed in a polybag\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3(1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following ha"
+ },
+ {
+  "id": 578,
+  "persona": "original",
+  "query": "product: these bags are designed for the storage and transportation of bulk materials such as sand, stone, pebbles, grains, fertilizers, and various other industrial products. they are manufactured from woven polypropylene (pp) fabric, ensuring strength and durability. the bag has a capicity of holding 1000 kg. the bags are supplied in empty condition and are folded and packed into woven polypropylene (pp) plastic fabric bales, with each bale containing approximately 200 to 300 bags.\n\nhmrc justi",
+  "expected_code": "6305321900",
+  "source_id": "atar_600015639",
+  "oracle_text": "product: these bags are designed for the storage and transportation of bulk materials such as sand, stone, pebbles, grains, fertilizers, and various other industrial products. they are manufactured from woven polypropylene (pp) fabric, ensuring strength and durability. the bag has a capicity of holding 1000 kg. the bags are supplied in empty condition and are folded and packed into woven polypropylene (pp) plastic fabric bales, with each bale containing approximately 200 to 300 bags.\n\nhmrc justi"
+ },
+ {
+  "id": 2718,
+  "persona": "emu_generic",
+  "query": "portable garage",
+  "expected_code": "6306220000",
+  "source_id": "atar_600015296",
+  "oracle_text": "product: heavy-duty freestanding instant garage/workshop which is supplied as a complete kit for on-site assembly. it can be dismantled and relocated. consists of a tubular steel frame structure with a tough triple-layer, waterproof, woven polyethylene fabric cover in dark green, which has been fully uv treated, incorporating fade blockers, anti-fungal and anti-yellowing agents to provide protection against sun and rain. supplied with hardware, joint supports and heavy-duty ground anchors. \r\ndim"
+ },
+ {
+  "id": 460,
+  "persona": "emu_ordinary",
+  "query": "microfibre cleaning cloth 38 cm square",
+  "expected_code": "6307101000",
+  "source_id": "atar_600015668",
+  "oracle_text": "product: microfiber cleaning cloths made from knitted textile, loop pile. \r\nmeasuring 38cm x 38cm and manufactured in 5 colours (green, red, yellow, white and blue). weighting 280 gsm. overlocked on all sides. made from polyester and polyamide. \r\n40 items packed in a plastic bag. 400 items packed in a cardboard box.\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately"
+ },
+ {
+  "id": 1498,
+  "persona": "emu_specific",
+  "query": "white reusable non-woven mop head with central band",
+  "expected_code": "6307103000",
+  "source_id": "atar_600015512",
+  "oracle_text": "product: a non-woven textile mop head designed for use with a compatible mop handle or holder, which is not included. product is made from a highly absorbent, white synthetic non-woven cloth composed of viscose and polyester fabric strips with a central band. the mop head weighs between 40 and 60 gsm and is suitable for cleaning floors in both retail and janitorial settings. product is reusable and available in two sizes.\n\nhmrc justification: classification has been determined in accordance with"
+ },
+ {
+  "id": 559,
+  "persona": "naive_vague",
+  "query": "mop cloth",
+  "expected_code": "6307109090",
+  "source_id": "atar_600015435",
+  "oracle_text": "product: woven microfibre mop cloth\r\nmaterials: polyester and polyamide\r\nback of cloth is fleece velcro\r\nuse: as an attachment to a mop head for cleaning floors\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have e"
+ },
+ {
+  "id": 224,
+  "persona": "naive_branded",
+  "query": "kids colourful craft feathers pack",
+  "expected_code": "6701000000",
+  "source_id": "atar_600015634",
+  "oracle_text": "product: an assorted pack of approximately 500 speckled feathers used for crafting activities.\r\n\r\nthe feathers are brightly coloured; they are approximately 5-10 cm in length.  suitable for ages 3 years plus.\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of in"
+ },
+ {
+  "id": 57,
+  "persona": "naive_specific",
+  "query": "spicy ramen set with ceramic bowl and chopsticks",
+  "expected_code": "6912002310",
+  "source_id": "atar_600015174",
+  "oracle_text": "product: ramen gift set that contains 2 sets. each set contains nongshim shin spicy ramen, furikake seasoning, wasabi flavour soy sauce, honey ginger flavour hot sauce, ceramic stoneware bowl and chopsticks. the nongshim shin spicy ramen contains the following ingredients: noodles (wheat flour, potato starch, palm oil, salt, acidity regulators (e501, e500, e339), antioxidant (e306), seasoning (yeast extract, soybean, garlic, wheat starch), colour (e101). soup powder seasoning [hydrolysed vegetab"
+ },
+ {
+  "id": 50,
+  "persona": "original",
+  "query": "product: glass filaments stitched onto a nonwoven polypropylene paving fabric in a grid structure longitudinal and transverse directions with polyester yarn grey and silver in colour roll lengths are of either 1.0,1.5,2.0 and 3.0 metres. weight is 280 grams per square metre mesh size 40 x 40 mm. it is used in the reinforcement of asphalt of new and existing pavements\n\nhmrc justification: classification has been determined in accordance with the following:\r\nfor the purposes of determining the com",
+  "expected_code": "7019900085",
+  "source_id": "atar_600015155",
+  "oracle_text": "product: glass filaments stitched onto a nonwoven polypropylene paving fabric in a grid structure longitudinal and transverse directions with polyester yarn grey and silver in colour roll lengths are of either 1.0,1.5,2.0 and 3.0 metres. weight is 280 grams per square metre mesh size 40 x 40 mm. it is used in the reinforcement of asphalt of new and existing pavements\n\nhmrc justification: classification has been determined in accordance with the following:\r\nfor the purposes of determining the com"
+ },
+ {
+  "id": 2745,
+  "persona": "emu_generic",
+  "query": "gold bar",
+  "expected_code": "7108120000",
+  "source_id": "atar_600015428",
+  "oracle_text": "product: gold bars\r\n\r\n1 kg denominations. unwrought. tanzanian origin. approximately 96% purity. \r\n\r\nthe gold has not been further worked or processed (such as rolled, drawn, or continuously cast).\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretat"
+ },
+ {
+  "id": 2752,
+  "persona": "emu_ordinary",
+  "query": "party pin badge with ribbon rosette",
+  "expected_code": "7117190090",
+  "source_id": "atar_600015383",
+  "oracle_text": "product: badge and rosette set\r\nthe badge and rosette comes in 2 different colours and suitable for parties and more. \r\nthe pin behind the badge/ rosette just needs to be attached to any piece of clothing or any item of choice.\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out"
+ },
+ {
+  "id": 311,
+  "persona": "emu_specific",
+  "query": "personalised recycled plastic bracelet with chrome-plated brass connector, leather band",
+  "expected_code": "7117900000",
+  "source_id": "atar_600014921",
+  "oracle_text": "product: a personalised bracelet made from recycled plastics, 40% polyester, 18% polyurethane (pre-consumer), 37% polyurethane and 5% calcium carbonate. there is a brass metal, plated with chromium connecting the bracelet with a leather band inside to layer the bracelet together. there are ties made of kraft paper and iron securing the bracelet to the kraft box. the box measures 94.5 mm width, 94.5 mm height and 14.5 mm in diameter, with an acrylic glue dot to secure the lid and base together in"
+ },
+ {
+  "id": 2171,
+  "persona": "naive_vague",
+  "query": "metal sheet",
+  "expected_code": "7210300090",
+  "source_id": "atar_600015613",
+  "oracle_text": "product: the electro galvanised steel sheet is embossed with a 6wl pattern into it to create a pattern effect on the material. this is primarily used for decorative purposes or high end kitchens as it has anti slip purposes due to the indentation caused by embossing the material. \r\nthe base material is galvanised steel sheet and then the pattern is rolled and pressed onto the material to create the indented pattern. it is then flattened and palletised for transportation.\r\nthe product is rectangu"
+ },
+ {
+  "id": 2164,
+  "persona": "naive_branded",
+  "query": "magnelis style galvanized steel coil",
+  "expected_code": "7210490030",
+  "source_id": "atar_600015303",
+  "oracle_text": "product: a flat-rolled non-alloyed steel strip coated on both sides with a zinc-magnesium-aluminium alloy layer by continuous hot-dip coating that complies with the bs en10346 +zinc-magnesium products. the coated strip is cooled, chemically passivated, optionally oiled, and wound into coils. the coating composition typically contains usually over 92% zinc, with the balance being aluminium and magnesium. \r\n\r\nthe steel strip is supplied in coils with a uniform rectangular cross section.\r\n\r\nthe coi"
+ },
+ {
+  "id": 2121,
+  "persona": "naive_specific",
+  "query": "1.6mm carbon steel wire for bed springs",
+  "expected_code": "7213917000",
+  "source_id": "atar_600014976",
+  "oracle_text": "product: this 1.6 mm steel wire rod is made from grade 1040 medium-carbon steel and features a bright finish without any phosphate coating. it comes in light pockets, which means the wire is wound into coils, offering a tensile strength between 1800 and 2000 n/mm\u00b2 and a minimum torsion of 33 turns. designed specifically for bed spring manufacturing, each package weighs between 900 and 1000 kg. when imported, the wire arrives as a wound coil.\n\nhmrc justification: classification has been determine"
+ },
+ {
+  "id": 2114,
+  "persona": "original",
+  "query": "product: this 1.9 mm steel wire rod is manufactured from grade 1100 medium-carbon steel and features a bright finish without any phosphate coating. it comes in light pockets, which means the wire is wound into coils, offering a tensile strength between 1800 and 2000 n/mm\u00b2 and a minimum torsion of 33 turns. designed specifically for bed spring manufacturing, each package weighs between 900 and 1000 kg. when imported, the wire arrives as a wound coil.\n\nhmrc justification: classification has been d",
+  "expected_code": "7213919000",
+  "source_id": "atar_600014977",
+  "oracle_text": "product: this 1.9 mm steel wire rod is manufactured from grade 1100 medium-carbon steel and features a bright finish without any phosphate coating. it comes in light pockets, which means the wire is wound into coils, offering a tensile strength between 1800 and 2000 n/mm\u00b2 and a minimum torsion of 33 turns. designed specifically for bed spring manufacturing, each package weighs between 900 and 1000 kg. when imported, the wire arrives as a wound coil.\n\nhmrc justification: classification has been d"
+ },
+ {
+  "id": 294,
+  "persona": "emu_generic",
+  "query": "steel bar",
+  "expected_code": "7224900700",
+  "source_id": "atar_600014944",
+  "oracle_text": "product: a semi-finished round cornered square steel bar with a cross-section throughout its length. \r\nsizes ranging from 95mm square up to 250.7mm square \r\n\r\nthe main molten steel production methods include:\r\nmelting raw materials using either an electric arc furnace or basic oxygen furnace\r\nladle furnace refining\r\nvacuum degassing\r\nchemical adjustments in the tundish\r\nafter this stage, the steel solidifies through two different methods:\r\n\r\ncontinuous casting into oscillating moulds to produce"
+ },
+ {
+  "id": 448,
+  "persona": "emu_ordinary",
+  "query": "stainless steel pipe coupling",
+  "expected_code": "7307291090",
+  "source_id": "atar_600015655",
+  "oracle_text": "product: the bsp unions m/f are used as a threaded connection, it is made from stainless steel. these can be made by either casing or from pipe. these are threaded fittings and are connected by threading one product into the other. the couplings have a female thread and a male thread, fitting is screwed into the coupling. the size range of the couplings are 1/4 inch to 4 inches. packaged: these are supplied in boxes. depending on the size, the packages can be from 5 pcs to 100 pcs.\n\nhmrc justifi"
+ },
+ {
+  "id": 2723,
+  "persona": "emu_specific",
+  "query": "steel cable ladder with 150 mm side rails and welded rungs",
+  "expected_code": "7308909890",
+  "source_id": "atar_600015362",
+  "oracle_text": "product: the unistrut u15 extra heavy duty cable ladder is a structural steel cable management component designed to support and route electrical or communications cables in fixed installations. \r\nthe u15 series is characterised by 150 mm high side rails with welded transverse rungs forming an open ladder-type structure. \r\nthe ladder provides mechanical support for cable runs and allows cables to be laid across the rungs and secured as required. \r\nthe u15 range is classified as extra heavy duty,"
+ },
+ {
+  "id": 211,
+  "persona": "naive_vague",
+  "query": "plant pot hanger",
+  "expected_code": "7312102000",
+  "source_id": "atar_600015589",
+  "oracle_text": "product: stainless steel plant support device\r\n\r\na reusable plant support device designed to suspend plant pots and containers in indoor and outdoor environments. the product is used in gardening and home d\u00e9cor applications to suspend plant pots and baskets from overhead supports. \r\n\r\nthe product is constructed from stainless steel wire formed into an adjustable support configuration and is used to replace plastic hanging supports commonly supplied with plant pots. the product functions as a loa"
+ },
+ {
+  "id": 4,
+  "persona": "naive_branded",
+  "query": "stainless pump seal face",
+  "expected_code": "7326909290",
+  "source_id": "atar_600014698",
+  "oracle_text": "product: the product is a stainless steel mechanical seal face and is one of the two seal faces in a mechanical seal assembly. the stainless steel seal faces are machined from commercially available steel alloys using cnc or manual machining processes and undergo electropolishing.\r\n\r\nthe seal is open - die forged and each seal face is custom made to precise specifications and combined with other mechanical seal elements and used solely for specific mechanical seals in industrial rotary applicati"
+ },
+ {
+  "id": 69,
+  "persona": "naive_specific",
+  "query": "metal wall pegboard with hooks and plastic bins",
+  "expected_code": "7326909890",
+  "source_id": "atar_600015207",
+  "oracle_text": "product: the product is a steel wall mounted pegboard for storing and organising tools used in workshops, garages or industrial settings.  the mechanically perforated pegboard panels are made from spcc cold-rolled steel sheets.  also provided with the pegboard are steel metal hooks and tool-holder set for use with spanners, screwdrivers, pillars etc and removable plastic storage bins for small parts such as screw, nuts, bolts etc.  hooks, tool holders and bins can be inserted into the slots and"
+ },
+ {
+  "id": 98,
+  "persona": "original",
+  "query": "product: the product is black aluminium bankcard wallet which is rfid protected and used for storing payment cards and to prevent them from bending. there is a mechanism on the bottom that allows you to slide out the cards ready to be used. this item can be put in a pocket or bag.\n\nhmrc classification rationale: classification has been determined in accordance with the following: \r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the",
+  "expected_code": "7616999099",
+  "source_id": "atar_600015366",
+  "oracle_text": "product: the product is black aluminium bankcard wallet which is rfid protected and used for storing payment cards and to prevent them from bending. there is a mechanism on the bottom that allows you to slide out the cards ready to be used. this item can be put in a pocket or bag.\n\nhmrc classification rationale: classification has been determined in accordance with the following: \r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the"
+ },
+ {
+  "id": 417,
+  "persona": "emu_generic",
+  "query": "children's garden tools",
+  "expected_code": "8201900000",
+  "source_id": "atar_600015566",
+  "oracle_text": "product: miniature gardening tool set consisting of a trowel, hand fork and hand rake, put up as a 3-piece pack. \r\ntools made from painted iron in red, yellow and blue with a wooden handle and a red chord wrist strap attached to each.  \r\n\r\nsizes:\r\ntrowel: 20cm \r\nhand fork: 20cm \r\nrake: 18.5cm\r\n\r\npackaging: individual packs measuring 260x120x40mm, with 48 packs per case. \r\nsuitable for children aged 3 years +\n\nhmrc justification: classification has been determined in accordance with the following"
+ },
+ {
+  "id": 2755,
+  "persona": "emu_ordinary",
+  "query": "metal hole punch",
+  "expected_code": "8203400000",
+  "source_id": "atar_600015381",
+  "oracle_text": "product: metal hole punch with metal clip\r\nhole dia 633 \r\nthe hole puncher can perforate a single sheet or multiple sheets of paper at one time\n\nhmrc justification: classification has been determined in accordance with the following:-\r\n\r\nfor the purposes of determining the commodity codes within which\r\ngoods most appropriately fall, reg 3 (1) of the customs tariff\r\n(establishment) (eu exit) regulations 2020 sets out that the rules of\r\ninterpretation contained in the following have effect \u2013\r\n\r\na."
+ },
+ {
+  "id": 299,
+  "persona": "emu_specific",
+  "query": "powder coated steel server rack rails with square cage-nut holes",
+  "expected_code": "8302420090",
+  "source_id": "atar_600015072",
+  "oracle_text": "product: black powder coated rack rails, typically manufactured from carbon steel, with standardised rack unit (u) hole spacing in accordance with the 19 inch rack format. holes may be square for cage nuts or pre tapped threaded holes for screw fixing.\r\nthey are mounting racking components, designed for permanent installation in standard 19 inch server and equipment racks. they provide vertical and horizontal fixing points to support and position rack mounted equipment.\r\nused to secure rack moun"
+ },
+ {
+  "id": 95,
+  "persona": "naive_vague",
+  "query": "portable crane",
+  "expected_code": "8425190000",
+  "source_id": "atar_600015361",
+  "oracle_text": "product: portable lightweight and quick assembly lifting davit arm with 360 degree rotation and built-in hand winch. it has a 125kg to 500kg lifting capacity, and is not self propelled. the safety lifting davit is a device designed to assist with lifting and lowering equipment safely in industrial and construction settings. it is constructed from high-strength, corrosion-resistant materials and includes safety locking mechanisms to reduce the risk of accidental load release or tipping. its desig"
+ },
+ {
+  "id": 664,
+  "persona": "naive_branded",
+  "query": "commercial veg prep machine",
+  "expected_code": "8438600000",
+  "source_id": "atar_600015696",
+  "oracle_text": "product: the item is a vegetable preparation machine for professional use. the appliance is made from metal and designed for processing large volumes of fruit and vegetables quickly in commercial environments including restaurants, institutions, delicatessens, and catering establishments.\r\n\r\nequipped with a single speed 550w induction motor, the processor has a capacity of over two litres and can process up to 250 kg of produce per hour. the extra-large hopper processes multiple vegetables and b"
+ },
+ {
+  "id": 2161,
+  "persona": "naive_specific",
+  "query": "stackable lithium home battery with inverter for night tariffs",
+  "expected_code": "8507600090",
+  "source_id": "atar_600015493",
+  "oracle_text": "product: a modular, stackable residential energy storage system\r\n\r\none inverter module multiple 5 kwh lithium iron phosphate (lifepo4) battery modules that are stacked vertically on site (1 to 6 modules, giving 5\u201330 kwh nominal capacity) a separate connection hub (ac combiner and protection unit) the complete system is supplied as separate modules and assembled on site by stacking the battery modules on a wheeled base and placing the inverter module on top\r\n\r\nhow it works: the primary function i"
+ },
+ {
+  "id": 2274,
+  "persona": "original",
+  "query": "product: a self contained hand washing unit intended for use in vehicles and mobile work environments where there is no permanent water supply. it incorporates an integrated water reservoir, a 12 volt electrically driven pump and hot and cold taps to deliver water on demand. the unit is designed to operate from a vehicle electrical system and is typically installed in commercial vehicles, workshops, or service vans. it provides a means of basic hand hygiene where mains water is not available and",
+  "expected_code": "8516108090",
+  "source_id": "atar_600015667",
+  "oracle_text": "product: a self contained hand washing unit intended for use in vehicles and mobile work environments where there is no permanent water supply. it incorporates an integrated water reservoir, a 12 volt electrically driven pump and hot and cold taps to deliver water on demand. the unit is designed to operate from a vehicle electrical system and is typically installed in commercial vehicles, workshops, or service vans. it provides a means of basic hand hygiene where mains water is not available and"
+ },
+ {
+  "id": 2805,
+  "persona": "emu_generic",
+  "query": "plastic bowl",
+  "expected_code": "8516900099",
+  "source_id": "atar_600015346",
+  "oracle_text": "product: a blue injection moulded round plastic bowl with convex base manufactured for use with a water heating and handwashing appliance. it is placed in the recess of the unit where it can be filled with hot and/or cold water and used for washing. the bowl cannot be used when placed on a surface such as a worktop or floor as the convex bottom will prevent it from remaining completely upright\n\nhmrc justification: classification has been determined in accordance with the following:\r\nfor the purp"
+ },
+ {
+  "id": 2782,
+  "persona": "emu_ordinary",
+  "query": "wearable bluetooth sensor ring",
+  "expected_code": "8517620000",
+  "source_id": "atar_600015485",
+  "oracle_text": "product: a bluetooth low energy (ble 5.0) communication device designed to function as part of a wireless data transmission system. the device (ring) is composed of a titanium housing, internal printed circuit board, semiconductor components, integrated antenna, sensors, and a rechargeable battery. the device incorporates a bluetooth radio, integrated antenna, onboard processor, and sensor inputs enabling continuous operation and connectivity. it is designed to be worn continuously on the finger"
+ },
+ {
+  "id": 386,
+  "persona": "emu_specific",
+  "query": "liquid crystal display bonded to laminated glass electromagnetic interference shield",
+  "expected_code": "8524910000",
+  "source_id": "atar_600015510",
+  "oracle_text": "product: lcd flat panel display\r\n\r\nthe product is an lcd flat panel display; this is bonded to a laminated emi shield cover of glass to protect from electromagnetic interference. to display of information designed to be incorporated into other articles in a wide variety of applications. \r\n\r\nthis item is not equipped with components to convert video signals. this display does not contain drivers but does contain control circuits.\n\nhmrc justification: classification has been determined in accordan"
+ },
+ {
+  "id": 167,
+  "persona": "naive_vague",
+  "query": "security camera",
+  "expected_code": "8525890000",
+  "source_id": "atar_600015547",
+  "oracle_text": "product: the product is an industrial iot (internet of things) based imaging device designed to operate in conjunction with a sensor, capturing still images and/or video only when triggered by a detection event. it does not function as a standalone camera and operates exclusively as part of a wider detection and verification system used in industrial and infrastructure environments. \r\n\r\nthe unit is used to provide visual confirmation of sensor detected events, including pedestrian detection, and"
+ },
+ {
+  "id": 240,
+  "persona": "naive_branded",
+  "query": "jet cockpit flight display screen",
+  "expected_code": "8528490000",
+  "source_id": "atar_600015659",
+  "oracle_text": "product: a display monitor for installation into the cockpit of various business jet and turboprop based aircraft as an electronic flight instrument system. it is used for generating symbols and flight navigation information to assist cabin crew during flight. the unit uses a cathode ray tube to display imagery and has a screen size of 8\u201d x 7\u201d, 16 colours.\n\nhmrc justification: classification has been determined in accordance with the following:\r\nfor the purposes of determining the commodity code"
+ },
+ {
+  "id": 2221,
+  "persona": "naive_specific",
+  "query": "20 pack colour coded car blade fuses 5a to 30a",
+  "expected_code": "8536105090",
+  "source_id": "atar_600015402",
+  "oracle_text": "product: 20 piece vehicle fuse set. the fuses range from 5a to 30a.\r\neach fuse is clearly marked and colour coordinated making them easy to use. \r\neach fuse is approx. 2cm by 2cm.\r\npackaged in a blister card\r\n\r\ncontents:-\r\n2 x 5a \r\n2 x 7.5a \r\n4 x 10a \r\n4 x 15a \r\n4 x 20a \r\n2 x 25a \r\n2 x 30a\n\nhmrc justification: classification has been determined in accordance with the following: -\r\ngeneral interpretative rules (gir)s:\r\n\r\nfor the purposes of determining the commodity codes within which goods most"
+ },
+ {
+  "id": 70,
+  "persona": "original",
+  "query": "product: an infrared microwave sensor for an outdoor solar light. it is used to detect motion which in turn will trigger lights only when needed. this will improve energy efficiency. the voltage is 3 - 16v. this item is imported as a separate component to be assembled at a later date.\r\n\r\npackaged in a carton box.\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fa",
+  "expected_code": "8536501900",
+  "source_id": "atar_600015220",
+  "oracle_text": "product: an infrared microwave sensor for an outdoor solar light. it is used to detect motion which in turn will trigger lights only when needed. this will improve energy efficiency. the voltage is 3 - 16v. this item is imported as a separate component to be assembled at a later date.\r\n\r\npackaged in a carton box.\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fa"
+ },
+ {
+  "id": 396,
+  "persona": "emu_generic",
+  "query": "junction box",
+  "expected_code": "8536901000",
+  "source_id": "atar_600015548",
+  "oracle_text": "product: the cab box pack is an electrical junction and connection box used in conjunction with the companies sensor system. it provides a secure enclosure for terminating and distributing low-voltage electrical connections (not exceeding 1,000v) between the sensor and associated cabling. in larger material handling equipment (mhe), it also supports in-cab alert functionality, enabling signals generated by the sensor system to be transmitted through connected wiring to provide visual or audible"
+ },
+ {
+  "id": 2794,
+  "persona": "emu_ordinary",
+  "query": "rack-mounted power distribution unit for servers",
+  "expected_code": "8537109899",
+  "source_id": "atar_600015342",
+  "oracle_text": "product: a vertical, remote monitor, rack-mounted power distribution unit (pdu), designed for use in server cabinets.  the pdu can also be described as a mains distribution panel or power strip, as it distributes electrical power to multiple outlets from a single supply.\r\nmaximum operating rating of 250v ac, providing 16 iec c13 outlets, each individually protected by a 3.15a fuse to protect connected equipment. \r\nit distributes power from a single mains input to multiple devices such as servers"
+ },
+ {
+  "id": 2693,
+  "persona": "emu_specific",
+  "query": "shielded low-voltage cable for sensors on material handling vehicles",
+  "expected_code": "8544429090",
+  "source_id": "atar_600015550",
+  "oracle_text": "product: a sensor cable which is used to connect to the companies sensor system and other related system components. it carries low-voltage electrical signals and/or power between the sensor, junction box, and in-cab alert or interface systems in larger mhe (material handling equipment). it's purpose is to provide a reliable, protected electrical connection for signal transmission (including detection event signals and alert outputs). it does not process or interpret data itself. the cable funct"
+ },
+ {
+  "id": 595,
+  "persona": "naive_vague",
+  "query": "sports car",
+  "expected_code": "8703241000",
+  "source_id": "atar_600015660",
+  "oracle_text": "product: a venom f5 revolution evolution hyper car is engineered and manufactured in 2025 in the united states as part of the exclusive venom f5 programme. \r\n\r\nthis ultra-low volume, allocation-only vehicle is produced in \"revolution\" and \"evolution\" factory specifications, representing the highest levels of performance available in the series. \r\n\r\nit features a 6.6-liter twin-turbocharged v8 engine generating approximately 2,031 bhp, with an estimated top speed of 311 mph. \r\n\r\ndesigned for extr"
+ },
+ {
+  "id": 704,
+  "persona": "naive_branded",
+  "query": "caravan trailer brake drum",
+  "expected_code": "8716909098",
+  "source_id": "atar_600015591",
+  "oracle_text": "product: trailer and caravan brake drums. these are components to be used exclusively for towing type 02 braked trailers (87 16 40) and caravans (87 16 10). they are not designed for, or suitable for use on any other vehicle.\r\n\r\n the main material is cast steel. these are machined cast with the provision for a bearing to be inserted and for attaching to a road wheel. then this brake drum is fitted over the brake drum back plate and secured in by a nut. brake drums are a permanent fixture and are"
+ },
+ {
+  "id": 2125,
+  "persona": "naive_specific",
+  "query": "aluminium aircraft vibration damper sub assembly",
+  "expected_code": "8807300010",
+  "source_id": "atar_600015463",
+  "oracle_text": "product: sub-assembly sub002-va-03-0032 is a part of an active tuned vibration attenuator (atva) designed to be installed on civilian aircraft to manage unwanted vibration and noise.\r\n\r\nmanufactured from aluminium alloy, the part is precision engineered to a specific design to be assembled, along with additional parts, to form a completed atva assembly and is part of the aircraft\u2019s original design specification. \r\n\r\nthe completed assembly that the sub-assembly sub002-va-03-0032 forms part of is"
+ },
+ {
+  "id": 102,
+  "persona": "original",
+  "query": "product: anaesthetic equipment accessory capture device for veterinary surgical use\r\n\r\nthe vet\u2011dock is an anaesthetic gas capture accessory designed for use in veterinary surgical environments.\r\n\r\nthe device is typically wall\u2011mounted, although alternative mounting options are available through separately purchased accessories. it operates on low\u2011voltage electricity (5v) and is supplied with an external power supply. \r\n\r\nthe vet\u2011dock is used to capture waste anaesthetic gases produced during vete",
+  "expected_code": "9018906000",
+  "source_id": "atar_600015408",
+  "oracle_text": "product: anaesthetic equipment accessory capture device for veterinary surgical use\r\n\r\nthe vet\u2011dock is an anaesthetic gas capture accessory designed for use in veterinary surgical environments.\r\n\r\nthe device is typically wall\u2011mounted, although alternative mounting options are available through separately purchased accessories. it operates on low\u2011voltage electricity (5v) and is supplied with an external power supply. \r\n\r\nthe vet\u2011dock is used to capture waste anaesthetic gases produced during vete"
+ },
+ {
+  "id": 423,
+  "persona": "emu_generic",
+  "query": "pressure sensor",
+  "expected_code": "9026900000",
+  "source_id": "atar_600015570",
+  "oracle_text": "product: an electronic pressure transducer. the pressure transducer is used in conjunction with a signal conditioner/indicator module to provide readings of pressure. it is suitable for both gas and liquid and is available with a variety of temperature compensation, pressure ports and electrical termination options to meet specific application requirements. the transducer is made from welded stainless steel construction designed for rugged industrial applications requiring high accuracy pressure"
+ },
+ {
+  "id": 2725,
+  "persona": "emu_ordinary",
+  "query": "respirator fit testing kit",
+  "expected_code": "9027900000",
+  "source_id": "atar_600015344",
+  "oracle_text": "product: fit test adapter kit, compatible with all cartridge half masks and full-face masks that are manufactured by the same trader. this kit enables quantitative fit testing to be performed accurately and providing confidence that the respirator fits the individual wearer.\r\n\r\nthe adapter is designed to be positioned between the respirator facepiece and the p3 filter, and to follow standard quantitative procedures using a particle counting device. the kit is supplied with an adapter, fitted wit"
+ },
+ {
+  "id": 2690,
+  "persona": "emu_specific",
+  "query": "handheld tester for capacitor esr and capacitance off pcbs",
+  "expected_code": "9030332090",
+  "source_id": "atar_600015326",
+  "oracle_text": "product: the product is a handheld electronic tester which is used to check that electronic components are working properly.\r\n\r\nthe unit measures a capacitor's equivalent series resistance (esr) which helps show whether the capacitor is faulty. it also measures its capacitance value components when removed from the printed circuit board (pcb), to see how much electrical charge it can hold.\r\n\r\nthe unit is made up of a pcb, an lcd screen, a battery and test leads. housed in a plastic enclosure. th"
+ },
+ {
+  "id": 567,
+  "persona": "naive_vague",
+  "query": "cable tester",
+  "expected_code": "9030400000",
+  "source_id": "atar_600015574",
+  "oracle_text": "product: a cable wi-fi and network tester. the cable performance testing up to 10gbase-t plus troubleshooting (distance to fault, wire map, toning). it tests and troubleshoots ethernet/ip, profinet, ethercat cabling with m12x, m12d, and m8d adapters (ie versions). network features include ipv4 and v6 ping, nearest switch diagnostics (ip address, name, port / vlan number, and advertised data rates). ethernet alliance-certified poe verification detects the poe class (1-8) and power, and performs a"
+ },
+ {
+  "id": 2268,
+  "persona": "naive_branded",
+  "query": "zener diode tester box",
+  "expected_code": "9030820000",
+  "source_id": "atar_600015323",
+  "oracle_text": "product: a handheld unit designed to test zener diode semiconductor components removed from printed circuit boards (pcbs). it consists of a uk sourced pcb populated with an lcd, battery and test leads, programmed and calibrated before being enclosed in a green plastic housing. \r\nthe unit uses fitted flexible test leads to measure component values out of circuit and generates constant current pulses (selectable from 2ma, 5ma, 10ma and 15ma) at voltages from 0v to 50v. \r\neach device is packaged in"
+ },
+ {
+  "id": 89,
+  "persona": "naive_specific",
+  "query": "network temperature and humidity alarm for server rack",
+  "expected_code": "9031808000",
+  "source_id": "atar_600015354",
+  "oracle_text": "product: the room alert 12sr networked environment monitor is a secure, rack\u2011mountable device designed to continuously monitor critical environmental conditions such as temperature, humidity, power, and more. it supports multiple external sensors, enabling real\u2011time tracking of up to eight additional parameters and integration with optional power or analogue sensors. the device features a web-based interface for easy configuration and data viewing, and it can send automated alerts via email, sms"
+ },
+ {
+  "id": 82,
+  "persona": "original",
+  "query": "product: the uplink power control system is an electronic device designed to maintain stable uplink signal power from earth station radio frequency terminals to geostationary satellites, compensating for signal reduction caused by weather conditions such as rain, ice or snow.\r\n\r\nthe system constantly monitors beacon signal loss using an internal or external receiver and automatically increases or reduces uplink power as needed. it can either adjust power using one reference signal or using a com",
+  "expected_code": "9032890090",
+  "source_id": "atar_600015297",
+  "oracle_text": "product: the uplink power control system is an electronic device designed to maintain stable uplink signal power from earth station radio frequency terminals to geostationary satellites, compensating for signal reduction caused by weather conditions such as rain, ice or snow.\r\n\r\nthe system constantly monitors beacon signal loss using an internal or external receiver and automatically increases or reduces uplink power as needed. it can either adjust power using one reference signal or using a com"
+ },
+ {
+  "id": 2694,
+  "persona": "emu_generic",
+  "query": "console table",
+  "expected_code": "9403601000",
+  "source_id": "atar_600015689",
+  "oracle_text": "product: bespoke console table, with solid american black walnut slab legs, sub-top made in veneered american black walnut, clear open grain satin finish, top in travertine romano classic super. \r\n\r\ndim: 1200w x 300d x 850h\n\nhmrc justification: classification has been determined in accordance with the following:\r\n \r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out th"
+ },
+ {
+  "id": 924,
+  "persona": "emu_ordinary",
+  "query": "moulded foam hot tub headrest",
+  "expected_code": "9404909000",
+  "source_id": "atar_600015631",
+  "oracle_text": "product: a hot tub pillow which is a single solid moulded piece made from cross-linked polyethylene (xlpe) and eva foam. it incorporates an oval aperture in the centre, where a branded light lens insert can be fitted if required (light insert not subject to this atar). the pillow will be installed on the interior shell of a hot tub to provide a cushioned support surface for the user\u2019s head and neck while bathing. the pillow is available in a grey or black colour. the pillow is supplied in a card"
+ },
+ {
+  "id": 362,
+  "persona": "emu_specific",
+  "query": "bedside lamp with film character and 20 minute gradual dimming",
+  "expected_code": "9405214000",
+  "source_id": "atar_600015410",
+  "oracle_text": "product: children\u2019s animated film character bedside light\r\n\r\nthe product is a children\u2019s animated film character bed-side light, with characters applied on the lamp stand. the settings have a sunset functionality to help kids to drift off to sleep and a nightlight feature. the sunset setting automatically dims the light over a period of 20 minutes either to off or to a pre-set nightlight level. it consists of themed graphics and a diffuser that houses the led lights. the product interface consis"
+ },
+ {
+  "id": 123,
+  "persona": "naive_vague",
+  "query": "candle holder",
+  "expected_code": "9405500090",
+  "source_id": "atar_600015431",
+  "oracle_text": "product: a metal candle holder. made from a zinc alloy the holder has a slim stem, a round base for stability and a rounded cup to hold a candle. halfway up the stem there is a decorative figure of a bat with two dangling ribbons all in the same metal.  the item has been finish with a black powder coating and is packaged in bubble wrap & hang tag label for retail sale in shops.\n\nhmrc justification: classification has been determined in accordance with the following: \r\n\r\nfor the purposes of deter"
+ },
+ {
+  "id": 2272,
+  "persona": "naive_branded",
+  "query": "street light pole collar ring",
+  "expected_code": "9405990090",
+  "source_id": "atar_600015299",
+  "oracle_text": "product: shaft ring for an outdoor lighting column made from grey iron.  the edge of the ring has 16 domed protrusions, equally spaced, around the entire edge.  a hole is drilled into the shaft ring for fixing to the column and the inside surface of the ring is smooth. \r\nthe product is not handmade and is packed in cartons.\n\nhmrc justification: classification has been determined in accordance with the following:\r\nfor the purposes of determining the commodity codes within which goods most appropr"
+ },
+ {
+  "id": 2213,
+  "persona": "naive_specific",
+  "query": "1/16 plastic us army halftrack model kit",
+  "expected_code": "9503003000",
+  "source_id": "atar_600015546",
+  "oracle_text": "product: a 1/16 scale model construction kit of a us army m3/m3a1 halftrack.\r\n\r\nthe kit consists of various individual parts that are not yet assembled, the parts can be used to build either a m3 halftrack or a m3a1 halftrack.  it is mainly constructed from direct injection molded plastic. there are 2 sheets of decals included and an a4 instruction manual. glue is not included within the kit.\r\n\r\nthe kit is recommended for ages 14+ and is presented in a printed cardboard box for retail sale.\n\nhmr"
+ },
+ {
+  "id": 18,
+  "persona": "original",
+  "query": "product: a hatch your own live aquatic creatures set.\r\n\r\nthe set comprises of a plastic sachet of shrimp brine (artemia salina) eggs, a plastic sachet of food, a plastic tank that is decorated to represent an underwater world.  the tank has a battery-operated led lights in the base, which requires 2 aaa batteries (not included).  also included is a small plastic feeding spoon, a pipette, a magnifier and an instruction booklet.\r\n\r\nthe hatch your own live aquatic creatures set is for ages 6+. it i",
+  "expected_code": "9503007000",
+  "source_id": "atar_600014889",
+  "oracle_text": "product: a hatch your own live aquatic creatures set.\r\n\r\nthe set comprises of a plastic sachet of shrimp brine (artemia salina) eggs, a plastic sachet of food, a plastic tank that is decorated to represent an underwater world.  the tank has a battery-operated led lights in the base, which requires 2 aaa batteries (not included).  also included is a small plastic feeding spoon, a pipette, a magnifier and an instruction booklet.\r\n\r\nthe hatch your own live aquatic creatures set is for ages 6+. it i"
+ },
+ {
+  "id": 2697,
+  "persona": "emu_generic",
+  "query": "christmas baubles",
+  "expected_code": "9505109000",
+  "source_id": "atar_600015577",
+  "oracle_text": "product: a pair of decorative ornaments to be used at christmas. \r\n\r\nthe ornaments are shaped like festive baubles, they have a gold coloured plastic base with a gold plastic band around the circumference and a gold plastic top depicting a bauble cap. \r\n\r\nthe baubles themselves are made from clear plastic and are filled with water and glitter, they also contain a festive scene. the 1st bauble depicts father christmas carrying a sack, he is standing next to a christmas tree which has presents in"
+ },
+ {
+  "id": 406,
+  "persona": "emu_ordinary",
+  "query": "fuzzy yellow craft chicks",
+  "expected_code": "9505900000",
+  "source_id": "atar_600015556",
+  "oracle_text": "product: the product consists of 36 fluffy yellow chicks made from 85% synthetic filament, with 10% polypropylene (pp) used for the eyes, beak, and feet, 3% eco-adhesive, and 2% paper. the chicks are used for easter displays and collage activities. they are packaged in a corrugated box.\r\n\r\nmanufacturing process: the body is formed using a pom-pom maker. the polypropylene pp eyes and beak are then attached using an eco-adhesive. the chick is trimmed and finished, then packaged.\n\nhmrc justificatio"
+ },
+ {
+  "id": 946,
+  "persona": "emu_specific",
+  "query": "polyurethane foam football size 4 orange with black panels",
+  "expected_code": "9506699000",
+  "source_id": "atar_600015807",
+  "oracle_text": "product: a soft football made from 100% polyurethane (pu) foam.  it is orange in colour with black pentagon shapes over it.  the ball has a circumference of 64.5 cm and is a size 4.\r\n\r\nthe ball is not suitable for children under 3 years of age. it is packaged within an open fronted cardboard box and is for retail sale.\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriatel"
+ },
+ {
+  "id": 91,
+  "persona": "naive_vague",
+  "query": "kids exercise machine",
+  "expected_code": "9506911000",
+  "source_id": "atar_600015360",
+  "oracle_text": "product: an exercise stepper intended for use by children to take steps to simulate walking. \r\n\r\nit is made from galvanized pipe, nbr foam and abs plastic. the steps are blue in colour with a yellow base and a red pole extending to the top of the product where there is a yellow monitor with an lcd screen and blue handles for the child to hold whilst using the product. there are two adjustment buttons below the lcd screen that enable the user to change the depth and resistance of the stepper to m"
+ },
+ {
+  "id": 584,
+  "persona": "naive_branded",
+  "query": "industrial mop refill head",
+  "expected_code": "9603909900",
+  "source_id": "atar_600015654",
+  "oracle_text": "product: replacement mophead without handle. large manual mop head manufactured from non woven, highly absorbent synthetic textile fibres, fitted with a plastic coloured socket for attachment to a standard universal screw fit mop handle. made from polyester, polypropylene and viscose. designed for wet floor cleaning only, to absorb  liquids, dirt, and moisture, in commercial, industrial, or institutional environments, \r\napproximate dimensions: length: 321 mm, width: 150 mm, height: 112 mm. \r\n50"
+ },
+ {
+  "id": 2129,
+  "persona": "naive_specific",
+  "query": "pack of 12 coated metal hair snap clips",
+  "expected_code": "9615190000",
+  "source_id": "atar_600015382",
+  "oracle_text": "product: pack of 12 hair snap clips, made from pvc-coated stainless steel. available in various colours.\n\nhmrc justification: classification has been determined in accordance with the following: \r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013 \r\n\r\na. part two (goods classification table rul"
+ },
+ {
+  "id": 246,
+  "persona": "original",
+  "query": "product: volkswagen beetle (type 1) 1967 the volkswagen type 1 beetle is a compact, rear-engine, rear-wheel-drive passenger car originally manufactured by volkswagen. \r\nthe 1967 model year represents one of the final versions of the classic beetle design before major later updates, and incorporates several one-year-only features that distinguish it from earlier and later models. \r\nthis vehicle is constructed with a two-door steel body mounted on a platform chassis. \r\nit is typically configured a",
+  "expected_code": "9705100048",
+  "source_id": "atar_600015664",
+  "oracle_text": "product: volkswagen beetle (type 1) 1967 the volkswagen type 1 beetle is a compact, rear-engine, rear-wheel-drive passenger car originally manufactured by volkswagen. \r\nthe 1967 model year represents one of the final versions of the classic beetle design before major later updates, and incorporates several one-year-only features that distinguish it from earlier and later models. \r\nthis vehicle is constructed with a two-door steel body mounted on a platform chassis. \r\nit is typically configured a"
+ },
+ {
+  "id": 684,
+  "persona": "naive_branded",
+  "query": "healthy fig snack pouches",
+  "expected_code": "0804209000",
+  "source_id": "atar_600015708",
+  "oracle_text": "product: freeze dried fig slices\r\npackaging: 30g re-sealable stand-up pouches\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013 a. part two (goods classification table rules of interpretation) of the tarif"
+ },
+ {
+  "id": 709,
+  "persona": "naive_specific",
+  "query": "freeze dried apple slices in small resealable bags",
+  "expected_code": "0813300000",
+  "source_id": "atar_600015746",
+  "oracle_text": "product: freeze dried apple slices\r\npackaging: 30g re-sealable stand-up pouches\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013 a. part two (goods classification table rules of interpretation) of the tar"
+ },
+ {
+  "id": 554,
+  "persona": "original",
+  "query": "product: freeze dried peach slices\r\npackaging: 30g re-sealable stand-up pouches\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013 a. part two (goods classification table rules of interpretation) of the tar",
+  "expected_code": "0813401000",
+  "source_id": "atar_600015747",
+  "oracle_text": "product: freeze dried peach slices\r\npackaging: 30g re-sealable stand-up pouches\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013 a. part two (goods classification table rules of interpretation) of the tar"
+ },
+ {
+  "id": 917,
+  "persona": "emu_generic",
+  "query": "dried strawberries",
+  "expected_code": "0813409580",
+  "source_id": "atar_600015706",
+  "oracle_text": "product: freeze dried strawberry slices\r\npackaging: 30g re-sealable stand-up pouches\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013 a. part two (goods classification table rules of interpretation) of th"
+ },
+ {
+  "id": 2728,
+  "persona": "emu_ordinary",
+  "query": "frozen boneless marinated chicken fillets",
+  "expected_code": "1602321190",
+  "source_id": "atar_600015633",
+  "oracle_text": "product: marinated chicken fillets\r\nuncooked, frozen, boneless, skinless\r\npackaging: vacuo polybag\n\nhmrc justification: classification has been determined in accordance with the following:- \r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013 a. part two (goods classification table rules of inter"
+ },
+ {
+  "id": 377,
+  "persona": "emu_specific",
+  "query": "ready-to-mix chocolate protein powder with soy isolate and maltodextrin",
+  "expected_code": "1806907090",
+  "source_id": "atar_600015483",
+  "oracle_text": "product: the product is a chocolate and soy protein isolate based protein powder, intended to be mixed with water (300g serving) for human consumption. it contains the following ingredients: maltodextrin, wheat gluten, soy protein isolate, cocoa, glycine, fat powder [refined vegetable oil (palm fruit), glucose syrup, milk protein, anti-caking agent], taurine, sodium chloride, flavouring, calcium lactate, disodium phosphate, tricalcium phosphate, potassium chloride, dimagnesium phosphate, digezym"
+ },
+ {
+  "id": 2103,
+  "persona": "naive_vague",
+  "query": "cheese dough balls",
+  "expected_code": "1901200000",
+  "source_id": "atar_600015343",
+  "oracle_text": "product: the product are frozen, uncooked gluten-free cheese dough balls  that are made for human consumption. it is made from cassava flour, milk, cheddar cheese, sunflower oil, egg, water and salt. presented as approximately 20 individual portions (approx. 20g each) in a 400g a food-grade plastic bag. the product is not ready-to-eat and requires baking prior to consumption.\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\nfor the purposes of determin"
+ },
+ {
+  "id": 2112,
+  "persona": "naive_branded",
+  "query": "japanese cracker coated peanuts",
+  "expected_code": "1905907000",
+  "source_id": "atar_600015141",
+  "oracle_text": "product: roasted peanuts coated in a thick, crunchy dough coating that is used as a bar-snack. it contains the following ingredients: peanuts, wheat flour, cane sugar, modified corn starch, corn starch, sesame seeds, maltodextrin, soy sauce (water, wheat, soy, salt), sunflower oil, maltose syrup, salt, raising agent: e503, e500; seaweed, colour: e150c, e160c. the roasted peanut is rolled into multiple layers of flavoured dough and baked. they are packed in 10kg polyamide and polyethylene plastic"
+ },
+ {
+  "id": 221,
+  "persona": "naive_specific",
+  "query": "fried sliced tomato chips in foil bags",
+  "expected_code": "2002109000",
+  "source_id": "atar_600015628",
+  "oracle_text": "product: the product is sliced whole tomato crisps that are vacuum\u2011fried in rapeseed oil. they  are packaged in 2.0 lb vacuum\u2011packed aluminium foil bags bags, with six bags per carton.\r\n\r\nfresh tomatoes are tested, washed, sliced, steam\u2011disinfected and iqf frozen, then lightly coated in a tapioca starch solution and vacuum\u2011fried at low temperature in rapeseed oil, preserving the tomato\u2019s colour and shape. excess oil is removed by centrifugation before the products are quality\u2011checked, metal\u2011dete"
+ },
+ {
+  "id": 2258,
+  "persona": "original",
+  "query": "product: preserved nameko mushrooms\r\ningredients: nameko mushroom, water, salt, garlic, acetic acid, bay leaves, black pepper, cloves, dill\r\npackaging: 580ml glass jar\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following h",
+  "expected_code": "2003909000",
+  "source_id": "atar_600015601",
+  "oracle_text": "product: preserved nameko mushrooms\r\ningredients: nameko mushroom, water, salt, garlic, acetic acid, bay leaves, black pepper, cloves, dill\r\npackaging: 580ml glass jar\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following h"
+ },
+ {
+  "id": 2808,
+  "persona": "emu_generic",
+  "query": "corn fritters",
+  "expected_code": "2004909810",
+  "source_id": "atar_600015433",
+  "oracle_text": "product: frozen sweetcorn fritters and onion and sweetcorn fritters with a sweet chilli dip. these are frozen. there are 8 x20g fritters\r\ningredients:\r\nsweetcorn , onion, cottonseed oil, corn starch, dried potato, wheat flour, coriander leaf, shallot, lemon juice, garlic, dried red chilli, lemongrass, salt, red chilli powder, makrut lime leaf, galangal, makrut lime peel, cumin. sweet chilli dip [water, sugar, distilled vinegar, modified maize starch, red chilli, salt, garlic powder, red bell pep"
+ },
+ {
+  "id": 409,
+  "persona": "emu_ordinary",
+  "query": "mixed red green yellow pepper crisps",
+  "expected_code": "2005998094",
+  "source_id": "atar_600015558",
+  "oracle_text": "product: the product consists of mixed bell pepper crisps made from sliced red, green, and yellow peppers. the peppers are vacuum\u2011fried in rapeseed oil. the product is packaged in 2.0 lb bags, with six bags per carton.\r\n\r\nproduction process: fresh vegetables are tested for pesticide residues, washed under high-pressure water, and sliced. the slices are steam-disinfected, rapidly cooled, and individually quick frozen before being coated in a light tapioca starch solution to enhance crispness. the"
+ },
+ {
+  "id": 437,
+  "persona": "emu_specific",
+  "query": "white and purple onion crisps vacuum fried in rapeseed oil",
+  "expected_code": "2005998098",
+  "source_id": "atar_600015626",
+  "oracle_text": "product: the product consists of onion crisps made from white and purple onion slices. the onions are vacuum fried in rapeseed oil. the product is packaged in 2.0 lb bags, with six bags per carton.\r\n\r\nfresh onions are tested for pesticide residues, thoroughly washed, and sliced before undergoing steam disinfection and rapid cooling. the slices are then individually quick frozen and coated in a light tapioca starch solution to enhance crispiness during frying. they are vacuum\u2011fried at low tempera"
+ },
+ {
+  "id": 615,
+  "persona": "naive_vague",
+  "query": "fruit snack pouches",
+  "expected_code": "2007995099",
+  "source_id": "atar_600015678",
+  "oracle_text": "product: the product is a apple and strawberry puree snack. it is packaged in a box of 16x 90g pouches made from pet, aluminium, nylon and pe. the puree is made from apple, strawberry, apple juice concentrate, ascorbic acid, malic acid and flavouring. it is fully smooth with no chunks but is not homogenised. product is cooked to 95\u00b0c, cooled to 75\u00b0c and then filtered and put into pouches which are then sealed and then sterilised. it is not cooked in a vacuum. product has over 13% sugars but less"
+ },
+ {
+  "id": 152,
+  "persona": "naive_branded",
+  "query": "spicy tomato squeeze sauce",
+  "expected_code": "2103909019",
+  "source_id": "atar_600015535",
+  "oracle_text": "product: a tomato based table sauce, with spices, used for human consumption and packaged in plastic squeeze bottle of 320g per unit.\r\ningredients: water, tomato paste, jaggery, sugar, salt, stabilisers: tapioca starch, stabilisers: xanthan gum, ginger, clove, red chilli, onion powder, garlic powder, cumin powder, black pepper, green cardamom, turmeric, nutmeg, cassia bark, acidity regulators: acetic acid, acidity regulators: citric acid, preservative: sodium benzoate.\n\nhmrc classification ratio"
+ },
+ {
+  "id": 149,
+  "persona": "naive_specific",
+  "query": "mango chilli chutney in plastic squeeze bottle",
+  "expected_code": "2103909089",
+  "source_id": "atar_600015534",
+  "oracle_text": "product: mango chilli chutney. \r\na flavourful condiment made primarily from mangoes and spiced with chilli and other spices. for human consumption and packaged in plastic squeeze bottle of 340g per unit.\r\ningredients: raw mango, sugar, water, salt, ginger, garlic, cumin powder, red chilli powder, dry mango powder, stabilisers: tapioca starch, xanthan gum, acidity regulator: citric acid, preservative: sodium benzoate.\n\nhmrc classification rationale: classification has been determined in accordanc"
+ },
+ {
+  "id": 694,
+  "persona": "original",
+  "query": "product: the product is a sports powder, intended for mixing with water, for human consumption, with the following ingredients: sucrose, maltodextrin, dextrose monohydrate, l-citrulline malate, beta alanine, fructose, glycine, potassium chloride, l-tyrosine, anti-caking agent, malic acid, flavouring, caffeine anhydrous, citric acid, vitamin c, vitamin b3, non-nutritive sweetener (sucralose, acesulfame-k), colourant. it is packaged in a 500g plastic container.\n\nhmrc justification: classification",
+  "expected_code": "2106909849",
+  "source_id": "atar_600015484",
+  "oracle_text": "product: the product is a sports powder, intended for mixing with water, for human consumption, with the following ingredients: sucrose, maltodextrin, dextrose monohydrate, l-citrulline malate, beta alanine, fructose, glycine, potassium chloride, l-tyrosine, anti-caking agent, malic acid, flavouring, caffeine anhydrous, citric acid, vitamin c, vitamin b3, non-nutritive sweetener (sucralose, acesulfame-k), colourant. it is packaged in a 500g plastic container.\n\nhmrc justification: classification"
+ },
+ {
+  "id": 411,
+  "persona": "emu_generic",
+  "query": "water additive",
+  "expected_code": "2201900000",
+  "source_id": "atar_600015563",
+  "oracle_text": "product: a water and mineral solution. this is added to purified water. to be used with a water mineralizer system. available in 1l and 5l.\n\nhmrc justification: classification has been determined in accordance with the following: \r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013 \r\n\r\na. part"
+ },
+ {
+  "id": 340,
+  "persona": "emu_ordinary",
+  "query": "denatured ethanol 1 litre bottles",
+  "expected_code": "2207200019",
+  "source_id": "atar_600015198",
+  "oracle_text": "product: bioethanol denatured alcohol\r\nit is packaged in 1 ltr bottles packed in cases of 12 bottles\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013 a. part two (goods classification table rules of inter"
+ },
+ {
+  "id": 2669,
+  "persona": "emu_specific",
+  "query": "turmeric and black pepper powder for horses in plastic bag",
+  "expected_code": "2309909696",
+  "source_id": "atar_600015501",
+  "oracle_text": "product: the product is a complementary daily feed for equine use only. it is used to maintain general health and soundness in horses. it is made of turmeric and black pepper powder mix. it is packaged in 2 kg bags that are made from polyethylene\u00a0and\u00a0polyamide plastic.\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establis"
+ },
+ {
+  "id": 2203,
+  "persona": "naive_vague",
+  "query": "face cream",
+  "expected_code": "3304990000",
+  "source_id": "atar_600015611",
+  "oracle_text": "product: face peptide cre\u0300me, to be gently applied to the face.\r\npackaged in a 50ml glass bottle.\r\ningredients: aqua, prunus armeniaca kernel oil, pentylene glycol, glyceryl stearate citrate, olus oil, glycerin, macadamia integrifolia seed oil, oenothera biennis oil, silica, cetearyl alcohol, xylityl glucosides, butyrospermum parkii butter, avena sativa kernel oil, anhydroxylitol, avena sativa kernel extract, hippophae rhamnoides fruit oil, palmitoyl grape seed extract, triolein, hydrogenated co"
+ },
+ {
+  "id": 2200,
+  "persona": "naive_branded",
+  "query": "makeup remover cleansing oil",
+  "expected_code": "3401300000",
+  "source_id": "atar_600015612",
+  "oracle_text": "product: a renewal oil to use and clean the skin that can also be used for makeup removal. \r\ningredients: helianthus annuus seed oil olus oil c9-12-isoalkanes acanthosicyos horridus seed oil avena sativa kernel oil caryodendron orinocense seed oil coco-caprylate/caprate glyceryl citrate/lactate/linoleate/oleate bakuchiol tocopheryl acetate tocopherol hippophae rhamnoides fruit oil beta-caryophyllene.\r\n\r\nput  up for retail sale in a 30ml glass bottle\n\nhmrc justification: classification has been d"
+ },
+ {
+  "id": 2177,
+  "persona": "naive_specific",
+  "query": "detergent tablets for baby bottle washer machine",
+  "expected_code": "3402501000",
+  "source_id": "atar_600015470",
+  "oracle_text": "product: detergent tablets used to clean baby bottles within a washer steriliser dryer electrical unit. the tablets are added to unit prior to washing, in a similar way to dishwasher tablets. \r\ningredients: sodium percarbonate, sodium bicarbonate, sodium dodecyl sulfate, citric acid anhydrous, protease, sodium carboxymethyl cellulose, ethylenediaminetetraacetic, acid disodium salt, peg-6000, sodium benzoate.\r\npackaged in doypacks within a larger cardboard box.  \r\nput up for retail sale.\n\nhmrc ju"
+ },
+ {
+  "id": 2130,
+  "persona": "original",
+  "query": "product: a 150g white tough tack. the package contains 2 x 75g packs of putty adhesive. ideal for mounting items on walls. suitable for use on glass, wood, metal (including aluminium), and other polished surfaces.\n\nhmrc justification: classification has been determined in accordance with the following: \r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3(1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rule",
+  "expected_code": "3506100000",
+  "source_id": "atar_600015380",
+  "oracle_text": "product: a 150g white tough tack. the package contains 2 x 75g packs of putty adhesive. ideal for mounting items on walls. suitable for use on glass, wood, metal (including aluminium), and other polished surfaces.\n\nhmrc justification: classification has been determined in accordance with the following: \r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3(1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rule"
+ },
+ {
+  "id": 2799,
+  "persona": "emu_generic",
+  "query": "plastic profile",
+  "expected_code": "3916100090",
+  "source_id": "atar_600015147",
+  "oracle_text": "product: a profile shape of polyethylene, measuring 4 cm in width with rounded edges and a consistent cross-section from one end to the other, used to connect continuous lengths of uniaxial geogrids in the principle strength direction. used in civil engineering.\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\n for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment)"
+ },
+ {
+  "id": 2776,
+  "persona": "emu_ordinary",
+  "query": "stiff polyethylene connector tube",
+  "expected_code": "3917211090",
+  "source_id": "atar_600015153",
+  "oracle_text": "product: rigid polymer tube\r\nmaterial: polyethylene (high density)\r\nlength: 155 mm\r\nuse: to connect continuous lengths of uniaxial geogrid\n\nhmrc justification: classification has been determined in accordance with the following:- \r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013 a. part two (g"
+ },
+ {
+  "id": 2774,
+  "persona": "emu_specific",
+  "query": "1 metre roll 30 mm clear double-sided nano gel tape",
+  "expected_code": "3919108090",
+  "source_id": "atar_600015368",
+  "oracle_text": "product: 1m x 30mm nano gel double -sided clear tape.\r\npolyurethane gel, packaged in a blue box.\n\nhmrc justification: classification has been determined in accordance with the following:\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013\r\na. part two (goods classification table rules of interpre"
+ },
+ {
+  "id": 2303,
+  "persona": "naive_vague",
+  "query": "cool box",
+  "expected_code": "3923109090",
+  "source_id": "atar_600015462",
+  "oracle_text": "product: a cool box designed for indoor and outdoor use. the item has 50 hrs chilling chilling capacity, with a 5 year warranty. the product has a shock absorbent abs plastic outer cabinet and an inner high performance removable and zero ozone-depleting foam insulation. the product has a leather handle.\n\nhmrc justification: classification has been determined in accordance with the following: \r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3"
+ },
+ {
+  "id": 28,
+  "persona": "naive_branded",
+  "query": "personalised monster kids mug",
+  "expected_code": "3924100090",
+  "source_id": "atar_600014923",
+  "oracle_text": "product: a plastic mug made from abs plastic, which is pink and red in colour. it has inscriptions on it stating \"ava\" and \"giggle monster\", with a face containing eyes and a mouth with three teeth (one on top, two on bottom) depicting a \"monster\" style face. there are two feet at the bottom of the mug, each with three toes coming off it, with black toenails designed in the shape of triangles. the mug can be personalised to replace the name at the top of the mug above the monster to whatever nam"
+ },
+ {
+  "id": 261,
+  "persona": "naive_specific",
+  "query": "45 litre plastic rubbish bin with foot pedal",
+  "expected_code": "3924900090",
+  "source_id": "atar_600015682",
+  "oracle_text": "product: pedal bin made of polypropylene with a flip up lid. available in yellow or grey, it is used to store domestic waste. \r\nthe item has 45 litre capacity. \r\nsize: 41cm x 39.8 x 60 cm. \r\nthe item is packaged in cardboard box by three items in a box, each item is packaged in plastic bag; sold to retail and janitorial markets.\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\nfor the purposes of determining the commodity codes within which goods most"
+ },
+ {
+  "id": 42,
+  "persona": "original",
+  "query": "product: plastic bioxial geogrid mesh \r\npolypropylene sheet which has been punched and drawn into a square grid/mesh, (61-65mm between each rib of the grid. each rib minimum of 4mm wide), with raised moulded nodes. grid is bonded to a non-woven polypropylene paving fabric\r\nuse: in civil engineering\n\nhmrc justification: classification has been determined in accordance with the following:- \r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) o",
+  "expected_code": "3926909790",
+  "source_id": "atar_600015150",
+  "oracle_text": "product: plastic bioxial geogrid mesh \r\npolypropylene sheet which has been punched and drawn into a square grid/mesh, (61-65mm between each rib of the grid. each rib minimum of 4mm wide), with raised moulded nodes. grid is bonded to a non-woven polypropylene paving fabric\r\nuse: in civil engineering\n\nhmrc justification: classification has been determined in accordance with the following:- \r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) o"
+ },
+ {
+  "id": 285,
+  "persona": "emu_generic",
+  "query": "rubber bellow",
+  "expected_code": "4016999790",
+  "source_id": "atar_600014701",
+  "oracle_text": "product: the product is a rubber bellow, a component for a mechanical seal assembly. the black moulded elastomer forms the secondary sealing interface between the mechanical seal assembly and the equipment being sealed. \r\n\r\nthe bellow (without the metal spring) is manufactured from nitrile butadiene rubber (nbr) a vulcanised synthetic fluoroelastomer copolymer.  each nbr moulded part is manufactured by compression moulding and is custom designed for its specific mechanical seal application. the"
+ },
+ {
+  "id": 2818,
+  "persona": "emu_ordinary",
+  "query": "plastic-surfaced carry case",
+  "expected_code": "4202921900",
+  "source_id": "atar_600015427",
+  "oracle_text": "product: rucksack\r\nmaterials: polyester with coating of pu on outer surface\r\ninternal gusset with draw cord closure\r\nbuckle down lid\r\nzipped pockets\r\nexternal water bottle pockets\r\nshoulder straps\r\ngrab handle at rear\r\ncapacity: 20 litres\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020"
+ },
+ {
+  "id": 2681,
+  "persona": "emu_specific",
+  "query": "zippered handheld console case with lift strap and pocket",
+  "expected_code": "4202929890",
+  "source_id": "atar_600015035",
+  "oracle_text": "product: the product is a zip\u2011up case designed to securely store a gaming console for portable use. it includes a lift strap to assist with removal and an internal velcro pouch for storage. the outer surface of the case is made from woven grey polyester (90%) and black polyurethane (pu) leatherette (10%). the zip, mesh netting and lining are made of polyester, with nylon, eva foam padding on the interior and a red rubber handle. the product is packaged with a cardboard sleeve.\r\n\r\nmanufacturing p"
+ },
+ {
+  "id": 2235,
+  "persona": "naive_vague",
+  "query": "wooden sticks",
+  "expected_code": "4421910000",
+  "source_id": "atar_600015378",
+  "oracle_text": "product: 300pc bamboo skewers.\r\nthey are 10cm in size, 2mm wide and are natural in colour. \r\ncan be used for canapes, chocolate fountains, cheeseboards and much more.\r\nsuitable for family dinners, parties, gatherings and all things bbq...\r\nthey come in a polypropylene bag with an insert card and headed card.\n\nhmrc justification: classification has been determined in accordance with the following: \r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall,"
+ },
+ {
+  "id": 2244,
+  "persona": "naive_branded",
+  "query": "wooden laundry pegs 24 pack",
+  "expected_code": "4421999999",
+  "source_id": "atar_600015373",
+  "oracle_text": "product: 24 wooden clothes pegs\r\nmade of pinewood with a coil spring for firm grip\r\n72 x 9 x 13mm approx.\r\npackaged in a plastic bag with a cardboard hanging tab\n\nhmrc justification: classification has been determined in accordance with the following: \r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs\r\ntariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following hav"
+ },
+ {
+  "id": 2225,
+  "persona": "naive_specific",
+  "query": "14 inch tall cake box with silver round board",
+  "expected_code": "4819200000",
+  "source_id": "atar_600015401",
+  "oracle_text": "product: an 14\" round silver cake board and tall box.\r\nthese are perfect for all types of baking. ideal to use for an 8\" cake.\r\n\r\n14\" cake box\r\nround cake board -  14\" 12mm thick silver board\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation co"
+ },
+ {
+  "id": 134,
+  "persona": "original",
+  "query": "product: the product is a mini photo album designed to hold and display 36 photographs. the album has a  paperboard cover/structure, incorporating a polyurethane (pu) foam padding layer, and is fully wrapped in an outer covering of polyvinyl chloride (pvc). the internal clear plastic pages are made of polypropylene (pp) with black centre sheets of polypropylene (pp). the packaging containing 72 units per outer carton. the album is intended for the storage, protection and display of printed photo",
+  "expected_code": "4820500000",
+  "source_id": "atar_600015482",
+  "oracle_text": "product: the product is a mini photo album designed to hold and display 36 photographs. the album has a  paperboard cover/structure, incorporating a polyurethane (pu) foam padding layer, and is fully wrapped in an outer covering of polyvinyl chloride (pvc). the internal clear plastic pages are made of polypropylene (pp) with black centre sheets of polypropylene (pp). the packaging containing 72 units per outer carton. the album is intended for the storage, protection and display of printed photo"
+ },
+ {
+  "id": 2703,
+  "persona": "emu_generic",
+  "query": "takeaway pot",
+  "expected_code": "4823699000",
+  "source_id": "atar_600015717",
+  "oracle_text": "product: food service product (food packaging) pot: 13g pe coated + 210gsm white paper + 15g pe coated lid:\r\npp lid is applied to pot to provide secure packaging of take away type food. \r\nalso maintains short-term freshness of the food and it's heat, (if hot product e.g. gravy, curry sauce at a fish and chip shop). \r\nfor 4oz, 50 pcs lid/bag, 25 pcs pot/bag in a box. lid and pot stand side by side. for 7oz, 25 pcs lid/bag, 25 pcs pot/bag in a box. pot at the bottom, lid on the top\n\nhmrc justifica"
+ },
+ {
+  "id": 2767,
+  "persona": "emu_ordinary",
+  "query": "party invites with envelopes",
+  "expected_code": "4909000000",
+  "source_id": "atar_600015372",
+  "oracle_text": "product: 16pk party invites set \r\nlets party invites include -\r\n16x invites\r\n16x white envelopes\r\nsize -15cm x 10cm\n\nhmrc justification: classification has been determined in accordance with the following:-\r\n\r\nfor the purposes of determining the commodity codes within which\r\ngoods most appropriately fall, reg 3 (1) of the customs tariff\r\n(establishment) (eu exit) regulations 2020 sets out that the rules of\r\ninterpretation contained in the following have effect \u2013\r\n\r\na. part two (goods classificat"
+ },
+ {
+  "id": 2813,
+  "persona": "emu_specific",
+  "query": "silk-screen printed recycled plastic road sign 1050x750mm",
+  "expected_code": "4911990000",
+  "source_id": "atar_600015340",
+  "oracle_text": "product: various road traffic signs 1050mm x 750mm, use silk printing to apply ink via a mesh stencil and squeegee. \r\nthey are made from 50% recycled abs plastic and 750mm50% virgin hdpe material.\r\nsilk screen printing produces crisp, vibrant images that remain clear over time, making them highly visible to road users. the blend of recycled abs and virgin hdpe gives the signs strength while promoting sustainability and environmental responsibility. \r\ntypically, these signs are used for regulator"
+ },
+ {
+  "id": 2239,
+  "persona": "naive_vague",
+  "query": "garden string",
+  "expected_code": "5307100000",
+  "source_id": "atar_600015376",
+  "oracle_text": "product: 3pk natural twisted jute yarn (3 x 40m), 1 ply. weight per ball 30g. put up for retail sale and packaged in plastic.\r\n 7,500 dtex\n\nhmrc justification: classification has been determined in accordance with the following:\r\n  \r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3(1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have effect \u2013  \r\na part two"
+ },
+ {
+  "id": 176,
+  "persona": "naive_branded",
+  "query": "kids felt flower craft shapes",
+  "expected_code": "5602101900",
+  "source_id": "atar_600015554",
+  "oracle_text": "product: the pack contains 250 felt flowers in assorted colours, intended for arts and crafts used by children aged 3 years and above. the needleloom felt is made from polyester and measures approximately 2.54 cm \u00d7 2.54 cm \u00d7 1 mm. the  felt flowers are packaged in a plastic polybag.\r\n\r\nthe manufacturing process includes cutting, stamping, laminating/assembly, and packaging.\n\nhmrc justification: classification has been determined in accordance with the following: \r\n\r\nfor the purposes of determini"
+ },
+ {
+  "id": 577,
+  "persona": "naive_specific",
+  "query": "cotton string mop head without handle fitting",
+  "expected_code": "5609000000",
+  "source_id": "atar_600015527",
+  "oracle_text": "product: twine mop head\r\nmaterials: cotton 85% and polyester 15%\r\nit does not have any attachment to attach the mop head to the handle\r\nmeasures 820-890mm\r\nproduct will be packed 30 items per carton\n\nhmrc justification: classification has been determined in accordance with the following:\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretati"
+ },
+ {
+  "id": 230,
+  "persona": "original",
+  "query": "product: a pack of assorted polyester woven ribbons. they can be used for crafting projects.\r\n\r\neach pack contains various ribbons measuring 6 mm x 1 m & 12 mm x 1 m, totalling 100 g in weight.  the ribbons are of different colours.  for ages 3 years plus.\r\n\r\nthe packs measure 200 mm x 150 mm x 50 mm, 60 packs are packaged together within a case.\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within w",
+  "expected_code": "5806321000",
+  "source_id": "atar_600015636",
+  "oracle_text": "product: a pack of assorted polyester woven ribbons. they can be used for crafting projects.\r\n\r\neach pack contains various ribbons measuring 6 mm x 1 m & 12 mm x 1 m, totalling 100 g in weight.  the ribbons are of different colours.  for ages 3 years plus.\r\n\r\nthe packs measure 200 mm x 150 mm x 50 mm, 60 packs are packaged together within a case.\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within w"
+ },
+ {
+  "id": 2796,
+  "persona": "emu_generic",
+  "query": "geotextile fabric",
+  "expected_code": "5911909990",
+  "source_id": "atar_600015148",
+  "oracle_text": "product: polyester geotextile\r\nmaterials: high tenacity polyester manufactured using the weft insertion process\r\nthe load bearing yarns are laid across one another and then stitch bonded\r\nuse: for technical use in the reinforcement of soil in the construction of structures such as embankments \r\npackaging: on rolls\n\nhmrc justification: classification has been determined in accordance with the following:- \r\nfor the purposes of determining the commodity codes within which goods most appropriately f"
+ },
+ {
+  "id": 439,
+  "persona": "emu_ordinary",
+  "query": "multi-coloured polyester lace strips",
+  "expected_code": "6003301000",
+  "source_id": "atar_600015635",
+  "oracle_text": "product: a pack of assorted multi-coloured polyester lace used for crafting activities.\r\n\r\nthe strips of lace vary in textures, designs & colours. the lace strips are less than 30 cm in width and are approximately 5 m in length.  they are manufactured using a raschel warp knitting machine.  for ages 3 years plus.\r\n\r\neach pack contains 10 x 5 m strips.\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes wit"
+ },
+ {
+  "id": 2816,
+  "persona": "emu_specific",
+  "query": "full body neoprene rubberised knit wetsuit",
+  "expected_code": "6113001000",
+  "source_id": "atar_600014875",
+  "oracle_text": "product: wetsuit\r\nmade up of neoprene rubber covered on both sides with a knitted textile\r\nmaterials: neoprene 65-70% and textile 30-35%\r\ncovers torso, arms and legs\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following hav"
+ },
+ {
+  "id": 2155,
+  "persona": "naive_vague",
+  "query": "mens jacket",
+  "expected_code": "6113009000",
+  "source_id": "atar_600015559",
+  "oracle_text": "product: men's jacket\r\nmaterials: knitted polyester, coated on one side with polyurethane.  woven polyester inner lining\r\nribbed cuffs and waistband\r\n2 patch pockets at front above waistband\r\nzip fastening\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of inter"
+ },
+ {
+  "id": 2208,
+  "persona": "naive_branded",
+  "query": "toddler grobag 18 24 months",
+  "expected_code": "6114200000",
+  "source_id": "atar_600015560",
+  "oracle_text": "product: toddler sleep bag.\r\nit is made from soft cotton jersey knit, elastane, recycled polyester.\r\nit has metal poppers on the shoulders and a plastic zip fastening. the filling is 1.5 tog. \r\nmeasurements: length from centre back neck to bottom edge is 94.5cm and max body height is 92cm which is 18/24mths.\r\nput up for retail sale.\n\nhmrc justification: classification has been determined in accordance with the following:\r\nfor the purposes of determining the commodity codes within which goods mos"
+ },
+ {
+  "id": 33,
+  "persona": "naive_specific",
+  "query": "polyester scrunchie set with rubber elastic inside",
+  "expected_code": "6217100090",
+  "source_id": "atar_600014924",
+  "oracle_text": "product: the scrunchie is a woven hair accessory made from polyester with a cotton stitching thread, with an inside made from rubber and spandex. it is blue and orange in colour and is primarily used to fasten medium to long length hair, while doubling as a fashion item. there are 3 scrunchies which are light blue, darker blue and orange in colour. packaged with a backing card made of foil matt laminated paper. there are patterns of oranges, stars and text decorating the scrunchies on the outsid"
+ },
+ {
+  "id": 2278,
+  "persona": "original",
+  "query": "product: a baby towel with hood. this is decorated with an embroidered lion face and 3d ears. the towel is made from cotton.\r\nsize l76cm x w76cm. packed in a polybag\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3(1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following ha",
+  "expected_code": "6302600090",
+  "source_id": "atar_600015481",
+  "oracle_text": "product: a baby towel with hood. this is decorated with an embroidered lion face and 3d ears. the towel is made from cotton.\r\nsize l76cm x w76cm. packed in a polybag\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3(1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following ha"
+ },
+ {
+  "id": 2538,
+  "persona": "emu_generic",
+  "query": "bulk bags",
+  "expected_code": "6305321900",
+  "source_id": "atar_600015639",
+  "oracle_text": "product: these bags are designed for the storage and transportation of bulk materials such as sand, stone, pebbles, grains, fertilizers, and various other industrial products. they are manufactured from woven polypropylene (pp) fabric, ensuring strength and durability. the bag has a capicity of holding 1000 kg. the bags are supplied in empty condition and are folded and packed into woven polypropylene (pp) plastic fabric bales, with each bale containing approximately 200 to 300 bags.\n\nhmrc justi"
+ },
+ {
+  "id": 2719,
+  "persona": "emu_ordinary",
+  "query": "freestanding garage kit",
+  "expected_code": "6306220000",
+  "source_id": "atar_600015296",
+  "oracle_text": "product: heavy-duty freestanding instant garage/workshop which is supplied as a complete kit for on-site assembly. it can be dismantled and relocated. consists of a tubular steel frame structure with a tough triple-layer, waterproof, woven polyethylene fabric cover in dark green, which has been fully uv treated, incorporating fade blockers, anti-fungal and anti-yellowing agents to provide protection against sun and rain. supplied with hardware, joint supports and heavy-duty ground anchors. \r\ndim"
+ },
+ {
+  "id": 461,
+  "persona": "emu_specific",
+  "query": "knitted loop-pile microfibre cloths polyester polyamide 38cm",
+  "expected_code": "6307101000",
+  "source_id": "atar_600015668",
+  "oracle_text": "product: microfiber cleaning cloths made from knitted textile, loop pile. \r\nmeasuring 38cm x 38cm and manufactured in 5 colours (green, red, yellow, white and blue). weighting 280 gsm. overlocked on all sides. made from polyester and polyamide. \r\n40 items packed in a plastic bag. 400 items packed in a cardboard box.\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately"
+ },
+ {
+  "id": 1148,
+  "persona": "naive_vague",
+  "query": "mop head",
+  "expected_code": "6307103000",
+  "source_id": "atar_600015512",
+  "oracle_text": "product: a non-woven textile mop head designed for use with a compatible mop handle or holder, which is not included. product is made from a highly absorbent, white synthetic non-woven cloth composed of viscose and polyester fabric strips with a central band. the mop head weighs between 40 and 60 gsm and is suitable for cleaning floors in both retail and janitorial settings. product is reusable and available in two sizes.\n\nhmrc justification: classification has been determined in accordance with"
+ },
+ {
+  "id": 560,
+  "persona": "naive_branded",
+  "query": "microfibre mop pad refill",
+  "expected_code": "6307109090",
+  "source_id": "atar_600015435",
+  "oracle_text": "product: woven microfibre mop cloth\r\nmaterials: polyester and polyamide\r\nback of cloth is fleece velcro\r\nuse: as an attachment to a mop head for cleaning floors\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following have e"
+ },
+ {
+  "id": 225,
+  "persona": "naive_specific",
+  "query": "500 small coloured feathers for childrens crafts",
+  "expected_code": "6701000000",
+  "source_id": "atar_600015634",
+  "oracle_text": "product: an assorted pack of approximately 500 speckled feathers used for crafting activities.\r\n\r\nthe feathers are brightly coloured; they are approximately 5-10 cm in length.  suitable for ages 3 years plus.\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of in"
+ },
+ {
+  "id": 54,
+  "persona": "original",
+  "query": "product: ramen gift set that contains 2 sets. each set contains nongshim shin spicy ramen, furikake seasoning, wasabi flavour soy sauce, honey ginger flavour hot sauce, ceramic stoneware bowl and chopsticks. the nongshim shin spicy ramen contains the following ingredients: noodles (wheat flour, potato starch, palm oil, salt, acidity regulators (e501, e500, e339), antioxidant (e306), seasoning (yeast extract, soybean, garlic, wheat starch), colour (e101). soup powder seasoning [hydrolysed vegetab",
+  "expected_code": "6912002310",
+  "source_id": "atar_600015174",
+  "oracle_text": "product: ramen gift set that contains 2 sets. each set contains nongshim shin spicy ramen, furikake seasoning, wasabi flavour soy sauce, honey ginger flavour hot sauce, ceramic stoneware bowl and chopsticks. the nongshim shin spicy ramen contains the following ingredients: noodles (wheat flour, potato starch, palm oil, salt, acidity regulators (e501, e500, e339), antioxidant (e306), seasoning (yeast extract, soybean, garlic, wheat starch), colour (e101). soup powder seasoning [hydrolysed vegetab"
+ },
+ {
+  "id": 330,
+  "persona": "emu_generic",
+  "query": "paving fabric",
+  "expected_code": "7019900085",
+  "source_id": "atar_600015155",
+  "oracle_text": "product: glass filaments stitched onto a nonwoven polypropylene paving fabric in a grid structure longitudinal and transverse directions with polyester yarn grey and silver in colour roll lengths are of either 1.0,1.5,2.0 and 3.0 metres. weight is 280 grams per square metre mesh size 40 x 40 mm. it is used in the reinforcement of asphalt of new and existing pavements\n\nhmrc justification: classification has been determined in accordance with the following:\r\nfor the purposes of determining the com"
+ },
+ {
+  "id": 2746,
+  "persona": "emu_ordinary",
+  "query": "1 kg gold bullion bar",
+  "expected_code": "7108120000",
+  "source_id": "atar_600015428",
+  "oracle_text": "product: gold bars\r\n\r\n1 kg denominations. unwrought. tanzanian origin. approximately 96% purity. \r\n\r\nthe gold has not been further worked or processed (such as rolled, drawn, or continuously cast).\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretat"
+ },
+ {
+  "id": 2753,
+  "persona": "emu_specific",
+  "query": "set of two pin-on decorative badges with ribbon rosettes",
+  "expected_code": "7117190090",
+  "source_id": "atar_600015383",
+  "oracle_text": "product: badge and rosette set\r\nthe badge and rosette comes in 2 different colours and suitable for parties and more. \r\nthe pin behind the badge/ rosette just needs to be attached to any piece of clothing or any item of choice.\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out"
+ },
+ {
+  "id": 23,
+  "persona": "naive_vague",
+  "query": "personalised bracelet",
+  "expected_code": "7117900000",
+  "source_id": "atar_600014921",
+  "oracle_text": "product: a personalised bracelet made from recycled plastics, 40% polyester, 18% polyurethane (pre-consumer), 37% polyurethane and 5% calcium carbonate. there is a brass metal, plated with chromium connecting the bracelet with a leather band inside to layer the bracelet together. there are ties made of kraft paper and iron securing the bracelet to the kraft box. the box measures 94.5 mm width, 94.5 mm height and 14.5 mm in diameter, with an acrylic glue dot to secure the lid and base together in"
+ },
+ {
+  "id": 2172,
+  "persona": "naive_branded",
+  "query": "anti slip kitchen steel panel",
+  "expected_code": "7210300090",
+  "source_id": "atar_600015613",
+  "oracle_text": "product: the electro galvanised steel sheet is embossed with a 6wl pattern into it to create a pattern effect on the material. this is primarily used for decorative purposes or high end kitchens as it has anti slip purposes due to the indentation caused by embossing the material. \r\nthe base material is galvanised steel sheet and then the pattern is rolled and pressed onto the material to create the indented pattern. it is then flattened and palletised for transportation.\r\nthe product is rectangu"
+ },
+ {
+  "id": 2165,
+  "persona": "naive_specific",
+  "query": "hot dipped zinc coated steel strip in rolls",
+  "expected_code": "7210490030",
+  "source_id": "atar_600015303",
+  "oracle_text": "product: a flat-rolled non-alloyed steel strip coated on both sides with a zinc-magnesium-aluminium alloy layer by continuous hot-dip coating that complies with the bs en10346 +zinc-magnesium products. the coated strip is cooled, chemically passivated, optionally oiled, and wound into coils. the coating composition typically contains usually over 92% zinc, with the balance being aluminium and magnesium. \r\n\r\nthe steel strip is supplied in coils with a uniform rectangular cross section.\r\n\r\nthe coi"
+ },
+ {
+  "id": 2118,
+  "persona": "original",
+  "query": "product: this 1.6 mm steel wire rod is made from grade 1040 medium-carbon steel and features a bright finish without any phosphate coating. it comes in light pockets, which means the wire is wound into coils, offering a tensile strength between 1800 and 2000 n/mm\u00b2 and a minimum torsion of 33 turns. designed specifically for bed spring manufacturing, each package weighs between 900 and 1000 kg. when imported, the wire arrives as a wound coil.\n\nhmrc justification: classification has been determine",
+  "expected_code": "7213917000",
+  "source_id": "atar_600014976",
+  "oracle_text": "product: this 1.6 mm steel wire rod is made from grade 1040 medium-carbon steel and features a bright finish without any phosphate coating. it comes in light pockets, which means the wire is wound into coils, offering a tensile strength between 1800 and 2000 n/mm\u00b2 and a minimum torsion of 33 turns. designed specifically for bed spring manufacturing, each package weighs between 900 and 1000 kg. when imported, the wire arrives as a wound coil.\n\nhmrc justification: classification has been determine"
+ },
+ {
+  "id": 2670,
+  "persona": "emu_generic",
+  "query": "steel wire",
+  "expected_code": "7213919000",
+  "source_id": "atar_600014977",
+  "oracle_text": "product: this 1.9 mm steel wire rod is manufactured from grade 1100 medium-carbon steel and features a bright finish without any phosphate coating. it comes in light pockets, which means the wire is wound into coils, offering a tensile strength between 1800 and 2000 n/mm\u00b2 and a minimum torsion of 33 turns. designed specifically for bed spring manufacturing, each package weighs between 900 and 1000 kg. when imported, the wire arrives as a wound coil.\n\nhmrc justification: classification has been d"
+ },
+ {
+  "id": 295,
+  "persona": "emu_ordinary",
+  "query": "square steel bar 95-250mm",
+  "expected_code": "7224900700",
+  "source_id": "atar_600014944",
+  "oracle_text": "product: a semi-finished round cornered square steel bar with a cross-section throughout its length. \r\nsizes ranging from 95mm square up to 250.7mm square \r\n\r\nthe main molten steel production methods include:\r\nmelting raw materials using either an electric arc furnace or basic oxygen furnace\r\nladle furnace refining\r\nvacuum degassing\r\nchemical adjustments in the tundish\r\nafter this stage, the steel solidifies through two different methods:\r\n\r\ncontinuous casting into oscillating moulds to produce"
+ },
+ {
+  "id": 449,
+  "persona": "emu_specific",
+  "query": "stainless steel male female threaded union 1/4 to 4 in",
+  "expected_code": "7307291090",
+  "source_id": "atar_600015655",
+  "oracle_text": "product: the bsp unions m/f are used as a threaded connection, it is made from stainless steel. these can be made by either casing or from pipe. these are threaded fittings and are connected by threading one product into the other. the couplings have a female thread and a male thread, fitting is screwed into the coupling. the size range of the couplings are 1/4 inch to 4 inches. packaged: these are supplied in boxes. depending on the size, the packages can be from 5 pcs to 100 pcs.\n\nhmrc justifi"
+ },
+ {
+  "id": 2183,
+  "persona": "naive_vague",
+  "query": "metal cable support",
+  "expected_code": "7308909890",
+  "source_id": "atar_600015362",
+  "oracle_text": "product: the unistrut u15 extra heavy duty cable ladder is a structural steel cable management component designed to support and route electrical or communications cables in fixed installations. \r\nthe u15 series is characterised by 150 mm high side rails with welded transverse rungs forming an open ladder-type structure. \r\nthe ladder provides mechanical support for cable runs and allows cables to be laid across the rungs and secured as required. \r\nthe u15 range is classified as extra heavy duty,"
+ },
+ {
+  "id": 212,
+  "persona": "naive_branded",
+  "query": "stainless hanging basket support",
+  "expected_code": "7312102000",
+  "source_id": "atar_600015589",
+  "oracle_text": "product: stainless steel plant support device\r\n\r\na reusable plant support device designed to suspend plant pots and containers in indoor and outdoor environments. the product is used in gardening and home d\u00e9cor applications to suspend plant pots and baskets from overhead supports. \r\n\r\nthe product is constructed from stainless steel wire formed into an adjustable support configuration and is used to replace plastic hanging supports commonly supplied with plant pots. the product functions as a loa"
+ },
+ {
+  "id": 5,
+  "persona": "naive_specific",
+  "query": "stainless steel rotary pump mechanical seal ring",
+  "expected_code": "7326909290",
+  "source_id": "atar_600014698",
+  "oracle_text": "product: the product is a stainless steel mechanical seal face and is one of the two seal faces in a mechanical seal assembly. the stainless steel seal faces are machined from commercially available steel alloys using cnc or manual machining processes and undergo electropolishing.\r\n\r\nthe seal is open - die forged and each seal face is custom made to precise specifications and combined with other mechanical seal elements and used solely for specific mechanical seals in industrial rotary applicati"
+ },
+ {
+  "id": 66,
+  "persona": "original",
+  "query": "product: the product is a steel wall mounted pegboard for storing and organising tools used in workshops, garages or industrial settings.  the mechanically perforated pegboard panels are made from spcc cold-rolled steel sheets.  also provided with the pegboard are steel metal hooks and tool-holder set for use with spanners, screwdrivers, pillars etc and removable plastic storage bins for small parts such as screw, nuts, bolts etc.  hooks, tool holders and bins can be inserted into the slots and",
+  "expected_code": "7326909890",
+  "source_id": "atar_600015207",
+  "oracle_text": "product: the product is a steel wall mounted pegboard for storing and organising tools used in workshops, garages or industrial settings.  the mechanically perforated pegboard panels are made from spcc cold-rolled steel sheets.  also provided with the pegboard are steel metal hooks and tool-holder set for use with spanners, screwdrivers, pillars etc and removable plastic storage bins for small parts such as screw, nuts, bolts etc.  hooks, tool holders and bins can be inserted into the slots and"
+ },
+ {
+  "id": 345,
+  "persona": "emu_generic",
+  "query": "card wallet",
+  "expected_code": "7616999099",
+  "source_id": "atar_600015366",
+  "oracle_text": "product: the product is black aluminium bankcard wallet which is rfid protected and used for storing payment cards and to prevent them from bending. there is a mechanism on the bottom that allows you to slide out the cards ready to be used. this item can be put in a pocket or bag.\n\nhmrc classification rationale: classification has been determined in accordance with the following: \r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the"
+ },
+ {
+  "id": 418,
+  "persona": "emu_ordinary",
+  "query": "3-piece kids gardening tool set",
+  "expected_code": "8201900000",
+  "source_id": "atar_600015566",
+  "oracle_text": "product: miniature gardening tool set consisting of a trowel, hand fork and hand rake, put up as a 3-piece pack. \r\ntools made from painted iron in red, yellow and blue with a wooden handle and a red chord wrist strap attached to each.  \r\n\r\nsizes:\r\ntrowel: 20cm \r\nhand fork: 20cm \r\nrake: 18.5cm\r\n\r\npackaging: individual packs measuring 260x120x40mm, with 48 packs per case. \r\nsuitable for children aged 3 years +\n\nhmrc justification: classification has been determined in accordance with the following"
+ },
+ {
+  "id": 2756,
+  "persona": "emu_specific",
+  "query": "hand operated metal hole punch with clip for multiple sheets",
+  "expected_code": "8203400000",
+  "source_id": "atar_600015381",
+  "oracle_text": "product: metal hole punch with metal clip\r\nhole dia 633 \r\nthe hole puncher can perforate a single sheet or multiple sheets of paper at one time\n\nhmrc justification: classification has been determined in accordance with the following:-\r\n\r\nfor the purposes of determining the commodity codes within which\r\ngoods most appropriately fall, reg 3 (1) of the customs tariff\r\n(establishment) (eu exit) regulations 2020 sets out that the rules of\r\ninterpretation contained in the following have effect \u2013\r\n\r\na."
+ },
+ {
+  "id": 39,
+  "persona": "naive_vague",
+  "query": "metal rails",
+  "expected_code": "8302420090",
+  "source_id": "atar_600015072",
+  "oracle_text": "product: black powder coated rack rails, typically manufactured from carbon steel, with standardised rack unit (u) hole spacing in accordance with the 19 inch rack format. holes may be square for cage nuts or pre tapped threaded holes for screw fixing.\r\nthey are mounting racking components, designed for permanent installation in standard 19 inch server and equipment racks. they provide vertical and horizontal fixing points to support and position rack mounted equipment.\r\nused to secure rack moun"
+ },
+ {
+  "id": 96,
+  "persona": "naive_branded",
+  "query": "portable davit crane with winch",
+  "expected_code": "8425190000",
+  "source_id": "atar_600015361",
+  "oracle_text": "product: portable lightweight and quick assembly lifting davit arm with 360 degree rotation and built-in hand winch. it has a 125kg to 500kg lifting capacity, and is not self propelled. the safety lifting davit is a device designed to assist with lifting and lowering equipment safely in industrial and construction settings. it is constructed from high-strength, corrosion-resistant materials and includes safety locking mechanisms to reduce the risk of accidental load release or tipping. its desig"
+ },
+ {
+  "id": 665,
+  "persona": "naive_specific",
+  "query": "electric vegetable slicer for restaurants with large hopper",
+  "expected_code": "8438600000",
+  "source_id": "atar_600015696",
+  "oracle_text": "product: the item is a vegetable preparation machine for professional use. the appliance is made from metal and designed for processing large volumes of fruit and vegetables quickly in commercial environments including restaurants, institutions, delicatessens, and catering establishments.\r\n\r\nequipped with a single speed 550w induction motor, the processor has a capacity of over two litres and can process up to 250 kg of produce per hour. the extra-large hopper processes multiple vegetables and b"
+ },
+ {
+  "id": 2158,
+  "persona": "original",
+  "query": "product: a modular, stackable residential energy storage system\r\n\r\none inverter module multiple 5 kwh lithium iron phosphate (lifepo4) battery modules that are stacked vertically on site (1 to 6 modules, giving 5\u201330 kwh nominal capacity) a separate connection hub (ac combiner and protection unit) the complete system is supplied as separate modules and assembled on site by stacking the battery modules on a wheeled base and placing the inverter module on top\r\n\r\nhow it works: the primary function i",
+  "expected_code": "8507600090",
+  "source_id": "atar_600015493",
+  "oracle_text": "product: a modular, stackable residential energy storage system\r\n\r\none inverter module multiple 5 kwh lithium iron phosphate (lifepo4) battery modules that are stacked vertically on site (1 to 6 modules, giving 5\u201330 kwh nominal capacity) a separate connection hub (ac combiner and protection unit) the complete system is supplied as separate modules and assembled on site by stacking the battery modules on a wheeled base and placing the inverter module on top\r\n\r\nhow it works: the primary function i"
+ },
+ {
+  "id": 2790,
+  "persona": "emu_generic",
+  "query": "portable sink",
+  "expected_code": "8516108090",
+  "source_id": "atar_600015667",
+  "oracle_text": "product: a self contained hand washing unit intended for use in vehicles and mobile work environments where there is no permanent water supply. it incorporates an integrated water reservoir, a 12 volt electrically driven pump and hot and cold taps to deliver water on demand. the unit is designed to operate from a vehicle electrical system and is typically installed in commercial vehicles, workshops, or service vans. it provides a means of basic hand hygiene where mains water is not available and"
+ },
+ {
+  "id": 2806,
+  "persona": "emu_ordinary",
+  "query": "blue plastic wash bowl",
+  "expected_code": "8516900099",
+  "source_id": "atar_600015346",
+  "oracle_text": "product: a blue injection moulded round plastic bowl with convex base manufactured for use with a water heating and handwashing appliance. it is placed in the recess of the unit where it can be filled with hot and/or cold water and used for washing. the bowl cannot be used when placed on a surface such as a worktop or floor as the convex bottom will prevent it from remaining completely upright\n\nhmrc justification: classification has been determined in accordance with the following:\r\nfor the purp"
+ },
+ {
+  "id": 2783,
+  "persona": "emu_specific",
+  "query": "titanium smart ring with bluetooth radio, antenna and battery",
+  "expected_code": "8517620000",
+  "source_id": "atar_600015485",
+  "oracle_text": "product: a bluetooth low energy (ble 5.0) communication device designed to function as part of a wireless data transmission system. the device (ring) is composed of a titanium housing, internal printed circuit board, semiconductor components, integrated antenna, sensors, and a rechargeable battery. the device incorporates a bluetooth radio, integrated antenna, onboard processor, and sensor inputs enabling continuous operation and connectivity. it is designed to be worn continuously on the finger"
+ },
+ {
+  "id": 143,
+  "persona": "naive_vague",
+  "query": "display screen",
+  "expected_code": "8524910000",
+  "source_id": "atar_600015510",
+  "oracle_text": "product: lcd flat panel display\r\n\r\nthe product is an lcd flat panel display; this is bonded to a laminated emi shield cover of glass to protect from electromagnetic interference. to display of information designed to be incorporated into other articles in a wide variety of applications. \r\n\r\nthis item is not equipped with components to convert video signals. this display does not contain drivers but does contain control circuits.\n\nhmrc justification: classification has been determined in accordan"
+ },
+ {
+  "id": 168,
+  "persona": "naive_branded",
+  "query": "industrial iot trigger camera",
+  "expected_code": "8525890000",
+  "source_id": "atar_600015547",
+  "oracle_text": "product: the product is an industrial iot (internet of things) based imaging device designed to operate in conjunction with a sensor, capturing still images and/or video only when triggered by a detection event. it does not function as a standalone camera and operates exclusively as part of a wider detection and verification system used in industrial and infrastructure environments. \r\n\r\nthe unit is used to provide visual confirmation of sensor detected events, including pedestrian detection, and"
+ },
+ {
+  "id": 241,
+  "persona": "naive_specific",
+  "query": "crt cockpit navigation monitor for business jet",
+  "expected_code": "8528490000",
+  "source_id": "atar_600015659",
+  "oracle_text": "product: a display monitor for installation into the cockpit of various business jet and turboprop based aircraft as an electronic flight instrument system. it is used for generating symbols and flight navigation information to assist cabin crew during flight. the unit uses a cathode ray tube to display imagery and has a screen size of 8\u201d x 7\u201d, 16 colours.\n\nhmrc justification: classification has been determined in accordance with the following:\r\nfor the purposes of determining the commodity code"
+ },
+ {
+  "id": 2218,
+  "persona": "original",
+  "query": "product: 20 piece vehicle fuse set. the fuses range from 5a to 30a.\r\neach fuse is clearly marked and colour coordinated making them easy to use. \r\neach fuse is approx. 2cm by 2cm.\r\npackaged in a blister card\r\n\r\ncontents:-\r\n2 x 5a \r\n2 x 7.5a \r\n4 x 10a \r\n4 x 15a \r\n4 x 20a \r\n2 x 25a \r\n2 x 30a\n\nhmrc justification: classification has been determined in accordance with the following: -\r\ngeneral interpretative rules (gir)s:\r\n\r\nfor the purposes of determining the commodity codes within which goods most",
+  "expected_code": "8536105090",
+  "source_id": "atar_600015402",
+  "oracle_text": "product: 20 piece vehicle fuse set. the fuses range from 5a to 30a.\r\neach fuse is clearly marked and colour coordinated making them easy to use. \r\neach fuse is approx. 2cm by 2cm.\r\npackaged in a blister card\r\n\r\ncontents:-\r\n2 x 5a \r\n2 x 7.5a \r\n4 x 10a \r\n4 x 15a \r\n4 x 20a \r\n2 x 25a \r\n2 x 30a\n\nhmrc justification: classification has been determined in accordance with the following: -\r\ngeneral interpretative rules (gir)s:\r\n\r\nfor the purposes of determining the commodity codes within which goods most"
+ },
+ {
+  "id": 318,
+  "persona": "emu_generic",
+  "query": "motion sensor",
+  "expected_code": "8536501900",
+  "source_id": "atar_600015220",
+  "oracle_text": "product: an infrared microwave sensor for an outdoor solar light. it is used to detect motion which in turn will trigger lights only when needed. this will improve energy efficiency. the voltage is 3 - 16v. this item is imported as a separate component to be assembled at a later date.\r\n\r\npackaged in a carton box.\n\nhmrc justification: classification has been determined in accordance with the following:\r\n\r\nfor the purposes of determining the commodity codes within which goods most appropriately fa"
+ },
+ {
+  "id": 397,
+  "persona": "emu_ordinary",
+  "query": "electrical junction box",
+  "expected_code": "8536901000",
+  "source_id": "atar_600015548",
+  "oracle_text": "product: the cab box pack is an electrical junction and connection box used in conjunction with the companies sensor system. it provides a secure enclosure for terminating and distributing low-voltage electrical connections (not exceeding 1,000v) between the sensor and associated cabling. in larger material handling equipment (mhe), it also supports in-cab alert functionality, enabling signals generated by the sensor system to be transmitted through connected wiring to provide visual or audible"
+ },
+ {
+  "id": 2795,
+  "persona": "emu_specific",
+  "query": "vertical rack-mounted power strip with 16 fused computer sockets",
+  "expected_code": "8537109899",
+  "source_id": "atar_600015342",
+  "oracle_text": "product: a vertical, remote monitor, rack-mounted power distribution unit (pdu), designed for use in server cabinets.  the pdu can also be described as a mains distribution panel or power strip, as it distributes electrical power to multiple outlets from a single supply.\r\nmaximum operating rating of 250v ac, providing 16 iec c13 outlets, each individually protected by a 3.15a fuse to protect connected equipment. \r\nit distributes power from a single mains input to multiple devices such as servers"
+ },
+ {
+  "id": 2143,
+  "persona": "naive_vague",
+  "query": "electrical cable",
+  "expected_code": "8544429090",
+  "source_id": "atar_600015550",
+  "oracle_text": "product: a sensor cable which is used to connect to the companies sensor system and other related system components. it carries low-voltage electrical signals and/or power between the sensor, junction box, and in-cab alert or interface systems in larger mhe (material handling equipment). it's purpose is to provide a reliable, protected electrical connection for signal transmission (including detection event signals and alert outputs). it does not process or interpret data itself. the cable funct"
+ },
+ {
+  "id": 1400,
+  "persona": "emu_generic",
+  "query": "high performance car",
+  "expected_code": "8703241000",
+  "source_id": "atar_600015660",
+  "oracle_text": "product: a venom f5 revolution evolution hyper car is engineered and manufactured in 2025 in the united states as part of the exclusive venom f5 programme. \r\n\r\nthis ultra-low volume, allocation-only vehicle is produced in \"revolution\" and \"evolution\" factory specifications, representing the highest levels of performance available in the series. \r\n\r\nit features a 6.6-liter twin-turbocharged v8 engine generating approximately 2,031 bhp, with an estimated top speed of 311 mph. \r\n\r\ndesigned for extr"
+ },
+ {
+  "id": 1023,
+  "persona": "emu_ordinary",
+  "query": "brake drums for trailers and caravans",
+  "expected_code": "8716909098",
+  "source_id": "atar_600015591",
+  "oracle_text": "product: trailer and caravan brake drums. these are components to be used exclusively for towing type 02 braked trailers (87 16 40) and caravans (87 16 10). they are not designed for, or suitable for use on any other vehicle.\r\n\r\n the main material is cast steel. these are machined cast with the provision for a bearing to be inserted and for attaching to a road wheel. then this brake drum is fitted over the brake drum back plate and secured in by a nut. brake drums are a permanent fixture and are"
+ },
+ {
+  "id": 2675,
+  "persona": "emu_specific",
+  "query": "precision aluminium sub-assembly for active vibration attenuator on civil aircraft",
+  "expected_code": "8807300010",
+  "source_id": "atar_600015463",
+  "oracle_text": "product: sub-assembly sub002-va-03-0032 is a part of an active tuned vibration attenuator (atva) designed to be installed on civilian aircraft to manage unwanted vibration and noise.\r\n\r\nmanufactured from aluminium alloy, the part is precision engineered to a specific design to be assembled, along with additional parts, to form a completed atva assembly and is part of the aircraft\u2019s original design specification. \r\n\r\nthe completed assembly that the sub-assembly sub002-va-03-0032 forms part of is"
+ }
+]

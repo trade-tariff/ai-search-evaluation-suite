@@ -40,8 +40,6 @@ from sections import section_for_code
 from simulator import simulate_answer
 
 MAX_ROUNDS = 5
-JUDGE_TIMEOUT_S = 60
-JUDGE_DRAIN_TIMEOUT_S = 300
 RESULTS_DIR = Path(__file__).parent.parent / "results"
 RESULTS_DIR.mkdir(exist_ok=True)
 
@@ -613,10 +611,7 @@ async def run_benchmark(
             _save_run(_current_run)
             yield SSEEvent(event="benchmark:cancelled", data={"phase": "panel", "reason": "user"})
             return
-        try:
-            item = await asyncio.wait_for(event_bus.get(), timeout=1.0)
-        except asyncio.TimeoutError:
-            continue
+        item = await event_bus.get()
         kind = item[0]
         if kind == "live":
             _, name, data = item
@@ -714,8 +709,6 @@ async def run_benchmark(
     judge_enabled = bool(openai_key and judge_cfg.enabled)
     judge_client = None
     judge_count = 0
-    judge_tasks: dict[int, asyncio.Task] = {}
-    pending_judges: set[int] = set()
 
     if judge_enabled:
         from openai import AsyncOpenAI
@@ -723,43 +716,28 @@ async def run_benchmark(
         judge_client = AsyncOpenAI(api_key=openai_key)
 
         async def run_judge(eval_idx: int, ev: EvaluationResult) -> None:
-            try:
-                consensus = consensus_results.get(ev.prompt_index)
-                target = None
-                if ev.model_id == "consensus":
-                    target = consensus
-                else:
-                    for r in _current_run.model_results:
-                        if r.model_id == ev.model_id and r.prompt_index == ev.prompt_index:
-                            target = r
-                            break
-                if not consensus or not target:
-                    await event_bus.put(("judge_done", eval_idx, {}))
-                    return
-                query = get_raw_query(ev.prompt_index)
-                # Pass the per-prompt fact store snapshot so the judge can score
-                # fact_consistency and understand the apples-to-apples property.
-                facts = fact_store.as_dict(ev.prompt_index)
-                scores = await asyncio.wait_for(
-                    judge_response(
-                        judge_client, query, consensus.response_text, target.response_text, judge_cfg,
-                        baseline_rounds=consensus.total_rounds, target_rounds=target.total_rounds,
-                        is_baseline=(ev.model_id == "consensus"),
-                        facts=facts,
-                    ),
-                    timeout=JUDGE_TIMEOUT_S,
-                )
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                scores = {
-                    "fact_consistency": None,
-                    "question_quality": None,
-                    "reasoning": f"Judge error: {str(exc)[:200]}",
-                    "cost": 0.0,
-                    "latency_ms": 0.0,
-                    "error": True,
-                }
+            consensus = consensus_results.get(ev.prompt_index)
+            target = None
+            if ev.model_id == "consensus":
+                target = consensus
+            else:
+                for r in _current_run.model_results:
+                    if r.model_id == ev.model_id and r.prompt_index == ev.prompt_index:
+                        target = r
+                        break
+            if not consensus or not target:
+                await event_bus.put(("judge_done", eval_idx, {}))
+                return
+            query = get_raw_query(ev.prompt_index)
+            # Pass the per-prompt fact store snapshot so the judge can score
+            # fact_consistency and understand the apples-to-apples property.
+            facts = fact_store.as_dict(ev.prompt_index)
+            scores = await judge_response(
+                judge_client, query, consensus.response_text, target.response_text, judge_cfg,
+                baseline_rounds=consensus.total_rounds, target_rounds=target.total_rounds,
+                is_baseline=(ev.model_id == "consensus"),
+                facts=facts,
+            )
             await event_bus.put(("judge_done", eval_idx, scores))
 
     # ── Phase 2a: Baseline judge evals fire immediately ──
@@ -851,10 +829,7 @@ async def run_benchmark(
             _save_run(_current_run)
             yield SSEEvent(event="benchmark:cancelled", data={"phase": "fanout", "reason": "user"})
             return
-        try:
-            item = await asyncio.wait_for(event_bus.get(), timeout=1.0)
-        except asyncio.TimeoutError:
-            continue
+        item = await event_bus.get()
         kind = item[0]
         if kind == "live":
             _, name, data = item
@@ -890,11 +865,7 @@ async def run_benchmark(
             evaluation.panel_agreement = panel_agreements.get(result.prompt_index)
             _current_run.evaluations.append(evaluation)
             if judge_enabled:
-                eval_idx = len(_current_run.evaluations) - 1
-                task = asyncio.create_task(run_judge(eval_idx, evaluation))
-                all_tasks.append(task)
-                judge_tasks[eval_idx] = task
-                pending_judges.add(eval_idx)
+                asyncio.create_task(run_judge(len(_current_run.evaluations) - 1, evaluation))
                 judge_count += 1
 
         snapshot_fact_store_to_run()
@@ -920,57 +891,13 @@ async def run_benchmark(
         yield SSEEvent(event="judge:start", data={"total": judge_count, "model": judge_cfg.model})
 
         judge_done = 0
-        judge_deadline = asyncio.get_running_loop().time() + JUDGE_DRAIN_TIMEOUT_S
-        last_wait_event = 0.0
         while judge_done < judge_count:
             if check_cancelled():
                 _current_run.status = "cancelled"
                 _save_run(_current_run)
                 yield SSEEvent(event="benchmark:cancelled", data={"phase": "judge", "reason": "user"})
                 return
-            now = asyncio.get_running_loop().time()
-            if now >= judge_deadline:
-                for task in judge_tasks.values():
-                    if not task.done():
-                        task.cancel()
-                for eval_idx in sorted(pending_judges):
-                    ev = _current_run.evaluations[eval_idx]
-                    ev.judge_error = True
-                    ev.judge_reasoning = (
-                        f"Judge timed out after {JUDGE_DRAIN_TIMEOUT_S}s drain window; "
-                        "deterministic metrics are still available."
-                    )
-                    issue = {
-                        "kind": "error",
-                        "source": "judge",
-                        "model_id": ev.model_id,
-                        "prompt_index": ev.prompt_index,
-                        "message": ev.judge_reasoning,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    }
-                    _current_run.issues.append(issue)
-                    judge_done += 1
-                    yield SSEEvent(event="judge:complete", data={
-                        "done": judge_done,
-                        "total": judge_count,
-                        "model_id": ev.model_id,
-                        "timed_out": True,
-                    })
-                pending_judges.clear()
-                break
-            try:
-                item = await asyncio.wait_for(event_bus.get(), timeout=1.0)
-            except asyncio.TimeoutError:
-                now = asyncio.get_running_loop().time()
-                if now - last_wait_event >= 15.0:
-                    last_wait_event = now
-                    yield SSEEvent(event="judge:waiting", data={
-                        "done": judge_done,
-                        "total": judge_count,
-                        "pending": judge_count - judge_done,
-                        "seconds_remaining": max(0, round(judge_deadline - now)),
-                    })
-                continue
+            item = await event_bus.get()
             kind = item[0]
             if kind == "live":
                 _, name, data = item
@@ -979,7 +906,6 @@ async def run_benchmark(
             if kind != "judge_done":
                 continue
             _, eval_idx, scores = item
-            pending_judges.discard(eval_idx)
             if scores:
                 ev = _current_run.evaluations[eval_idx]
                 # Judge now scores TWO dimensions: fact_consistency and

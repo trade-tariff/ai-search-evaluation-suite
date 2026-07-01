@@ -57,6 +57,9 @@ const ACTION_KEYS = [
 
 const LEVELS = ["section", "chapter", "heading", "subheading", "eight_digit", "declarable"] as const;
 type Level = (typeof LEVELS)[number];
+type ChartTooltipPayload<T = any> = {
+  payload: T;
+};
 
 type Term = {
   index: number;
@@ -1362,7 +1365,7 @@ export default function InterceptsPanel() {
               <ZAxis range={[40, 40]} />
               <Tooltip
                 contentStyle={{ background: "#111827", border: "1px solid #374151" }}
-                content={({ payload }) => {
+                content={({ payload }: { payload?: ChartTooltipPayload[] }) => {
                   if (!payload || !payload.length) return null;
                   const p = payload[0].payload;
                   return (
@@ -1567,7 +1570,7 @@ export function GoldRecallPanel() {
                 />
                 <Tooltip
                   contentStyle={{ background: "#111827", border: "1px solid #374151" }}
-                  content={({ payload }) => {
+                  content={({ payload }: { payload?: ChartTooltipPayload[] }) => {
                     if (!payload || !payload.length) return null;
                     const p = payload[0].payload as any;
                     return (
@@ -1878,7 +1881,7 @@ export function CommoditySweepView({
                 name="Chapter"
                 domain={[1, 105]}
                 ticks={[1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 99, 102]}
-                tickFormatter={(v) => (Math.round(v) === 102 ? "MISS" : String(Math.round(v)))}
+                tickFormatter={(v: number) => (Math.round(v) === 102 ? "MISS" : String(Math.round(v)))}
                 allowDecimals={false}
                 tick={{ fill: "#9ca3af", fontSize: 11 }}
                 label={{ value: "Chapter", position: "insideBottom", offset: -20, fill: "#9ca3af" }}
@@ -1894,7 +1897,7 @@ export function CommoditySweepView({
               <ZAxis range={[35, 35]} />
               <Tooltip
                 contentStyle={{ background: "#111827", border: "1px solid #374151" }}
-                content={({ payload }) => {
+                content={({ payload }: { payload?: ChartTooltipPayload[] }) => {
                   if (!payload || !payload.length) return null;
                   const p = payload[0].payload as any;
                   const source = p.term ? "Intercept term" : p.action ? "Bucket-B commodity" : "Commodity";

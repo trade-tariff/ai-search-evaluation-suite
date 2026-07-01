@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import signal
 import sqlite3
@@ -17,7 +18,7 @@ from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.routing import APIRoute
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -132,6 +133,14 @@ class RetrievalSearch(BaseModel):
     allow_spend: bool = False
 
 
+class InputScoreRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=500)
+    run_label: str | None = Field(default="baseline_fts_only", max_length=120)
+    retrieval_limit: int = Field(default=100, ge=10, le=500)
+    include_candidates: bool = False
+    allow_spend: bool = False
+
+
 class ClassifyTrial(BaseModel):
     gold_id: int | None = None
     query: str | None = Field(default=None, max_length=500)
@@ -167,6 +176,69 @@ def _temporary_env(updates: dict[str, str | None]):
 
 def _tariff_dsn() -> str:
     return os.environ.get("TARIFF_DB_DSN", "postgresql:///tariff_db")
+
+
+def _extraction_pipeline_script() -> Path:
+    return APP_ROOT / "scripts" / "extraction_pipeline.py"
+
+
+def _extraction_status_payload() -> dict[str, Any]:
+    script = _extraction_pipeline_script()
+    if not script.exists():
+        return {
+            "status": "missing",
+            "available": False,
+            "script": str(script),
+            "detail": "scripts/extraction_pipeline.py is not present in the deployed app bundle.",
+        }
+    env = os.environ.copy()
+    env.setdefault("PYTHONPATH", str(PRODUCT_BACKEND))
+    try:
+        result = subprocess.run(
+            [sys.executable, str(script), "status", "--json"],
+            cwd=APP_ROOT,
+            env=env,
+            text=True,
+            capture_output=True,
+            timeout=20,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return {
+            "status": "timeout",
+            "available": True,
+            "script": str(script),
+            "detail": "extraction status command timed out after 20 seconds",
+        }
+    except Exception as exc:
+        return {
+            "status": "error",
+            "available": True,
+            "script": str(script),
+            "detail": f"{type(exc).__name__}: {exc}",
+        }
+    if result.returncode != 0:
+        return {
+            "status": "error",
+            "available": True,
+            "script": str(script),
+            "returncode": result.returncode,
+            "stderr": (result.stderr or "")[-2000:],
+            "stdout": (result.stdout or "")[-2000:],
+        }
+    try:
+        payload = json.loads(result.stdout or "{}")
+    except json.JSONDecodeError as exc:
+        return {
+            "status": "error",
+            "available": True,
+            "script": str(script),
+            "detail": f"status output was not JSON: {exc}",
+            "stdout": (result.stdout or "")[-2000:],
+        }
+    payload["available"] = True
+    payload["script"] = str(script)
+    return payload
 
 
 def _init_db() -> None:
@@ -335,6 +407,7 @@ def health() -> dict:
         "kg_label_profile": os.environ.get("AI_FAN_OUT_KG_LABEL_PROFILE", "full"),
         "openai_key_present": bool(os.environ.get("OPENAI_API_KEY")),
         "state_ready": STATE_DIR.exists(),
+        "extraction_pipeline_present": _extraction_pipeline_script().exists(),
         "limits": {
             "allowed_models": _allowed_models(),
             "max_running_jobs": _env_int("CLASSIFY_EVAL_MAX_RUNNING_JOBS", 1),
@@ -347,6 +420,11 @@ def health() -> dict:
 @app.get("/api/live")
 def live() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/api/extraction/status")
+def extraction_status() -> dict:
+    return _extraction_status_payload()
 
 
 @app.get("/api/options")
@@ -365,6 +443,298 @@ def options() -> dict:
             "max_sessions": _env_int("CLASSIFY_EVAL_MAX_SESSIONS", 50),
             "max_est_usd": _env_float("CLASSIFY_EVAL_MAX_EST_USD", 10.0),
             "allow_sweep": _env_bool("CLASSIFY_EVAL_ALLOW_SWEEP"),
+        },
+    }
+
+
+@app.get("/api/eval-cost/summary")
+def eval_cost_summary(limit: int = 20) -> dict:
+    limit = max(1, min(int(limit or 20), 100))
+    try:
+        import psycopg
+        from psycopg.rows import dict_row
+
+        with psycopg.connect(_tariff_dsn(), row_factory=dict_row) as conn, conn.cursor() as cur:
+            cur.execute("SELECT to_regclass('kg.commodity_fact_model_eval') AS table_name")
+            if not cur.fetchone()["table_name"]:
+                return {
+                    "totals": {
+                        "calls": 0,
+                        "ok": 0,
+                        "failed": 0,
+                        "runs": 0,
+                        "models": 0,
+                        "prompt_versions": 0,
+                        "cost_usd": 0.0,
+                        "prompt_tokens": 0,
+                        "completion_tokens": 0,
+                    },
+                    "runs": [],
+                    "model_totals": [],
+                    "prompt_totals": [],
+                }
+
+            cur.execute(
+                """
+                SELECT count(*)::int AS calls,
+                       count(*) FILTER (WHERE error IS NULL)::int AS ok,
+                       count(*) FILTER (WHERE error IS NOT NULL)::int AS failed,
+                       count(DISTINCT run_id)::int AS runs,
+                       count(DISTINCT model)::int AS models,
+                       count(DISTINCT prompt_version)::int AS prompt_versions,
+                       coalesce(sum(cost_usd), 0)::float8 AS cost_usd,
+                       coalesce(sum(prompt_tokens), 0)::bigint AS prompt_tokens,
+                       coalesce(sum(completion_tokens), 0)::bigint AS completion_tokens,
+                       min(created_at) AS first_write,
+                       max(created_at) AS last_write
+                FROM kg.commodity_fact_model_eval
+                """
+            )
+            totals = dict(cur.fetchone())
+
+            cur.execute(
+                """
+                SELECT run_id,
+                       count(*)::int AS calls,
+                       count(*) FILTER (WHERE error IS NULL)::int AS ok,
+                       count(*) FILTER (WHERE error IS NOT NULL)::int AS failed,
+                       count(DISTINCT model)::int AS models,
+                       count(DISTINCT prompt_version)::int AS prompt_versions,
+                       count(DISTINCT commodity_code)::int AS commodity_codes,
+                       coalesce(sum(cost_usd), 0)::float8 AS cost_usd,
+                       coalesce(sum(prompt_tokens), 0)::bigint AS prompt_tokens,
+                       coalesce(sum(completion_tokens), 0)::bigint AS completion_tokens,
+                       avg(nullif(quality->>'score', '')::float8)::float8 AS avg_score,
+                       min(created_at) AS first_write,
+                       max(created_at) AS last_write,
+                       extract(epoch FROM max(created_at) - min(created_at))::float8 AS duration_seconds
+                FROM kg.commodity_fact_model_eval
+                GROUP BY run_id
+                ORDER BY max(created_at) DESC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+            runs = [dict(row) for row in cur.fetchall()]
+
+            cur.execute(
+                """
+                SELECT model,
+                       count(*)::int AS calls,
+                       count(*) FILTER (WHERE error IS NULL)::int AS ok,
+                       coalesce(sum(cost_usd), 0)::float8 AS cost_usd,
+                       coalesce(sum(prompt_tokens), 0)::bigint AS prompt_tokens,
+                       coalesce(sum(completion_tokens), 0)::bigint AS completion_tokens,
+                       avg(nullif(quality->>'score', '')::float8)::float8 AS avg_score
+                FROM kg.commodity_fact_model_eval
+                GROUP BY model
+                ORDER BY cost_usd DESC
+                """
+            )
+            model_totals = [dict(row) for row in cur.fetchall()]
+
+            cur.execute(
+                """
+                SELECT prompt_version,
+                       count(*)::int AS calls,
+                       count(*) FILTER (WHERE error IS NULL)::int AS ok,
+                       coalesce(sum(cost_usd), 0)::float8 AS cost_usd,
+                       avg(nullif(quality->>'score', '')::float8)::float8 AS avg_score
+                FROM kg.commodity_fact_model_eval
+                GROUP BY prompt_version
+                ORDER BY cost_usd DESC
+                LIMIT 50
+                """
+            )
+            prompt_totals = [dict(row) for row in cur.fetchall()]
+
+            embedding_cost_per_million = float(os.environ.get("COST_EMBEDDING_USD_PER_1M_TOKENS", "0.02"))
+            e2e_provider_call_est_usd = float(os.environ.get("COST_E2E_PROVIDER_CALL_USD", "0.002"))
+
+            retrieval_runs = []
+            retrieval_totals = {
+                "runs": 0,
+                "calls": 0,
+                "estimated_embedding_tokens": 0,
+                "estimated_cost_usd": 0.0,
+                "last_write": None,
+            }
+            cur.execute("SELECT to_regclass('kg.eval_runs') AS table_name")
+            if cur.fetchone()["table_name"]:
+                cur.execute(
+                    """
+                    SELECT er.id,
+                           er.run_label,
+                           er.config_json,
+                           er.n_queries,
+                           er.retrieval_limit,
+                           count(rr.id)::int AS calls,
+                           coalesce(sum(greatest(1, ceil(length(coalesce(g.query, '')) / 4.0))), 0)::bigint AS estimated_embedding_tokens,
+                           er.started_at AS first_write,
+                           er.finished_at AS last_write,
+                           extract(epoch FROM er.finished_at - er.started_at)::float8 AS duration_seconds
+                    FROM kg.eval_runs er
+                    LEFT JOIN kg.eval_run_results rr ON rr.run_id = er.id
+                    LEFT JOIN kg.eval_gold g ON g.id = rr.gold_id
+                    GROUP BY er.id
+                    ORDER BY er.started_at DESC
+                    """
+                )
+                for row in cur.fetchall():
+                    item = dict(row)
+                    cfg = item.pop("config_json") or {}
+                    item["use_vector"] = bool(cfg.get("use_vector"))
+                    item["use_facts_vec"] = bool(cfg.get("use_facts_vec"))
+                    item["use_kg_vec"] = bool(cfg.get("use_kg_vec"))
+                    vector_enabled = item["use_vector"] or item["use_facts_vec"] or item["use_kg_vec"]
+                    tokens = int(item.get("estimated_embedding_tokens") or 0) if vector_enabled else 0
+                    item["estimated_embedding_tokens"] = tokens
+                    item["estimated_cost_usd"] = tokens * embedding_cost_per_million / 1_000_000.0
+                    retrieval_runs.append(item)
+                retrieval_totals = {
+                    "runs": len(retrieval_runs),
+                    "calls": sum(int(row.get("calls") or 0) for row in retrieval_runs),
+                    "estimated_embedding_tokens": sum(int(row.get("estimated_embedding_tokens") or 0) for row in retrieval_runs),
+                    "estimated_cost_usd": sum(float(row.get("estimated_cost_usd") or 0.0) for row in retrieval_runs),
+                    "last_write": max((row.get("last_write") for row in retrieval_runs if row.get("last_write")), default=None),
+                }
+                retrieval_runs = retrieval_runs[:limit]
+
+            e2e_runs = []
+            e2e_totals = {
+                "runs": 0,
+                "provider_calls": 0,
+                "estimated_embedding_tokens": 0,
+                "estimated_cost_usd": 0.0,
+                "last_write": None,
+            }
+            cur.execute("SELECT to_regclass('kg.e2e_eval_runs') AS table_name")
+            if cur.fetchone()["table_name"]:
+                cur.execute(
+                    """
+                    SELECT r.id,
+                           r.run_label,
+                           r.retrieval_run_label,
+                           r.question_mode,
+                           r.answerer,
+                           r.config_json,
+                           r.input_count,
+                           r.provider_calls_used,
+                           coalesce(sum(greatest(1, ceil(length(coalesce(res.query, '')) / 4.0))), 0)::bigint AS estimated_embedding_tokens,
+                           r.started_at AS first_write,
+                           r.finished_at AS last_write,
+                           extract(epoch FROM r.finished_at - r.started_at)::float8 AS duration_seconds
+                    FROM kg.e2e_eval_runs r
+                    LEFT JOIN kg.e2e_eval_results res ON res.run_id = r.id
+                    GROUP BY r.id
+                    ORDER BY r.started_at DESC
+                    """
+                )
+                for row in cur.fetchall():
+                    item = dict(row)
+                    cfg = item.pop("config_json") or {}
+                    retrieval_cfg = cfg.get("retrieval_config") or {}
+                    vector_enabled = bool(
+                        retrieval_cfg.get("use_vector")
+                        or retrieval_cfg.get("use_facts_vec")
+                        or retrieval_cfg.get("use_kg_vec")
+                    )
+                    tokens = int(item.get("estimated_embedding_tokens") or 0) if vector_enabled else 0
+                    provider_calls = int(item.get("provider_calls_used") or 0)
+                    item["estimated_embedding_tokens"] = tokens
+                    item["estimated_cost_usd"] = (
+                        provider_calls * e2e_provider_call_est_usd
+                        + tokens * embedding_cost_per_million / 1_000_000.0
+                    )
+                    e2e_runs.append(item)
+                e2e_totals = {
+                    "runs": len(e2e_runs),
+                    "provider_calls": sum(int(row.get("provider_calls_used") or 0) for row in e2e_runs),
+                    "estimated_embedding_tokens": sum(int(row.get("estimated_embedding_tokens") or 0) for row in e2e_runs),
+                    "estimated_cost_usd": sum(float(row.get("estimated_cost_usd") or 0.0) for row in e2e_runs),
+                    "last_write": max((row.get("last_write") for row in e2e_runs if row.get("last_write")), default=None),
+                }
+                e2e_runs = e2e_runs[:limit]
+
+            classification_runs = []
+            classification_totals = {
+                "runs": 0,
+                "sessions": 0,
+                "estimated_cost_usd": 0.0,
+                "last_write": None,
+            }
+            cur.execute("SELECT to_regclass('kg.classify_runs') AS table_name")
+            if cur.fetchone()["table_name"]:
+                cur.execute(
+                    """
+                    SELECT run_label,
+                           model,
+                           strategy,
+                           prompt_mode,
+                           augmentation,
+                           count(*)::int AS sessions,
+                           coalesce(sum(est_cost_usd), 0)::float8 AS estimated_cost_usd,
+                           min(started_at) AS first_write,
+                           max(started_at) AS last_write
+                    FROM kg.classify_runs
+                    GROUP BY run_label, model, strategy, prompt_mode, augmentation
+                    ORDER BY max(started_at) DESC
+                    LIMIT %s
+                    """,
+                    (limit,),
+                )
+                classification_runs = [dict(row) for row in cur.fetchall()]
+                cur.execute(
+                    """
+                    SELECT count(DISTINCT run_label)::int AS runs,
+                           count(*)::int AS sessions,
+                           coalesce(sum(est_cost_usd), 0)::float8 AS estimated_cost_usd,
+                           max(started_at) AS last_write
+                    FROM kg.classify_runs
+                    """
+                )
+                classification_totals = dict(cur.fetchone())
+
+    except Exception as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+    def encode(row: dict[str, Any]) -> dict[str, Any]:
+        out = dict(row)
+        for key in ("first_write", "last_write"):
+            if out.get(key) is not None:
+                out[key] = out[key].isoformat()
+        return out
+
+    fact_cost = float((totals or {}).get("cost_usd") or 0.0)
+    retrieval_cost = float((retrieval_totals or {}).get("estimated_cost_usd") or 0.0)
+    e2e_cost = float((e2e_totals or {}).get("estimated_cost_usd") or 0.0)
+    classification_cost = float((classification_totals or {}).get("estimated_cost_usd") or 0.0)
+
+    return {
+        "totals": encode(totals),
+        "runs": [encode(row) for row in runs],
+        "model_totals": [encode(row) for row in model_totals],
+        "prompt_totals": [encode(row) for row in prompt_totals],
+        "spend_totals": {
+            "fact_eval_cost_usd": fact_cost,
+            "retrieval_embedding_est_cost_usd": retrieval_cost,
+            "e2e_est_cost_usd": e2e_cost,
+            "classification_est_cost_usd": classification_cost,
+            "estimated_total_usd": fact_cost + retrieval_cost + e2e_cost + classification_cost,
+            "embedding_cost_per_million_tokens": embedding_cost_per_million,
+            "e2e_provider_call_est_usd": e2e_provider_call_est_usd,
+        },
+        "retrieval": {
+            "totals": encode(retrieval_totals),
+            "runs": [encode(row) for row in retrieval_runs],
+        },
+        "e2e": {
+            "totals": encode(e2e_totals),
+            "runs": [encode(row) for row in e2e_runs],
+        },
+        "classification": {
+            "totals": encode(classification_totals),
+            "runs": [encode(row) for row in classification_runs],
         },
     }
 
@@ -422,6 +792,8 @@ def retrieval_search(req: RetrievalSearch) -> dict:
         DISPLAY_LIMIT,
         _flat_code,
         experiment_catalog,
+        query_difficulty_from_candidates,
+        query_lexical_specificity,
         retrieve_for_config,
     )
 
@@ -477,18 +849,20 @@ def retrieval_search(req: RetrievalSearch) -> dict:
                 rank = idx
                 break
 
-    top_candidates = []
-    for idx, row in enumerate(candidates[:DISPLAY_LIMIT], start=1):
+    ranked_candidates = []
+    for idx, row in enumerate(candidates, start=1):
         item = dict(row)
         item["rank"] = idx
-        top_candidates.append(item)
+        ranked_candidates.append(item)
+    top_candidates = ranked_candidates[:DISPLAY_LIMIT]
 
     return {
         "query": req.query,
         "processed_query": processed_query,
         "rewrite": rewrite_info,
         "expected_code": req.expected_code,
-        "expected_code_normalized": expected_flat or None,
+        "expected_code_normalized": expected_flat,
+        "evaluated": bool(expected_flat),
         "experiment": selected,
         "retrieval_limit": limit,
         "provider_calls_used": needs_provider,
@@ -498,7 +872,10 @@ def retrieval_search(req: RetrievalSearch) -> dict:
         "hit_at_100": bool(rank and rank <= 100),
         "hit_within_limit": rank is not None,
         "leg_counts": leg_counts,
+        "lexical_specificity": query_lexical_specificity(req.query),
+        "query_difficulty": query_difficulty_from_candidates(processed_query, ranked_candidates, k=limit),
         "top_candidates": top_candidates,
+        "candidates": ranked_candidates,
     }
 
 
@@ -512,8 +889,6 @@ def retrieval_try(payload: dict) -> dict:
     expected_code = str(payload.get("expected_code") or "").strip()
     if not query:
         raise HTTPException(400, "query is required")
-    if not expected_code:
-        raise HTTPException(400, "expected_code is required")
     try:
         retrieval_limit = int(payload.get("retrieval_limit") or 100)
     except (TypeError, ValueError):
@@ -527,6 +902,199 @@ def retrieval_try(payload: dict) -> dict:
             allow_spend=payload.get("allow_spend") is True,
         )
     )
+
+
+def _score_flat_code(code: str) -> str:
+    digits = "".join(ch for ch in str(code or "") if ch.isdigit())
+    return digits.ljust(10, "0")[:10] if digits else ""
+
+
+def _score_weight(row: dict[str, Any], rank: int) -> float:
+    for key in ("score", "rrf_score", "cosine_score"):
+        try:
+            value = row.get(key)
+            if value is not None:
+                value_f = float(value)
+                if value_f > 0:
+                    return value_f
+        except Exception:
+            pass
+    return 1.0 / (rank + 60.0)
+
+
+def _shannon_bits(values: list[float]) -> float:
+    total = sum(v for v in values if v > 0)
+    if total <= 0:
+        return 0.0
+    entropy = 0.0
+    for value in values:
+        if value <= 0:
+            continue
+        p = value / total
+        entropy -= p * math.log2(p)
+    return entropy
+
+
+def _input_code_prefix_entropy(candidates: list[dict[str, Any]], k: int) -> dict[str, Any]:
+    subset = list(candidates or [])[: max(1, int(k or 1))]
+    levels = {"chapter": 2, "heading": 4, "subheading": 6, "cn8": 8, "commodity": 10}
+    distributions: dict[str, dict[str, float]] = {name: {} for name in levels}
+    candidate_count = 0
+    for rank, row in enumerate(subset, start=1):
+        code = _score_flat_code(str(row.get("commodity_code") or row.get("code") or ""))
+        if not code:
+            continue
+        candidate_count += 1
+        weight = _score_weight(row, rank)
+        for name, length in levels.items():
+            key = code[:length]
+            distributions[name][key] = distributions[name].get(key, 0.0) + weight
+    by_level: dict[str, Any] = {}
+    for name, dist in distributions.items():
+        entropy = _shannon_bits(list(dist.values()))
+        max_entropy = math.log2(len(dist)) if len(dist) > 1 else 0.0
+        by_level[name] = {
+            "distinct": len(dist),
+            "entropy_bits": round(entropy, 4),
+            "normalized_entropy": round(entropy / max_entropy, 4) if max_entropy else 0.0,
+            "top_values": [
+                {"value": key, "weight": round(value, 6)}
+                for key, value in sorted(dist.items(), key=lambda item: item[1], reverse=True)[:8]
+            ],
+        }
+    return {
+        "basis": "post_retrieval_code_prefix_shannon_entropy",
+        "candidate_count": candidate_count,
+        "k": len(subset),
+        "levels": by_level,
+    }
+
+
+def _input_facet_entropy(candidates: list[dict[str, Any]], k: int = 100, max_facets: int = 12) -> dict[str, Any]:
+    codes: list[str] = []
+    for row in list(candidates or [])[: max(1, int(k or 1))]:
+        code = _score_flat_code(str(row.get("commodity_code") or row.get("code") or ""))
+        if code and code not in codes:
+            codes.append(code)
+    if not codes:
+        return {"available": True, "basis": "kg.commodity_facets", "candidate_count": 0, "facets": []}
+    try:
+        import psycopg
+        from psycopg.rows import dict_row
+
+        with psycopg.connect(_tariff_dsn(), row_factory=dict_row) as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT commodity_code, facet_key, facet_value
+                FROM kg.commodity_facets
+                WHERE commodity_code = ANY(%s)
+                  AND facet_key IS NOT NULL
+                  AND facet_value IS NOT NULL
+                  AND (use_scopes IS NULL
+                       OR 'qa' = ANY(use_scopes)
+                       OR 'classification' = ANY(use_scopes)
+                       OR 'retrieval' = ANY(use_scopes))
+                """,
+                (codes,),
+            )
+            rows = [dict(row) for row in cur.fetchall()]
+    except Exception as exc:
+        return {
+            "available": False,
+            "basis": "kg.commodity_facets",
+            "candidate_count": len(codes),
+            "error": f"{type(exc).__name__}: {str(exc)[:180]}",
+            "facets": [],
+        }
+
+    per_facet: dict[str, dict[str, set[str]]] = {}
+    for row in rows:
+        code = _score_flat_code(str(row.get("commodity_code") or ""))
+        key = str(row.get("facet_key") or "").strip()
+        value = str(row.get("facet_value") or "").strip()
+        if not code or not key or not value:
+            continue
+        per_facet.setdefault(key, {}).setdefault(value, set()).add(code)
+
+    summaries: list[dict[str, Any]] = []
+    total_candidates = max(len(codes), 1)
+    for key, values in per_facet.items():
+        covered = set().union(*values.values()) if values else set()
+        if len(values) < 2 or len(covered) < 2:
+            continue
+        counts = {value: len(value_codes) for value, value_codes in values.items()}
+        entropy = _shannon_bits([float(v) for v in counts.values()])
+        max_entropy = math.log2(len(counts)) if len(counts) > 1 else 0.0
+        coverage = len(covered) / total_candidates
+        summaries.append({
+            "facet_key": key,
+            "coverage": round(coverage, 4),
+            "covered_candidates": len(covered),
+            "distinct_values": len(counts),
+            "entropy_bits": round(entropy, 4),
+            "normalized_entropy": round(entropy / max_entropy, 4) if max_entropy else 0.0,
+            "values": [
+                {"value": value, "candidate_count": count}
+                for value, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:12]
+            ],
+        })
+    summaries.sort(
+        key=lambda row: (row["normalized_entropy"] * row["coverage"], row["entropy_bits"], row["covered_candidates"]),
+        reverse=True,
+    )
+    return {
+        "available": True,
+        "basis": "kg.commodity_facets_candidate_distribution",
+        "candidate_count": len(codes),
+        "facets_considered": len(per_facet),
+        "facets": summaries[:max_facets],
+    }
+
+
+@app.post("/api/scoring/input")
+@app.post("/api/input/score")
+def input_score(req: InputScoreRequest) -> dict:
+    search = retrieval_search(
+        RetrievalSearch(
+            query=req.query,
+            run_label=req.run_label,
+            retrieval_limit=req.retrieval_limit,
+            allow_spend=req.allow_spend,
+        )
+    )
+    candidates = list(search.get("candidates") or [])
+    limit = int(search.get("retrieval_limit") or req.retrieval_limit)
+    response: dict[str, Any] = {
+        "query": req.query,
+        "processed_query": search.get("processed_query"),
+        "rewrite": search.get("rewrite"),
+        "experiment": search.get("experiment"),
+        "retrieval_limit": limit,
+        "provider_calls_used": bool(search.get("provider_calls_used")),
+        "provider_call_types": search.get("provider_call_types") or [],
+        "pre_retrieval": {
+            "qpp_lexical_specificity": search.get("lexical_specificity"),
+            "descriptiveness": {
+                "available": False,
+                "score": None,
+                "basis": "kg.query_descriptiveness",
+                "note": "LLM descriptiveness is batch/eval-gold oriented and is not run for arbitrary input by this no-spend endpoint.",
+            },
+        },
+        "retrieval": {
+            "candidate_count": len(candidates),
+            "leg_counts": search.get("leg_counts") or {},
+            "top_candidates": candidates[:10],
+        },
+        "post_retrieval": {
+            "query_difficulty": search.get("query_difficulty"),
+            "code_prefix_entropy": _input_code_prefix_entropy(candidates, limit),
+            "facet_entropy": _input_facet_entropy(candidates, k=min(limit, 100)),
+        },
+    }
+    if req.include_candidates:
+        response["retrieval"]["candidates"] = candidates
+    return response
 
 
 @app.get("/api/evals/classification/gold-examples")
@@ -681,6 +1249,7 @@ def classify_trial(req: ClassifyTrial) -> dict:
             "simulator_calls": result.get("simulator_calls"),
             "est_cost_usd": result.get("est_cost_usd"),
             "latency_seconds": result.get("latency_seconds"),
+            "persisted_session_facts": result.get("persisted_session_facts") or (trace.get("persisted_session_facts") if isinstance(trace, dict) else None),
         },
         "trace": trace,
     }
@@ -812,12 +1381,202 @@ def classify_matrix() -> str:
     return eval_classify_matrix()
 
 
+
+
+@app.get("/eval/e2e-matrix", response_class=HTMLResponse)
+def e2e_matrix() -> str:
+    return _render_live_e2e_matrix(qa_only=False)
+
+
+@app.get("/eval/qa-matrix", response_class=HTMLResponse)
+def qa_matrix() -> str:
+    return _render_live_e2e_matrix(qa_only=True)
+
+
+def _render_live_e2e_matrix(*, qa_only: bool) -> str:
+    from html import escape as _html_escape
+
+    def esc(value) -> str:
+        return _html_escape(str(value if value is not None else ""), quote=True)
+
+    def pct(num, den) -> str:
+        try:
+            den = int(den or 0)
+            return "-" if den <= 0 else f"{(100 * int(num or 0) / den):.1f}%"
+        except Exception:
+            return "-"
+
+    def num(value) -> str:
+        try:
+            return f"{float(value):.2f}"
+        except Exception:
+            return "-"
+
+    def prompt_label(row: dict) -> str:
+        cfg = row.get("config_json") or {}
+        if not isinstance(cfg, dict):
+            cfg = {}
+        prompt = cfg.get("staging_prompt_mode") or cfg.get("prompt_mode") or "-"
+        effort = cfg.get("classify_reasoning_effort") or "-"
+        policy = ", ".join(cfg.get("policy_eval") or []) if isinstance(cfg.get("policy_eval"), list) else ""
+        parts = [f"prompt: {prompt}", f"reasoning: {effort}"]
+        if policy:
+            parts.append(f"policy: {policy}")
+        return " | ".join(parts)
+
+    try:
+        import psycopg
+        from psycopg.rows import dict_row
+        with psycopg.connect(_tariff_dsn(), row_factory=dict_row) as conn, conn.cursor() as cur:
+            cur.execute("SELECT to_regclass('kg.e2e_eval_runs') AS runs_table")
+            if not (cur.fetchone() or {}).get("runs_table"):
+                rows = []
+            else:
+                cur.execute(
+                    """
+                    SELECT r.id,
+                           r.run_label,
+                           r.retrieval_run_label,
+                           r.question_mode,
+                           r.answerer,
+                           r.question_model,
+                           r.simulator_model,
+                           r.pair_limit,
+                           r.persona_count,
+                           r.input_count,
+                           r.retrieval_limit,
+                           r.hydrate_limit,
+                           r.max_rounds,
+                           r.allow_spend,
+                           r.config_json,
+                           r.started_at,
+                           r.finished_at,
+                           r.n_inputs,
+                           r.initial_gold_in_retrieval,
+                           r.gold_kept,
+                           r.gold_top1_after_qa,
+                           r.avg_initial_rank,
+                           r.avg_post_qa_rank,
+                           r.avg_rounds,
+                           r.avg_active_count,
+                           r.provider_calls_used,
+                           r.errors,
+                           count(res.id)::int AS result_rows,
+                           count(res.id) FILTER (WHERE res.final_state::text LIKE '%From retrieval%')::int AS fallback_rows,
+                           coalesce(sum(
+                               CASE
+                                 WHEN jsonb_typeof(res.final_state->'fallback_to_retrieval_rounds') = 'number'
+                                 THEN (res.final_state->>'fallback_to_retrieval_rounds')::int
+                                 ELSE 0
+                               END
+                           ), 0)::int AS fallback_rounds
+                    FROM kg.e2e_eval_runs r
+                    LEFT JOIN kg.e2e_eval_results res ON res.run_id = r.id
+                    GROUP BY r.id
+                    ORDER BY r.id DESC
+                    LIMIT 160
+                    """
+                )
+                rows = [dict(r) for r in cur.fetchall()]
+    except Exception as exc:
+        rows = []
+        error = f"{type(exc).__name__}: {exc}"
+    else:
+        error = ""
+
+    title = "Q&A Matrix" if qa_only else "End-to-End Journey Matrix"
+    sub = (
+        "Question-mode comparison after retrieval. Keep/top1 rates are conditioned on gold being present in the retrieved shortlist."
+        if qa_only
+        else "Full journey view from retrieval through Q&A and final result-list preservation/rank metrics."
+    )
+    if error:
+        body = f"<div class='empty'>Could not load matrix: {esc(error)}</div>"
+    elif not rows:
+        body = "<div class='empty'>No E2E/Q&A runs yet.</div>"
+    else:
+        row_html = []
+        for r in rows:
+            n = r.get("n_inputs") or r.get("input_count") or r.get("result_rows") or 0
+            eligible = r.get("initial_gold_in_retrieval") or 0
+            denom = eligible if qa_only else n
+            fallback = int(r.get("fallback_rows") or 0)
+            fallback_rounds = int(r.get("fallback_rounds") or 0)
+            fallback_cls = "bad" if fallback else "muted"
+            done = bool(r.get("finished_at"))
+            status_cls = "good" if done and not int(r.get("errors") or 0) else ("warn" if not done else "bad")
+            row_html.append(
+                f"""
+                <tr>
+                  <td class='id'>#{esc(r.get('id'))}</td>
+                  <td>
+                    <b>{esc(r.get('run_label'))}</b>
+                    <br><span>{esc(r.get('retrieval_run_label'))}</span>
+                    <br><code>{esc(prompt_label(r))}</code>
+                  </td>
+                  <td>{esc(r.get('question_mode'))}<br><span>{esc(r.get('answerer'))}</span></td>
+                  <td>{esc(r.get('question_model') or '-')}<br><span>sim: {esc(r.get('simulator_model') or '-')}</span></td>
+                  <td>{esc(n)}<br><span>{esc(eligible)} eligible</span></td>
+                  <td>{pct(r.get('initial_gold_in_retrieval'), n)}</td>
+                  <td>{pct(r.get('gold_kept'), denom)}</td>
+                  <td>{pct(r.get('gold_top1_after_qa'), denom)}</td>
+                  <td>{num(r.get('avg_initial_rank'))} -> {num(r.get('avg_post_qa_rank'))}</td>
+                  <td>{num(r.get('avg_rounds'))}<br><span>active {num(r.get('avg_active_count'))}</span></td>
+                  <td>{esc(r.get('provider_calls_used') or 0)}</td>
+                  <td class='{fallback_cls}'>{esc(fallback)} rows<br><span>{esc(fallback_rounds)} rounds</span></td>
+                  <td class='{status_cls}'>{'done' if done else 'running'}<br><span>{esc(r.get('errors') or 0)} errors</span></td>
+                </tr>
+                """
+            )
+        body = f"""
+        <table>
+          <thead><tr>
+            <th>Run</th><th>Config</th><th>Question mode</th><th>Models</th><th>N</th>
+            <th>Gold in retrieval</th><th>Gold kept</th><th>Gold top1</th>
+            <th>Avg rank</th><th>Rounds / active</th><th>Calls</th><th>Fallback</th><th>Status</th>
+          </tr></thead>
+          <tbody>{''.join(row_html)}</tbody>
+        </table>
+        """
+    return f"""
+    <!doctype html><html><head><meta charset='utf-8'><title>{esc(title)}</title>
+    <style>
+      body {{ margin:0; background:#070b13; color:#e5e7eb; font-family:Inter,system-ui,sans-serif; padding:24px; }}
+      h1 {{ margin:0 0 6px; font-size:24px; }}
+      .sub, span {{ color:#94a3b8; }}
+      table {{ width:100%; border-collapse:separate; border-spacing:0; margin-top:18px; font-size:13px; }}
+      th,td {{ border-bottom:1px solid #243044; padding:10px; text-align:left; vertical-align:top; }}
+      th {{ background:#101827; color:#bfdbfe; position:sticky; top:0; z-index:1; }}
+      tbody tr:nth-child(even) td {{ background:#0b1220; }}
+      tbody tr:hover td {{ background:#111a2b; }}
+      .id {{ color:#93c5fd; font-weight:800; white-space:nowrap; }}
+      code {{ color:#c4b5fd; font-size:11px; }}
+      .good {{ color:#bbf7d0; }}
+      .warn {{ color:#fde68a; }}
+      .bad {{ color:#fca5a5; }}
+      .muted {{ color:#94a3b8; }}
+      .empty {{ border:1px solid #263243; background:#0b1220; padding:18px; margin-top:18px; }}
+    </style></head><body>
+      <h1>{esc(title)}</h1>
+      <div class='sub'>{esc(sub)}</div>
+      {body}
+    </body></html>
+    """
+
+
 @app.get("/eval/matrix")
-def retrieval_matrix() -> FileResponse:
+def retrieval_matrix() -> Response:
     matrix_path = MATRIX_DIR / "retrieval_matrix.html"
     if not matrix_path.exists():
         raise HTTPException(404, "Exported retrieval matrix snapshot is missing.")
-    return FileResponse(matrix_path, media_type="text/html")
+    html_text = matrix_path.read_text(encoding="utf-8")
+    try:
+        from experiment_retrieval import matrix_input_quality_html
+        if "matrix-input-quality" not in html_text:
+            html_text = html_text.replace("</body>", matrix_input_quality_html() + "</body>")
+    except Exception as exc:
+        html_text = html_text.replace("</body>", f"<section id='matrix-input-quality' style='margin-top:28px;color:#fca5a5'>Input-quality strip unavailable: {type(exc).__name__}</section></body>")
+    return Response(html_text, media_type="text/html")
 
 
 @app.get("/eval/matrix.csv")
@@ -954,6 +1713,7 @@ def index() -> str:
     <button class="tab-button" data-tab="try-search" onclick="showTab('try-search')">Try Search</button>
     <button class="tab-button" data-tab="qa-harness" onclick="showTab('qa-harness')">Q&amp;A Harness</button>
     <button class="tab-button" data-tab="classification-matrix" onclick="showTab('classification-matrix')">Q&amp;A Matrix</button>
+    <button class="tab-button" data-tab="e2e-matrix" onclick="showTab('e2e-matrix')">E2E Matrix</button>
     <button class="tab-button" data-tab="jobs" onclick="showTab('jobs')">Jobs &amp; Logs</button>
   </nav>
 
@@ -966,6 +1726,7 @@ def index() -> str:
         <div class="row">
           <a href="/eval/matrix" target="_blank">Open retrieval matrix</a>
           <a href="/eval/classify-matrix" target="_blank">Open Q&amp;A matrix</a>
+          <a href="/eval/e2e-matrix" target="_blank">Open E2E matrix</a>
           <a href="/eval/matrix.csv">Download matrix CSV</a>
         </div>
       </div>
@@ -1049,6 +1810,18 @@ def index() -> str:
       <a href="/eval/classify-matrix" target="_blank">Open full tab</a>
     </div>
     <iframe src="/eval/classify-matrix" title="Classification matrix"></iframe>
+  </section>
+
+
+  <section id="e2e-matrix" class="panel">
+    <div class="toolbar">
+      <div>
+        <h2>End-to-End Journey Matrix</h2>
+        <p class="muted">Live from <code>kg.e2e_eval_runs</code>. Rows are fixed-set input -&gt; retrieval shortlist -&gt; hydrated Q&amp;A -&gt; final result-list evaluations.</p>
+      </div>
+      <a href="/eval/e2e-matrix" target="_blank">Open full tab</a>
+    </div>
+    <iframe src="/eval/e2e-matrix" title="E2E retrieval and Q&amp;A matrix"></iframe>
   </section>
 
   <section id="jobs" class="panel">
@@ -1365,8 +2138,10 @@ _DEPLOYABLE_WORKBENCH_EXACT_PATHS = {
     "/api/retrieval/experiments",
     "/api/retrieval/top-experiment",
     "/api/retrieval/try",
+    "/api/hydration/candidates",
     "/eval/matrix",
     "/eval/matrix.csv",
+    "/eval/e2e-matrix",
 }
 _DEPLOYABLE_WORKBENCH_PREFIXES = (
     "/api/prompts",

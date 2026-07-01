@@ -36,9 +36,9 @@ export default function ReferencePanel() {
         setCfg(
           c.reference_config || {
             mode: "single",
-            model_id: "gpt-5-nano",
-            passes: 1,
-            panel_model_ids: ["gpt-5-nano", "gpt-5-mini"],
+            model_id: "gpt-5.4-xhigh",
+            passes: 3,
+            panel_model_ids: ["gpt-5.4-xhigh", "gpt-5.2"],
           },
         );
       } catch (e) {

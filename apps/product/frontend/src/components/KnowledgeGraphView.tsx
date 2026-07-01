@@ -19,7 +19,7 @@ interface GraphPayload {
   stats: { n_nodes?: number; n_edges?: number; reason?: string };
 }
 
-const ALL_RULE_TYPES = ["exclusion", "definition", "classification_order", "discriminator", "rationale", "operational_treatment", "other"];
+const ALL_RULE_TYPES = ["exclusion", "definition", "classification_order", "discriminator", "rationale", "duty_treatment", "other"];
 
 export default function KnowledgeGraphView() {
   const [mode, setMode] = useState<"code" | "chapter" | "all">("code");

@@ -1,0 +1,27 @@
+2026-06-25T11:07:08Z | EXPERIMENT START
+2026-06-25T11:07:08Z | gold_ids = 683,709,556,917,2728,377,2102,2111,221,2260,2808,409,437,614,151,149,696,411,340,2669,2202,2199,2177,2132,2799,2776,2774,2302,27,261,44,285,2818,2681,2234,2243,2225,136,2703,2767
+2026-06-25T11:07:08Z | PHASE 1 START (6 cells)
+2026-06-25T11:07:08Z | phase1 cell: exp_converge_none_baseline (converge/baseline/none)
+2026-06-25T11:07:09Z | cost-guard: journey est_cost so far = $0 (cap $200)
+2026-06-25T11:18:03Z | phase1 cell done: exp_converge_none_baseline rc=0
+2026-06-25T11:18:03Z | phase1 cell: exp_converge_factskg_baseline (converge/baseline/facts+kg)
+2026-06-25T11:18:04Z | cost-guard: journey est_cost so far = $9.60 (cap $200)
+2026-06-25T11:29:09Z | phase1 cell done: exp_converge_factskg_baseline rc=0
+2026-06-25T11:29:09Z | phase1 cell: exp_eliminate_none_baseline (eliminate/baseline/none)
+2026-06-25T11:29:10Z | cost-guard: journey est_cost so far = $20.30 (cap $200)
+2026-06-25T12:58:34Z | phase1 cell done: exp_eliminate_none_baseline rc=0
+2026-06-25T12:58:34Z | phase1 cell: exp_eliminate_factskg_baseline (eliminate/baseline/facts+kg)
+2026-06-25T12:58:35Z | cost-guard: journey est_cost so far = $74.64 (cap $200)
+2026-06-25T14:29:09Z | phase1 cell done: exp_eliminate_factskg_baseline rc=0
+2026-06-25T14:29:09Z | phase1 cell: exp_eliminate_factskg_rulereasoning (eliminate/rule_reasoning/facts+kg)
+2026-06-25T14:29:10Z | cost-guard: journey est_cost so far = $127.42 (cap $200)
+2026-06-25T15:59:03Z | phase1 cell done: exp_eliminate_factskg_rulereasoning rc=0
+2026-06-25T15:59:03Z | phase1 cell: exp_converge_factskg_rulereasoning (converge/rule_reasoning/facts+kg)
+2026-06-25T15:59:04Z | cost-guard: journey est_cost so far = $180.58 (cap $200)
+2026-06-25T16:10:42Z | phase1 cell done: exp_converge_factskg_rulereasoning rc=0
+2026-06-25T16:10:42Z | PHASE 1 DONE. labels=exp_converge_none_baseline,exp_converge_factskg_baseline,exp_eliminate_none_baseline,exp_eliminate_factskg_baseline,exp_eliminate_factskg_rulereasoning,exp_converge_factskg_rulereasoning
+2026-06-25T16:10:42Z | PHASE 2 START (MCP arm)
+2026-06-25T16:10:43Z | mcp perm: mcp_base env=[]
+2026-06-25T16:54:23Z | MCP ARM (new key) START
+2026-06-25T17:39:45Z | MCP ARM done: 40 rows
+2026-06-25T17:39:46Z | PHASE 5 DONE - EXPERIMENT COMPLETE

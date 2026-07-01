@@ -16,17 +16,11 @@ DSN = os.environ.get("TARIFF_DB_DSN", "postgresql:///tariff_db")
 SCHEMA = os.environ.get("TARIFF_DB_SCHEMA", "uk")
 KG_SCHEMA = os.environ.get("TARIFF_DB_KG_SCHEMA", "kg")
 MATRIX_CSV = Path(__file__).parent.parent / "data" / "matrix" / "retrieval_matrix.csv"
+KG_FACT_ALIAS_SOURCES = {"goods_nomenclature_labels", "search_reference"}
 
 TOP_RUN_LABEL = "no_curated_only"
 DEFAULT_LIMIT = 500
 DISPLAY_LIMIT = 25
-MATRIX_ROWS_WITH_IMPLICIT_REFERENCES = {
-    "all_legs_on",
-    "all_legs_loo",
-    "baseline_fts_only",
-    "fts_plus_description_vec",
-    "no_semantic_kg",
-}
 
 
 def _conn():
@@ -60,6 +54,11 @@ def _kg_use_scope_filter(alias: str, table: str, scope: str) -> str:
     return f"AND '{scope}' = ANY({alias}.use_scopes)"
 
 
+def _kg_fact_source_filter(alias: str) -> tuple[str, list[str]]:
+    excluded = sorted(KG_FACT_ALIAS_SOURCES)
+    return f"AND {alias}.source <> ALL(%s::text[])", excluded
+
+
 def _flat_code(code: str) -> str:
     digits = re.sub(r"\D", "", code or "")
     return digits.ljust(10, "0")[:10] if digits else ""
@@ -72,31 +71,22 @@ def _pct(value: str) -> float:
         return 0.0
 
 
-def _normalise_matrix_config(run_label: str, cfg: dict[str, Any]) -> dict[str, Any]:
-    normalised = dict(cfg)
-    if "use_curated" not in normalised and run_label in MATRIX_ROWS_WITH_IMPLICIT_REFERENCES:
-        normalised["use_curated"] = True
-    return normalised
-
-
 def _load_matrix_rows() -> list[dict[str, Any]]:
     with MATRIX_CSV.open(newline="") as f:
         rows = list(csv.DictReader(f))
     out: list[dict[str, Any]] = []
     for row in rows:
-        run_label = row.get("run_label", "")
         try:
             cfg = json.loads(row.get("config_json") or "{}")
         except json.JSONDecodeError:
             cfg = {}
-        cfg = _normalise_matrix_config(run_label, cfg)
         rank_raw = row.get("rank_by_code_macro_at_100") or ""
         rank = int(rank_raw) if rank_raw.isdigit() else None
-        title, description, caveats = describe_experiment(run_label, cfg)
+        title, description, caveats = describe_experiment(row.get("run_label", ""), cfg)
         out.append(
             {
                 "rank": rank,
-                "run_label": run_label,
+                "run_label": row.get("run_label"),
                 "run_id": row.get("run_id"),
                 "title": title,
                 "description": description,
@@ -122,6 +112,20 @@ def top_experiment_info() -> dict[str, Any]:
     return rows[0]
 
 
+def select_experiment(run_label: str | None = None) -> dict[str, Any]:
+    catalog = _load_matrix_rows()
+    selected_label = run_label or TOP_RUN_LABEL
+    for row in catalog:
+        if row["run_label"] == selected_label:
+            return row
+    raise ValueError(f"Unknown experiment: {run_label}")
+
+
+def experiment_requires_provider(run_label: str | None = None) -> bool:
+    cfg = select_experiment(run_label)["config"]
+    return bool(cfg.get("use_vector") or cfg.get("use_facts_vec") or cfg.get("use_kg_vec"))
+
+
 def is_runnable_config(cfg: dict[str, Any]) -> bool:
     # Query rewrite / triage depends on the eval-time rewrite harness, which is
     # intentionally not included in this shareable app.
@@ -135,7 +139,7 @@ def _enabled_parts(cfg: dict[str, Any]) -> list[str]:
     if cfg.get("use_vector"):
         parts.append("semantic vector")
     if cfg.get("use_facts") or cfg.get("use_facts_vec"):
-        parts.append("facets")
+        parts.append("commodity facts")
     if cfg.get("use_kg_context") or cfg.get("use_kg_vec"):
         parts.append("KG")
     if cfg.get("use_curated"):
@@ -150,8 +154,8 @@ def describe_experiment(run_label: str, cfg: dict[str, Any]) -> tuple[str, str, 
         "baseline_fts_only": "Classic keyword baseline",
         "staging_ai": "Production-style AI staging baseline",
         "rw_g41_staging": "Staging rewrite upper-bound baseline",
-        "no_curated_only": "Top overall: semantic + KG + facets, no Search References",
-        "all_legs_on": "Semantic + KG + facets + Search References",
+        "no_curated_only": "Top overall: semantic + KG + commodity facts, no Search References",
+        "all_legs_on": "Semantic + KG + commodity facts",
         "ai_semantic_composite_triage": "AI-enriched semantic search with query rewrite",
         "rw_g5_staging": "Staging rewrite with GPT-5-class rewrite model",
         "rw_g5_mine": "Eval rewrite with GPT-5-class rewrite model",
@@ -190,9 +194,9 @@ def describe_experiment(run_label: str, cfg: dict[str, Any]) -> tuple[str, str, 
     else:
         signals.append("Search References not flagged in the matrix config")
     if cfg.get("use_facts"):
-        signals.append("structured facet keyword matches")
+        signals.append("structured commodity fact keyword matches")
     if cfg.get("use_facts_vec"):
-        signals.append("structured facet semantic matches")
+        signals.append("structured commodity fact semantic matches")
     if cfg.get("use_kg_context"):
         signals.append("KG rule/note keyword matches")
     if cfg.get("use_kg_vec"):
@@ -328,6 +332,7 @@ def _curated_leg(query: str, limit: int) -> list[dict[str, Any]]:
 def _facts_leg(query: str, limit: int) -> list[dict[str, Any]]:
     if not query.strip():
         return []
+    source_filter, source_excl = _kg_fact_source_filter("cf")
     with _conn() as c, c.cursor() as cur:
         cur.execute(
             f"""
@@ -354,12 +359,13 @@ def _facts_leg(query: str, limit: int) -> list[dict[str, Any]]:
                       AND gn.validity_end_date IS NULL LIMIT 1) AS description
             FROM {KG_SCHEMA}.commodity_facets cf, q
             WHERE to_tsvector('english', cf.facet_key || ' ' || cf.facet_value || ' ' || COALESCE(cf.evidence, '')) @@ q.tsq
+              {source_filter}
               {_kg_use_scope_filter("cf", "commodity_facets", "retrieval")}
             GROUP BY cf.commodity_code
             ORDER BY score DESC
             LIMIT %s
             """,
-            (query, limit),
+            (query, source_excl, limit),
         )
         return [
             {
@@ -500,6 +506,7 @@ def _composite_vector_leg(query_embedding: list[float], limit: int) -> list[dict
 def _facts_vec_leg(query_embedding: list[float], limit: int) -> list[dict[str, Any]]:
     literal = "[" + ",".join(f"{x:.6f}" for x in query_embedding) + "]"
     fact_pool = limit * 4
+    source_filter, source_excl = _kg_fact_source_filter("cf")
     with _conn() as c, c.cursor() as cur:
         cur.execute(
             f"""
@@ -509,6 +516,7 @@ def _facts_vec_leg(query_embedding: list[float], limit: int) -> list[dict[str, A
                        1 - (cf.embedding <=> %s::vector) AS cosine
                 FROM {KG_SCHEMA}.commodity_facets cf
                 WHERE cf.embedding IS NOT NULL
+                  {source_filter}
                   {_kg_use_scope_filter("cf", "commodity_facets", "retrieval")}
                 ORDER BY cf.embedding <=> %s::vector
                 LIMIT %s
@@ -533,7 +541,7 @@ def _facts_vec_leg(query_embedding: list[float], limit: int) -> list[dict[str, A
             ORDER BY score DESC
             LIMIT %s
             """,
-            (literal, literal, fact_pool, limit),
+            (literal, source_excl, literal, fact_pool, limit),
         )
         return [
             {
@@ -670,36 +678,29 @@ def run_trial(
     expected_flat = _flat_code(expected_code)
     if not query:
         raise ValueError("query is required")
-    if not expected_flat:
-        raise ValueError("expected_code is required")
 
-    catalog = _load_matrix_rows()
-    selected = None
-    for row in catalog:
-        if row["run_label"] == (run_label or TOP_RUN_LABEL):
-            selected = row
-            break
-    if selected is None:
-        raise ValueError(f"Unknown experiment: {run_label}")
+    selected = select_experiment(run_label)
 
     limit = max(10, min(int(retrieval_limit or DEFAULT_LIMIT), DEFAULT_LIMIT))
     candidates, leg_counts = retrieve_for_config(query, selected["config"], api_key, limit)
     rank = None
-    for idx, row in enumerate(candidates, start=1):
-        if _flat_code(row["commodity_code"]) == expected_flat:
-            rank = idx
-            break
+    if expected_flat:
+        for idx, row in enumerate(candidates, start=1):
+            if _flat_code(row["commodity_code"]) == expected_flat:
+                rank = idx
+                break
 
-    top = []
-    for idx, row in enumerate(candidates[:DISPLAY_LIMIT], start=1):
+    ranked_candidates = []
+    for idx, row in enumerate(candidates, start=1):
         item = dict(row)
         item["rank"] = idx
-        top.append(item)
+        ranked_candidates.append(item)
 
     return {
         "query": query,
         "expected_code": expected_code,
         "expected_code_normalized": expected_flat,
+        "evaluated": bool(expected_flat),
         "experiment": selected,
         "retrieval_limit": limit,
         "rank": rank,
@@ -707,5 +708,6 @@ def run_trial(
         "hit_at_100": bool(rank and rank <= 100),
         "hit_within_limit": rank is not None,
         "leg_counts": leg_counts,
-        "top_candidates": top,
+        "top_candidates": ranked_candidates[:DISPLAY_LIMIT],
+        "candidates": ranked_candidates,
     }

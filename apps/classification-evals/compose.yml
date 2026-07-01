@@ -64,6 +64,63 @@ services:
       timeout: 5s
       retries: 3
 
+  extraction-pipeline:
+    profiles: ["manual"]
+    build:
+      context: ../..
+      dockerfile: apps/classification-evals/Dockerfile
+    env_file:
+      - .env
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AI_FAN_OUT_KG_LABEL_PROFILE: ${AI_FAN_OUT_KG_LABEL_PROFILE:-deployable}
+      TARIFF_DB_DSN: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@tariff-db:5432/${POSTGRES_DB:-tariff_db}
+      OPENSEARCH_URL: ${OPENSEARCH_URL:-http://opensearch:9200}
+      OPENSEARCH_INDEX: ${OPENSEARCH_INDEX:-tariff_commodities}
+      EXTRACTION_ALLOW_PROVIDER_CALLS: ${EXTRACTION_ALLOW_PROVIDER_CALLS:-0}
+      EXTRACTION_ALLOW_NETWORK: ${EXTRACTION_ALLOW_NETWORK:-0}
+      HSEN_DIR: ${HSEN_DIR:-}
+    command: ["python", "scripts/extraction_pipeline.py", "status"]
+    volumes:
+      - classification_eval_state:/srv/ai-search-evaluation-suite/apps/classification-evals/var
+      - product_app_data:/srv/ai-search-evaluation-suite/apps/product/data
+      - product_app_results:/srv/ai-search-evaluation-suite/apps/product/results
+    depends_on:
+      tariff-db:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+    restart: "no"
+
+  extraction-scheduler:
+    profiles: ["scheduler"]
+    build:
+      context: ../..
+      dockerfile: apps/classification-evals/Dockerfile
+    env_file:
+      - .env
+    environment:
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AI_FAN_OUT_KG_LABEL_PROFILE: ${AI_FAN_OUT_KG_LABEL_PROFILE:-deployable}
+      TARIFF_DB_DSN: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@tariff-db:5432/${POSTGRES_DB:-tariff_db}
+      OPENSEARCH_URL: ${OPENSEARCH_URL:-http://opensearch:9200}
+      OPENSEARCH_INDEX: ${OPENSEARCH_INDEX:-tariff_commodities}
+      EXTRACTION_ALLOW_PROVIDER_CALLS: ${EXTRACTION_ALLOW_PROVIDER_CALLS:-0}
+      EXTRACTION_ALLOW_NETWORK: ${EXTRACTION_ALLOW_NETWORK:-0}
+      EXTRACTION_RUN_INTERVAL_SECONDS: ${EXTRACTION_RUN_INTERVAL_SECONDS:-86400}
+      HSEN_DIR: ${HSEN_DIR:-}
+    command: ["sh", "-c", "python scripts/extraction_pipeline.py schedule --profile safe --interval-seconds \"$${EXTRACTION_RUN_INTERVAL_SECONDS:-86400}\""]
+    volumes:
+      - classification_eval_state:/srv/ai-search-evaluation-suite/apps/classification-evals/var
+      - product_app_data:/srv/ai-search-evaluation-suite/apps/product/data
+      - product_app_results:/srv/ai-search-evaluation-suite/apps/product/results
+    depends_on:
+      tariff-db:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   classification_eval_postgres:
   classification_eval_state:

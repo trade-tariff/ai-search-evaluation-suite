@@ -1,0 +1,394 @@
+[
+ {
+  "id": 282,
+  "persona": "emu_generic",
+  "query": "mechanical seal",
+  "expected_code": "7326909290",
+  "source_id": "atar_600014698",
+  "oracle_text": "product: the product is a stainless steel mechanical seal face and is one of the two seal faces in a mechanical seal assembly. the stainless steel seal faces are machined from commercially available steel alloys using cnc or manual machining processes and undergo electropolishing.\r\n\r\nthe seal is open - die forged and each seal face is custom made to precise specifications and combined with other mechanical seal elements and used solely for specific mechanical seals in industrial rotary applicati"
+ },
+ {
+  "id": 285,
+  "persona": "emu_generic",
+  "query": "rubber bellow",
+  "expected_code": "4016999790",
+  "source_id": "atar_600014701",
+  "oracle_text": "product: the product is a rubber bellow, a component for a mechanical seal assembly. the black moulded elastomer forms the secondary sealing interface between the mechanical seal assembly and the equipment being sealed. \r\n\r\nthe bellow (without the metal spring) is manufactured from nitrile butadiene rubber (nbr) a vulcanised synthetic fluoroelastomer copolymer.  each nbr moulded part is manufactured by compression moulding and is custom designed for its specific mechanical seal application. the"
+ },
+ {
+  "id": 288,
+  "persona": "emu_generic",
+  "query": "hatching kit",
+  "expected_code": "9503007000",
+  "source_id": "atar_600014889",
+  "oracle_text": "product: a hatch your own live aquatic creatures set.\r\n\r\nthe set comprises of a plastic sachet of shrimp brine (artemia salina) eggs, a plastic sachet of food, a plastic tank that is decorated to represent an underwater world.  the tank has a battery-operated led lights in the base, which requires 2 aaa batteries (not included).  also included is a small plastic feeding spoon, a pipette, a magnifier and an instruction booklet.\r\n\r\nthe hatch your own live aquatic creatures set is for ages 6+. it i"
+ },
+ {
+  "id": 291,
+  "persona": "emu_generic",
+  "query": "rubber bellows",
+  "expected_code": "4016999790",
+  "source_id": "atar_600014703",
+  "oracle_text": "product: the product is a rubber bellow, a component for a mechanical seal assembly. the black moulded unthreaded elastomer forms the secondary sealing interface between the mechanical seal assembly and the equipment being sealed. \r\n\r\nthe bellow (without the metal spring) is manufactured from ethylene propylene diene monomer, (epdm) a type of synthetic rubber.  the epdm part is manufactured via compression moulding and is custom-designed and intended solely for its specific mechanical seal appli"
+ },
+ {
+  "id": 294,
+  "persona": "emu_generic",
+  "query": "steel bar",
+  "expected_code": "7224900700",
+  "source_id": "atar_600014944",
+  "oracle_text": "product: a semi-finished round cornered square steel bar with a cross-section throughout its length. \r\nsizes ranging from 95mm square up to 250.7mm square \r\n\r\nthe main molten steel production methods include:\r\nmelting raw materials using either an electric arc furnace or basic oxygen furnace\r\nladle furnace refining\r\nvacuum degassing\r\nchemical adjustments in the tundish\r\nafter this stage, the steel solidifies through two different methods:\r\n\r\ncontinuous casting into oscillating moulds to produce"
+ },
+ {
+  "id": 297,
+  "persona": "emu_generic",
+  "query": "rack rails",
+  "expected_code": "8302420090",
+  "source_id": "atar_600015072",
+  "oracle_text": "product: black powder coated rack rails, typically manufactured from carbon steel, with standardised rack unit (u) hole spacing in accordance with the 19 inch rack format. holes may be square for cage nuts or pre tapped threaded holes for screw fixing.\r\nthey are mounting racking components, designed for permanent installation in standard 19 inch server and equipment racks. they provide vertical and horizontal fixing points to support and position rack mounted equipment.\r\nused to secure rack moun"
+ },
+ {
+  "id": 300,
+  "persona": "emu_generic",
+  "query": "plastic geogrid",
+  "expected_code": "3926909790",
+  "source_id": "atar_600015150",
+  "oracle_text": "product: plastic bioxial geogrid mesh \r\npolypropylene sheet which has been punched and drawn into a square grid/mesh, (61-65mm between each rib of the grid. each rib minimum of 4mm wide), with raised moulded nodes. grid is bonded to a non-woven polypropylene paving fabric\r\nuse: in civil engineering\n\nhmrc justification: classification has been determined in accordance with the following:- \r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) o"
+ },
+ {
+  "id": 283,
+  "persona": "emu_ordinary",
+  "query": "stainless steel seal face",
+  "expected_code": "7326909290",
+  "source_id": "atar_600014698",
+  "oracle_text": "product: the product is a stainless steel mechanical seal face and is one of the two seal faces in a mechanical seal assembly. the stainless steel seal faces are machined from commercially available steel alloys using cnc or manual machining processes and undergo electropolishing.\r\n\r\nthe seal is open - die forged and each seal face is custom made to precise specifications and combined with other mechanical seal elements and used solely for specific mechanical seals in industrial rotary applicati"
+ },
+ {
+  "id": 286,
+  "persona": "emu_ordinary",
+  "query": "moulded nitrile rubber bellow",
+  "expected_code": "4016999790",
+  "source_id": "atar_600014701",
+  "oracle_text": "product: the product is a rubber bellow, a component for a mechanical seal assembly. the black moulded elastomer forms the secondary sealing interface between the mechanical seal assembly and the equipment being sealed. \r\n\r\nthe bellow (without the metal spring) is manufactured from nitrile butadiene rubber (nbr) a vulcanised synthetic fluoroelastomer copolymer.  each nbr moulded part is manufactured by compression moulding and is custom designed for its specific mechanical seal application. the"
+ },
+ {
+  "id": 289,
+  "persona": "emu_ordinary",
+  "query": "brine shrimp hatching kit",
+  "expected_code": "9503007000",
+  "source_id": "atar_600014889",
+  "oracle_text": "product: a hatch your own live aquatic creatures set.\r\n\r\nthe set comprises of a plastic sachet of shrimp brine (artemia salina) eggs, a plastic sachet of food, a plastic tank that is decorated to represent an underwater world.  the tank has a battery-operated led lights in the base, which requires 2 aaa batteries (not included).  also included is a small plastic feeding spoon, a pipette, a magnifier and an instruction booklet.\r\n\r\nthe hatch your own live aquatic creatures set is for ages 6+. it i"
+ },
+ {
+  "id": 292,
+  "persona": "emu_ordinary",
+  "query": "epdm rubber bellows for seals",
+  "expected_code": "4016999790",
+  "source_id": "atar_600014703",
+  "oracle_text": "product: the product is a rubber bellow, a component for a mechanical seal assembly. the black moulded unthreaded elastomer forms the secondary sealing interface between the mechanical seal assembly and the equipment being sealed. \r\n\r\nthe bellow (without the metal spring) is manufactured from ethylene propylene diene monomer, (epdm) a type of synthetic rubber.  the epdm part is manufactured via compression moulding and is custom-designed and intended solely for its specific mechanical seal appli"
+ },
+ {
+  "id": 295,
+  "persona": "emu_ordinary",
+  "query": "square steel bar 95-250mm",
+  "expected_code": "7224900700",
+  "source_id": "atar_600014944",
+  "oracle_text": "product: a semi-finished round cornered square steel bar with a cross-section throughout its length. \r\nsizes ranging from 95mm square up to 250.7mm square \r\n\r\nthe main molten steel production methods include:\r\nmelting raw materials using either an electric arc furnace or basic oxygen furnace\r\nladle furnace refining\r\nvacuum degassing\r\nchemical adjustments in the tundish\r\nafter this stage, the steel solidifies through two different methods:\r\n\r\ncontinuous casting into oscillating moulds to produce"
+ },
+ {
+  "id": 298,
+  "persona": "emu_ordinary",
+  "query": "19 inch server rack rails",
+  "expected_code": "8302420090",
+  "source_id": "atar_600015072",
+  "oracle_text": "product: black powder coated rack rails, typically manufactured from carbon steel, with standardised rack unit (u) hole spacing in accordance with the 19 inch rack format. holes may be square for cage nuts or pre tapped threaded holes for screw fixing.\r\nthey are mounting racking components, designed for permanent installation in standard 19 inch server and equipment racks. they provide vertical and horizontal fixing points to support and position rack mounted equipment.\r\nused to secure rack moun"
+ },
+ {
+  "id": 301,
+  "persona": "emu_ordinary",
+  "query": "polypropylene geogrid with fabric",
+  "expected_code": "3926909790",
+  "source_id": "atar_600015150",
+  "oracle_text": "product: plastic bioxial geogrid mesh \r\npolypropylene sheet which has been punched and drawn into a square grid/mesh, (61-65mm between each rib of the grid. each rib minimum of 4mm wide), with raised moulded nodes. grid is bonded to a non-woven polypropylene paving fabric\r\nuse: in civil engineering\n\nhmrc justification: classification has been determined in accordance with the following:- \r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) o"
+ },
+ {
+  "id": 284,
+  "persona": "emu_specific",
+  "query": "custom machined electropolished stainless steel sealing face",
+  "expected_code": "7326909290",
+  "source_id": "atar_600014698",
+  "oracle_text": "product: the product is a stainless steel mechanical seal face and is one of the two seal faces in a mechanical seal assembly. the stainless steel seal faces are machined from commercially available steel alloys using cnc or manual machining processes and undergo electropolishing.\r\n\r\nthe seal is open - die forged and each seal face is custom made to precise specifications and combined with other mechanical seal elements and used solely for specific mechanical seals in industrial rotary applicati"
+ },
+ {
+  "id": 287,
+  "persona": "emu_specific",
+  "query": "moulded nitrile rubber sealing bellow for mechanical seal assemblies",
+  "expected_code": "4016999790",
+  "source_id": "atar_600014701",
+  "oracle_text": "product: the product is a rubber bellow, a component for a mechanical seal assembly. the black moulded elastomer forms the secondary sealing interface between the mechanical seal assembly and the equipment being sealed. \r\n\r\nthe bellow (without the metal spring) is manufactured from nitrile butadiene rubber (nbr) a vulcanised synthetic fluoroelastomer copolymer.  each nbr moulded part is manufactured by compression moulding and is custom designed for its specific mechanical seal application. the"
+ },
+ {
+  "id": 290,
+  "persona": "emu_specific",
+  "query": "brine shrimp hatch kit with decorated plastic tank and led base",
+  "expected_code": "9503007000",
+  "source_id": "atar_600014889",
+  "oracle_text": "product: a hatch your own live aquatic creatures set.\r\n\r\nthe set comprises of a plastic sachet of shrimp brine (artemia salina) eggs, a plastic sachet of food, a plastic tank that is decorated to represent an underwater world.  the tank has a battery-operated led lights in the base, which requires 2 aaa batteries (not included).  also included is a small plastic feeding spoon, a pipette, a magnifier and an instruction booklet.\r\n\r\nthe hatch your own live aquatic creatures set is for ages 6+. it i"
+ },
+ {
+  "id": 293,
+  "persona": "emu_specific",
+  "query": "moulded epdm bellows for mechanical seals, no spring",
+  "expected_code": "4016999790",
+  "source_id": "atar_600014703",
+  "oracle_text": "product: the product is a rubber bellow, a component for a mechanical seal assembly. the black moulded unthreaded elastomer forms the secondary sealing interface between the mechanical seal assembly and the equipment being sealed. \r\n\r\nthe bellow (without the metal spring) is manufactured from ethylene propylene diene monomer, (epdm) a type of synthetic rubber.  the epdm part is manufactured via compression moulding and is custom-designed and intended solely for its specific mechanical seal appli"
+ },
+ {
+  "id": 296,
+  "persona": "emu_specific",
+  "query": "semi-finished square steel bar with rounded corners 95-250mm",
+  "expected_code": "7224900700",
+  "source_id": "atar_600014944",
+  "oracle_text": "product: a semi-finished round cornered square steel bar with a cross-section throughout its length. \r\nsizes ranging from 95mm square up to 250.7mm square \r\n\r\nthe main molten steel production methods include:\r\nmelting raw materials using either an electric arc furnace or basic oxygen furnace\r\nladle furnace refining\r\nvacuum degassing\r\nchemical adjustments in the tundish\r\nafter this stage, the steel solidifies through two different methods:\r\n\r\ncontinuous casting into oscillating moulds to produce"
+ },
+ {
+  "id": 299,
+  "persona": "emu_specific",
+  "query": "powder coated steel server rack rails with square cage-nut holes",
+  "expected_code": "8302420090",
+  "source_id": "atar_600015072",
+  "oracle_text": "product: black powder coated rack rails, typically manufactured from carbon steel, with standardised rack unit (u) hole spacing in accordance with the 19 inch rack format. holes may be square for cage nuts or pre tapped threaded holes for screw fixing.\r\nthey are mounting racking components, designed for permanent installation in standard 19 inch server and equipment racks. they provide vertical and horizontal fixing points to support and position rack mounted equipment.\r\nused to secure rack moun"
+ },
+ {
+  "id": 302,
+  "persona": "emu_specific",
+  "query": "perforated stretched polypropylene grid with raised nodes bonded to fabric",
+  "expected_code": "3926909790",
+  "source_id": "atar_600015150",
+  "oracle_text": "product: plastic bioxial geogrid mesh \r\npolypropylene sheet which has been punched and drawn into a square grid/mesh, (61-65mm between each rib of the grid. each rib minimum of 4mm wide), with raised moulded nodes. grid is bonded to a non-woven polypropylene paving fabric\r\nuse: in civil engineering\n\nhmrc justification: classification has been determined in accordance with the following:- \r\nfor the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) o"
+ },
+ {
+  "id": 4,
+  "persona": "naive_branded",
+  "query": "stainless pump seal face",
+  "expected_code": "7326909290",
+  "source_id": "atar_600014698",
+  "oracle_text": "product: the product is a stainless steel mechanical seal face and is one of the two seal faces in a mechanical seal assembly. the stainless steel seal faces are machined from commercially available steel alloys using cnc or manual machining processes and undergo electropolishing.\r\n\r\nthe seal is open - die forged and each seal face is custom made to precise specifications and combined with other mechanical seal elements and used solely for specific mechanical seals in industrial rotary applicati"
+ },
+ {
+  "id": 8,
+  "persona": "naive_branded",
+  "query": "pump seal rubber boot",
+  "expected_code": "4016999790",
+  "source_id": "atar_600014701",
+  "oracle_text": "product: the product is a rubber bellow, a component for a mechanical seal assembly. the black moulded elastomer forms the secondary sealing interface between the mechanical seal assembly and the equipment being sealed. \r\n\r\nthe bellow (without the metal spring) is manufactured from nitrile butadiene rubber (nbr) a vulcanised synthetic fluoroelastomer copolymer.  each nbr moulded part is manufactured by compression moulding and is custom designed for its specific mechanical seal application. the"
+ },
+ {
+  "id": 12,
+  "persona": "naive_branded",
+  "query": "pump seal rubber bellows",
+  "expected_code": "4016999790",
+  "source_id": "atar_600014703",
+  "oracle_text": "product: the product is a rubber bellow, a component for a mechanical seal assembly. the black moulded unthreaded elastomer forms the secondary sealing interface between the mechanical seal assembly and the equipment being sealed. \r\n\r\nthe bellow (without the metal spring) is manufactured from ethylene propylene diene monomer, (epdm) a type of synthetic rubber.  the epdm part is manufactured via compression moulding and is custom-designed and intended solely for its specific mechanical seal appli"
+ },
+ {
+  "id": 16,
+  "persona": "naive_branded",
+  "query": "full body surf wetsuit",
+  "expected_code": "6113001000",
+  "source_id": "atar_600014875",
+  "oracle_text": "product: wetsuit\r\nmade up of neoprene rubber covered on both sides with a knitted textile\r\nmaterials: neoprene 65-70% and textile 30-35%\r\ncovers torso, arms and legs\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following hav"
+ },
+ {
+  "id": 20,
+  "persona": "naive_branded",
+  "query": "sea-monkeys light up tank kit",
+  "expected_code": "9503007000",
+  "source_id": "atar_600014889",
+  "oracle_text": "product: a hatch your own live aquatic creatures set.\r\n\r\nthe set comprises of a plastic sachet of shrimp brine (artemia salina) eggs, a plastic sachet of food, a plastic tank that is decorated to represent an underwater world.  the tank has a battery-operated led lights in the base, which requires 2 aaa batteries (not included).  also included is a small plastic feeding spoon, a pipette, a magnifier and an instruction booklet.\r\n\r\nthe hatch your own live aquatic creatures set is for ages 6+. it i"
+ },
+ {
+  "id": 24,
+  "persona": "naive_branded",
+  "query": "eco friendly personalised friendship bracelet",
+  "expected_code": "7117900000",
+  "source_id": "atar_600014921",
+  "oracle_text": "product: a personalised bracelet made from recycled plastics, 40% polyester, 18% polyurethane (pre-consumer), 37% polyurethane and 5% calcium carbonate. there is a brass metal, plated with chromium connecting the bracelet with a leather band inside to layer the bracelet together. there are ties made of kraft paper and iron securing the bracelet to the kraft box. the box measures 94.5 mm width, 94.5 mm height and 14.5 mm in diameter, with an acrylic glue dot to secure the lid and base together in"
+ },
+ {
+  "id": 28,
+  "persona": "naive_branded",
+  "query": "personalised monster kids mug",
+  "expected_code": "3924100090",
+  "source_id": "atar_600014923",
+  "oracle_text": "product: a plastic mug made from abs plastic, which is pink and red in colour. it has inscriptions on it stating \"ava\" and \"giggle monster\", with a face containing eyes and a mouth with three teeth (one on top, two on bottom) depicting a \"monster\" style face. there are two feet at the bottom of the mug, each with three toes coming off it, with black toenails designed in the shape of triangles. the mug can be personalised to replace the name at the top of the mug above the monster to whatever nam"
+ },
+ {
+  "id": 5,
+  "persona": "naive_specific",
+  "query": "stainless steel rotary pump mechanical seal ring",
+  "expected_code": "7326909290",
+  "source_id": "atar_600014698",
+  "oracle_text": "product: the product is a stainless steel mechanical seal face and is one of the two seal faces in a mechanical seal assembly. the stainless steel seal faces are machined from commercially available steel alloys using cnc or manual machining processes and undergo electropolishing.\r\n\r\nthe seal is open - die forged and each seal face is custom made to precise specifications and combined with other mechanical seal elements and used solely for specific mechanical seals in industrial rotary applicati"
+ },
+ {
+  "id": 9,
+  "persona": "naive_specific",
+  "query": "nitrile rubber bellows for pump mechanical seal",
+  "expected_code": "4016999790",
+  "source_id": "atar_600014701",
+  "oracle_text": "product: the product is a rubber bellow, a component for a mechanical seal assembly. the black moulded elastomer forms the secondary sealing interface between the mechanical seal assembly and the equipment being sealed. \r\n\r\nthe bellow (without the metal spring) is manufactured from nitrile butadiene rubber (nbr) a vulcanised synthetic fluoroelastomer copolymer.  each nbr moulded part is manufactured by compression moulding and is custom designed for its specific mechanical seal application. the"
+ },
+ {
+  "id": 13,
+  "persona": "naive_specific",
+  "query": "epdm rubber bellows for water pump seal",
+  "expected_code": "4016999790",
+  "source_id": "atar_600014703",
+  "oracle_text": "product: the product is a rubber bellow, a component for a mechanical seal assembly. the black moulded unthreaded elastomer forms the secondary sealing interface between the mechanical seal assembly and the equipment being sealed. \r\n\r\nthe bellow (without the metal spring) is manufactured from ethylene propylene diene monomer, (epdm) a type of synthetic rubber.  the epdm part is manufactured via compression moulding and is custom-designed and intended solely for its specific mechanical seal appli"
+ },
+ {
+  "id": 17,
+  "persona": "naive_specific",
+  "query": "neoprene full body wetsuit with long sleeves and legs",
+  "expected_code": "6113001000",
+  "source_id": "atar_600014875",
+  "oracle_text": "product: wetsuit\r\nmade up of neoprene rubber covered on both sides with a knitted textile\r\nmaterials: neoprene 65-70% and textile 30-35%\r\ncovers torso, arms and legs\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following hav"
+ },
+ {
+  "id": 21,
+  "persona": "naive_specific",
+  "query": "hatch your own sea monkeys tank with lights",
+  "expected_code": "9503007000",
+  "source_id": "atar_600014889",
+  "oracle_text": "product: a hatch your own live aquatic creatures set.\r\n\r\nthe set comprises of a plastic sachet of shrimp brine (artemia salina) eggs, a plastic sachet of food, a plastic tank that is decorated to represent an underwater world.  the tank has a battery-operated led lights in the base, which requires 2 aaa batteries (not included).  also included is a small plastic feeding spoon, a pipette, a magnifier and an instruction booklet.\r\n\r\nthe hatch your own live aquatic creatures set is for ages 6+. it i"
+ },
+ {
+  "id": 25,
+  "persona": "naive_specific",
+  "query": "recycled plastic bracelet with metal clasp in gift box",
+  "expected_code": "7117900000",
+  "source_id": "atar_600014921",
+  "oracle_text": "product: a personalised bracelet made from recycled plastics, 40% polyester, 18% polyurethane (pre-consumer), 37% polyurethane and 5% calcium carbonate. there is a brass metal, plated with chromium connecting the bracelet with a leather band inside to layer the bracelet together. there are ties made of kraft paper and iron securing the bracelet to the kraft box. the box measures 94.5 mm width, 94.5 mm height and 14.5 mm in diameter, with an acrylic glue dot to secure the lid and base together in"
+ },
+ {
+  "id": 29,
+  "persona": "naive_specific",
+  "query": "pink monster plastic mug with removable name label",
+  "expected_code": "3924100090",
+  "source_id": "atar_600014923",
+  "oracle_text": "product: a plastic mug made from abs plastic, which is pink and red in colour. it has inscriptions on it stating \"ava\" and \"giggle monster\", with a face containing eyes and a mouth with three teeth (one on top, two on bottom) depicting a \"monster\" style face. there are two feet at the bottom of the mug, each with three toes coming off it, with black toenails designed in the shape of triangles. the mug can be personalised to replace the name at the top of the mug above the monster to whatever nam"
+ },
+ {
+  "id": 3,
+  "persona": "naive_vague",
+  "query": "metal machine part",
+  "expected_code": "7326909290",
+  "source_id": "atar_600014698",
+  "oracle_text": "product: the product is a stainless steel mechanical seal face and is one of the two seal faces in a mechanical seal assembly. the stainless steel seal faces are machined from commercially available steel alloys using cnc or manual machining processes and undergo electropolishing.\r\n\r\nthe seal is open - die forged and each seal face is custom made to precise specifications and combined with other mechanical seal elements and used solely for specific mechanical seals in industrial rotary applicati"
+ },
+ {
+  "id": 7,
+  "persona": "naive_vague",
+  "query": "rubber seal",
+  "expected_code": "4016999790",
+  "source_id": "atar_600014701",
+  "oracle_text": "product: the product is a rubber bellow, a component for a mechanical seal assembly. the black moulded elastomer forms the secondary sealing interface between the mechanical seal assembly and the equipment being sealed. \r\n\r\nthe bellow (without the metal spring) is manufactured from nitrile butadiene rubber (nbr) a vulcanised synthetic fluoroelastomer copolymer.  each nbr moulded part is manufactured by compression moulding and is custom designed for its specific mechanical seal application. the"
+ },
+ {
+  "id": 11,
+  "persona": "naive_vague",
+  "query": "rubber pump part",
+  "expected_code": "4016999790",
+  "source_id": "atar_600014703",
+  "oracle_text": "product: the product is a rubber bellow, a component for a mechanical seal assembly. the black moulded unthreaded elastomer forms the secondary sealing interface between the mechanical seal assembly and the equipment being sealed. \r\n\r\nthe bellow (without the metal spring) is manufactured from ethylene propylene diene monomer, (epdm) a type of synthetic rubber.  the epdm part is manufactured via compression moulding and is custom-designed and intended solely for its specific mechanical seal appli"
+ },
+ {
+  "id": 15,
+  "persona": "naive_vague",
+  "query": "diving suit",
+  "expected_code": "6113001000",
+  "source_id": "atar_600014875",
+  "oracle_text": "product: wetsuit\r\nmade up of neoprene rubber covered on both sides with a knitted textile\r\nmaterials: neoprene 65-70% and textile 30-35%\r\ncovers torso, arms and legs\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following hav"
+ },
+ {
+  "id": 19,
+  "persona": "naive_vague",
+  "query": "kids aquarium toy",
+  "expected_code": "9503007000",
+  "source_id": "atar_600014889",
+  "oracle_text": "product: a hatch your own live aquatic creatures set.\r\n\r\nthe set comprises of a plastic sachet of shrimp brine (artemia salina) eggs, a plastic sachet of food, a plastic tank that is decorated to represent an underwater world.  the tank has a battery-operated led lights in the base, which requires 2 aaa batteries (not included).  also included is a small plastic feeding spoon, a pipette, a magnifier and an instruction booklet.\r\n\r\nthe hatch your own live aquatic creatures set is for ages 6+. it i"
+ },
+ {
+  "id": 23,
+  "persona": "naive_vague",
+  "query": "personalised bracelet",
+  "expected_code": "7117900000",
+  "source_id": "atar_600014921",
+  "oracle_text": "product: a personalised bracelet made from recycled plastics, 40% polyester, 18% polyurethane (pre-consumer), 37% polyurethane and 5% calcium carbonate. there is a brass metal, plated with chromium connecting the bracelet with a leather band inside to layer the bracelet together. there are ties made of kraft paper and iron securing the bracelet to the kraft box. the box measures 94.5 mm width, 94.5 mm height and 14.5 mm in diameter, with an acrylic glue dot to secure the lid and base together in"
+ },
+ {
+  "id": 27,
+  "persona": "naive_vague",
+  "query": "kids plastic cup",
+  "expected_code": "3924100090",
+  "source_id": "atar_600014923",
+  "oracle_text": "product: a plastic mug made from abs plastic, which is pink and red in colour. it has inscriptions on it stating \"ava\" and \"giggle monster\", with a face containing eyes and a mouth with three teeth (one on top, two on bottom) depicting a \"monster\" style face. there are two feet at the bottom of the mug, each with three toes coming off it, with black toenails designed in the shape of triangles. the mug can be personalised to replace the name at the top of the mug above the monster to whatever nam"
+ },
+ {
+  "id": 1,
+  "persona": "original",
+  "query": "product: the product is a stainless steel mechanical seal face and is one of the two seal faces in a mechanical seal assembly. the stainless steel seal faces are machined from commercially available steel alloys using cnc or manual machining processes and undergo electropolishing.\r\n\r\nthe seal is open - die forged and each seal face is custom made to precise specifications and combined with other mechanical seal elements and used solely for specific mechanical seals in industrial rotary applicati",
+  "expected_code": "7326909290",
+  "source_id": "atar_600014698",
+  "oracle_text": "product: the product is a stainless steel mechanical seal face and is one of the two seal faces in a mechanical seal assembly. the stainless steel seal faces are machined from commercially available steel alloys using cnc or manual machining processes and undergo electropolishing.\r\n\r\nthe seal is open - die forged and each seal face is custom made to precise specifications and combined with other mechanical seal elements and used solely for specific mechanical seals in industrial rotary applicati"
+ },
+ {
+  "id": 6,
+  "persona": "original",
+  "query": "product: the product is a rubber bellow, a component for a mechanical seal assembly. the black moulded elastomer forms the secondary sealing interface between the mechanical seal assembly and the equipment being sealed. \r\n\r\nthe bellow (without the metal spring) is manufactured from nitrile butadiene rubber (nbr) a vulcanised synthetic fluoroelastomer copolymer.  each nbr moulded part is manufactured by compression moulding and is custom designed for its specific mechanical seal application. the",
+  "expected_code": "4016999790",
+  "source_id": "atar_600014701",
+  "oracle_text": "product: the product is a rubber bellow, a component for a mechanical seal assembly. the black moulded elastomer forms the secondary sealing interface between the mechanical seal assembly and the equipment being sealed. \r\n\r\nthe bellow (without the metal spring) is manufactured from nitrile butadiene rubber (nbr) a vulcanised synthetic fluoroelastomer copolymer.  each nbr moulded part is manufactured by compression moulding and is custom designed for its specific mechanical seal application. the"
+ },
+ {
+  "id": 10,
+  "persona": "original",
+  "query": "product: the product is a rubber bellow, a component for a mechanical seal assembly. the black moulded unthreaded elastomer forms the secondary sealing interface between the mechanical seal assembly and the equipment being sealed. \r\n\r\nthe bellow (without the metal spring) is manufactured from ethylene propylene diene monomer, (epdm) a type of synthetic rubber.  the epdm part is manufactured via compression moulding and is custom-designed and intended solely for its specific mechanical seal appli",
+  "expected_code": "4016999790",
+  "source_id": "atar_600014703",
+  "oracle_text": "product: the product is a rubber bellow, a component for a mechanical seal assembly. the black moulded unthreaded elastomer forms the secondary sealing interface between the mechanical seal assembly and the equipment being sealed. \r\n\r\nthe bellow (without the metal spring) is manufactured from ethylene propylene diene monomer, (epdm) a type of synthetic rubber.  the epdm part is manufactured via compression moulding and is custom-designed and intended solely for its specific mechanical seal appli"
+ },
+ {
+  "id": 14,
+  "persona": "original",
+  "query": "product: wetsuit\r\nmade up of neoprene rubber covered on both sides with a knitted textile\r\nmaterials: neoprene 65-70% and textile 30-35%\r\ncovers torso, arms and legs\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following hav",
+  "expected_code": "6113001000",
+  "source_id": "atar_600014875",
+  "oracle_text": "product: wetsuit\r\nmade up of neoprene rubber covered on both sides with a knitted textile\r\nmaterials: neoprene 65-70% and textile 30-35%\r\ncovers torso, arms and legs\n\nhmrc justification: classification has been determined in accordance with the following:- for the purposes of determining the commodity codes within which goods most appropriately fall, reg 3 (1) of the customs tariff (establishment) (eu exit) regulations 2020 sets out that the rules of interpretation contained in the following hav"
+ },
+ {
+  "id": 18,
+  "persona": "original",
+  "query": "product: a hatch your own live aquatic creatures set.\r\n\r\nthe set comprises of a plastic sachet of shrimp brine (artemia salina) eggs, a plastic sachet of food, a plastic tank that is decorated to represent an underwater world.  the tank has a battery-operated led lights in the base, which requires 2 aaa batteries (not included).  also included is a small plastic feeding spoon, a pipette, a magnifier and an instruction booklet.\r\n\r\nthe hatch your own live aquatic creatures set is for ages 6+. it i",
+  "expected_code": "9503007000",
+  "source_id": "atar_600014889",
+  "oracle_text": "product: a hatch your own live aquatic creatures set.\r\n\r\nthe set comprises of a plastic sachet of shrimp brine (artemia salina) eggs, a plastic sachet of food, a plastic tank that is decorated to represent an underwater world.  the tank has a battery-operated led lights in the base, which requires 2 aaa batteries (not included).  also included is a small plastic feeding spoon, a pipette, a magnifier and an instruction booklet.\r\n\r\nthe hatch your own live aquatic creatures set is for ages 6+. it i"
+ },
+ {
+  "id": 22,
+  "persona": "original",
+  "query": "product: a personalised bracelet made from recycled plastics, 40% polyester, 18% polyurethane (pre-consumer), 37% polyurethane and 5% calcium carbonate. there is a brass metal, plated with chromium connecting the bracelet with a leather band inside to layer the bracelet together. there are ties made of kraft paper and iron securing the bracelet to the kraft box. the box measures 94.5 mm width, 94.5 mm height and 14.5 mm in diameter, with an acrylic glue dot to secure the lid and base together in",
+  "expected_code": "7117900000",
+  "source_id": "atar_600014921",
+  "oracle_text": "product: a personalised bracelet made from recycled plastics, 40% polyester, 18% polyurethane (pre-consumer), 37% polyurethane and 5% calcium carbonate. there is a brass metal, plated with chromium connecting the bracelet with a leather band inside to layer the bracelet together. there are ties made of kraft paper and iron securing the bracelet to the kraft box. the box measures 94.5 mm width, 94.5 mm height and 14.5 mm in diameter, with an acrylic glue dot to secure the lid and base together in"
+ },
+ {
+  "id": 26,
+  "persona": "original",
+  "query": "product: a plastic mug made from abs plastic, which is pink and red in colour. it has inscriptions on it stating \"ava\" and \"giggle monster\", with a face containing eyes and a mouth with three teeth (one on top, two on bottom) depicting a \"monster\" style face. there are two feet at the bottom of the mug, each with three toes coming off it, with black toenails designed in the shape of triangles. the mug can be personalised to replace the name at the top of the mug above the monster to whatever nam",
+  "expected_code": "3924100090",
+  "source_id": "atar_600014923",
+  "oracle_text": "product: a plastic mug made from abs plastic, which is pink and red in colour. it has inscriptions on it stating \"ava\" and \"giggle monster\", with a face containing eyes and a mouth with three teeth (one on top, two on bottom) depicting a \"monster\" style face. there are two feet at the bottom of the mug, each with three toes coming off it, with black toenails designed in the shape of triangles. the mug can be personalised to replace the name at the top of the mug above the monster to whatever nam"
+ }
+]

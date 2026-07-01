@@ -1,4 +1,4 @@
-.env
+.env*
 .DS_Store
 *.zip
 *.tar.gz
@@ -30,3 +30,10 @@ apps/product/backend/.venv/
 apps/product/backend/**/__pycache__/
 apps/product/results/
 apps/product/reports/
+
+# mcp-skill-eval run outputs (code + docs versioned, results are not)
+mcp-skill-eval/arm_a_results/
+mcp-skill-eval/arm_b_results/
+mcp-skill-eval/experiment/mcp_base/
+mcp-skill-eval/experiment/mcp_claude/
+mcp-skill-eval/**/*.log

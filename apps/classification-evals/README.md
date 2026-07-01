@@ -11,6 +11,9 @@ classification eval runs. It serves:
 - retrieval matrix review, fresh retrieval trials, classification Q&A matrices,
   and long-running classification experiment/simulation jobs.
 
+- Q&A/E2E handover contract: `docs/QNA_E2E_CONTRACT.md`
+- Extraction pipeline runner: `scripts/extraction_pipeline.py`
+
 The runner wraps the classification matrix module:
 
 ```text
@@ -102,6 +105,48 @@ The app uses OpenSearch for the keyword leg and pgvector for the semantic leg,
 then fuses the two result sets with reciprocal rank fusion. If OpenSearch is
 not configured or unavailable, prompt/search preview falls back to Postgres
 full-text search.
+
+## Extraction Pipeline
+
+The deployed image includes the KG extraction seeders, SQL migrations, bundled
+seed data, and an operational manifest runner under `scripts/etl_seeders` and
+`scripts/extraction_pipeline.py`.
+
+Check status without mutating data:
+
+```bash
+docker compose --profile manual run --rm extraction-pipeline
+curl -k -u "$APP_USERNAME:$APP_PASSWORD" \
+  https://18.175.148.215.sslip.io/api/extraction/status
+```
+
+Write a dry-run manifest for the safe no-provider profile:
+
+```bash
+docker compose --profile manual run --rm extraction-pipeline \
+  python scripts/extraction_pipeline.py run --profile safe --dry-run
+```
+
+Run the safe profile deliberately:
+
+```bash
+docker compose --profile manual run --rm extraction-pipeline \
+  python scripts/extraction_pipeline.py run --profile safe
+```
+
+Provider-backed extraction steps are not enabled by default. To run them, set
+`EXTRACTION_ALLOW_PROVIDER_CALLS=1`, pass `--allow-spend`, and use only after
+agreeing spend limits. GOV.UK ATAR scrape steps also require
+`EXTRACTION_ALLOW_NETWORK=1` or `--allow-network`.
+
+The latest manifest is written to `var/extraction/manifest.json`, including the
+selected DAG profile, step statuses, blockers, command tails, and before/after
+KG table counts. An optional scheduler profile exists but is not started by the
+default deployment:
+
+```bash
+EXTRACTION_RUN_INTERVAL_SECONDS=86400 docker compose --profile scheduler up -d extraction-scheduler
+```
 
 The first `apply_deploy_kg_profile.py` call is a dry run. It reports how many
 KG rows would be removed or relabelled. The second call commits the deployable
