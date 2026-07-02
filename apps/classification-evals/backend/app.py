@@ -469,7 +469,7 @@ def health() -> dict:
         "auth_enabled": auth_enabled(),
         "product_backend_present": PRODUCT_BACKEND.exists(),
         "kg_label_profile": os.environ.get("AI_FAN_OUT_KG_LABEL_PROFILE", "full"),
-        "openai_key_present": bool(os.environ.get("OPENAI_API_KEY")),
+        "openai_key_present": bool(_openai_api_key()),
         "state_ready": STATE_DIR.exists(),
         "extraction_pipeline_present": _extraction_pipeline_script().exists(),
         "limits": {
@@ -878,9 +878,13 @@ def retrieval_search(req: RetrievalSearch) -> dict:
             403,
             "Selected experiment uses provider-backed rewrite and/or embeddings. Enable provider calls or choose the keyword baseline.",
         )
-    api_key = os.environ.get("OPENAI_API_KEY")
+    api_key = _openai_api_key()
     if needs_provider and not api_key:
-        raise HTTPException(400, "OPENAI_API_KEY is required for semantic retrieval trials.")
+        raise HTTPException(
+            400,
+            "No OpenAI key available for semantic retrieval trials: set OPENAI_API_KEY "
+            "or save one in the Configuration tab.",
+        )
 
     limit = max(10, min(int(req.retrieval_limit or 100), DEFAULT_LIMIT))
     processed_query = req.query
@@ -1224,8 +1228,12 @@ def classify_trial(req: ClassifyTrial) -> dict:
             403,
             "Q&A emulator trials call classifier and trader-emulator models. Set allow_spend=true.",
         )
-    if not os.environ.get("OPENAI_API_KEY"):
-        raise HTTPException(400, "OPENAI_API_KEY is required for Q&A emulator trials.")
+    if not _openai_api_key():
+        raise HTTPException(
+            400,
+            "No OpenAI key available for Q&A emulator trials: set OPENAI_API_KEY "
+            "or save one in the Configuration tab.",
+        )
     if req.model not in _allowed_models():
         raise HTTPException(422, "Classifier model is not enabled for classification trials.")
     if req.simulator_model not in _allowed_models():
