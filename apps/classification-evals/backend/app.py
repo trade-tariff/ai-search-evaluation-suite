@@ -1112,6 +1112,7 @@ def classify_gold_examples(persona: str = "emu_ordinary", limit: int = 20) -> di
                 SELECT id, source_id, persona, query, expected_code
                 FROM kg.eval_gold
                 WHERE source_type = 'atar'
+                  AND active
                   AND persona = %s
                 ORDER BY id
                 LIMIT %s
@@ -1134,6 +1135,7 @@ def _load_gold_example(gold_id: int) -> tuple[dict[str, Any], str]:
             SELECT id, source_id, source_type, persona, query, expected_code
             FROM kg.eval_gold
             WHERE id = %s
+              AND active
             LIMIT 1
             """,
             (gold_id,),
@@ -1406,10 +1408,26 @@ def _render_live_e2e_matrix(*, qa_only: bool) -> str:
     def esc(value) -> str:
         return _html_escape(str(value if value is not None else ""), quote=True)
 
+    def _wilson(successes: int, n: int, z: float = 1.96) -> tuple[float, float]:
+        if n <= 0:
+            return (0.0, 0.0)
+        p = successes / n
+        denom = 1 + z * z / n
+        centre = (p + z * z / (2 * n)) / denom
+        margin = (z / denom) * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))
+        return (max(0.0, centre - margin), min(1.0, centre + margin))
+
     def pct(num, den) -> str:
         try:
             den = int(den or 0)
-            return "-" if den <= 0 else f"{(100 * int(num or 0) / den):.1f}%"
+            if den <= 0:
+                return "-"
+            k = int(num or 0)
+            lo, hi = _wilson(k, den)
+            return (
+                f"<span title='95% CI {100 * lo:.0f}-{100 * hi:.0f}% (n={den})'>"
+                f"{(100 * k / den):.1f}%</span>"
+            )
         except Exception:
             return "-"
 
@@ -1502,6 +1520,18 @@ def _render_live_e2e_matrix(*, qa_only: bool) -> str:
     elif not rows:
         body = "<div class='empty'>No E2E/Q&A runs yet.</div>"
     else:
+        def _top1_rate(row) -> float | None:
+            nn = row.get("n_inputs") or row.get("input_count") or row.get("result_rows") or 0
+            el = row.get("initial_gold_in_retrieval") or 0
+            dd = el if qa_only else nn
+            return (int(row.get("gold_top1_after_qa") or 0) / dd) if dd else None
+
+        baseline_label = (os.environ.get("E2E_BASELINE_RUN_LABEL") or "").strip()
+        baseline_row = next((row for row in rows if row.get("run_label") == baseline_label), None)
+        if baseline_row is not None:
+            rows = [baseline_row] + [row for row in rows if row is not baseline_row]
+        baseline_rate = _top1_rate(baseline_row) if baseline_row is not None else None
+
         row_html = []
         for r in rows:
             n = r.get("n_inputs") or r.get("input_count") or r.get("result_rows") or 0
@@ -1512,12 +1542,27 @@ def _render_live_e2e_matrix(*, qa_only: bool) -> str:
             fallback_cls = "bad" if fallback else "muted"
             done = bool(r.get("finished_at"))
             status_cls = "good" if done and not int(r.get("errors") or 0) else ("warn" if not done else "bad")
+            is_base = baseline_row is not None and r is baseline_row
+            base_badge = (
+                "<span style='background:#1d4ed8;color:#dbeafe;font-size:9px;"
+                "padding:1px 6px;border-radius:8px'>LIVE BASELINE</span><br>"
+                if is_base else ""
+            )
+            top1_cell = pct(r.get('gold_top1_after_qa'), denom)
+            rate = _top1_rate(r)
+            if baseline_rate is not None and not is_base and rate is not None:
+                delta = (rate - baseline_rate) * 100
+                colour = "#bbf7d0" if delta >= 0 else "#fca5a5"
+                top1_cell += (
+                    f"<br><span style='color:{colour};font-size:11px'>"
+                    f"{delta:+.1f}pp vs live</span>"
+                )
             row_html.append(
                 f"""
                 <tr>
                   <td class='id'>#{esc(r.get('id'))}</td>
                   <td>
-                    <b>{esc(r.get('run_label'))}</b>
+                    {base_badge}<b>{esc(r.get('run_label'))}</b>
                     <br><span>{esc(r.get('retrieval_run_label'))}</span>
                     <br><code>{esc(prompt_label(r))}</code>
                   </td>
@@ -1526,7 +1571,7 @@ def _render_live_e2e_matrix(*, qa_only: bool) -> str:
                   <td>{esc(n)}<br><span>{esc(eligible)} eligible</span></td>
                   <td>{pct(r.get('initial_gold_in_retrieval'), n)}</td>
                   <td>{pct(r.get('gold_kept'), denom)}</td>
-                  <td>{pct(r.get('gold_top1_after_qa'), denom)}</td>
+                  <td>{top1_cell}</td>
                   <td>{num(r.get('avg_initial_rank'))} -> {num(r.get('avg_post_qa_rank'))}</td>
                   <td>{num(r.get('avg_rounds'))}<br><span>active {num(r.get('avg_active_count'))}</span></td>
                   <td>{esc(r.get('provider_calls_used') or 0)}</td>

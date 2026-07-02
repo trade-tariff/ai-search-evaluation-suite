@@ -61,6 +61,10 @@ export interface ScoringWeights {
   // LLM-derived
   fact_consistency: number;
   question_quality: number;
+  // Ground truth - replaces the reference-agreement bucket in the verdict
+  // whenever every compared model has gold-evaluated prompts
+  gold_top1: number;
+  gold_hierarchical: number;
 }
 
 export interface AppConfig {

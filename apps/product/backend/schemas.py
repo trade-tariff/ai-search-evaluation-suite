@@ -111,6 +111,13 @@ class ScoringWeights(BaseModel):
     """
     # Deterministic accuracy (6) - ranked-list aware. Production AI search
     # returns a ranked list with confidence labels, so these reflect that.
+    # Ground truth (2) - scored against the prompt's gold_code. When every
+    # compared model has gold-evaluated prompts, the verdict uses these
+    # INSTEAD of the reference-agreement bucket below: gold is the single
+    # most valuable signal and must outrank resemblance to the reference.
+    gold_top1: float = 0.35
+    gold_hierarchical: float = 0.15
+
     top1_match: float = 0.15              # strict: exact top-1 match
     mean_reciprocal_rank: float = 0.12    # continuous: 1/rank of ref's top
     top3_hit: float = 0.08                # softer: ref's top in candidate top-3

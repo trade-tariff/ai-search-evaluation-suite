@@ -208,11 +208,15 @@ async def run_one_session(gold: dict, oracle_text: str, *, strategy: str,
     if not final_set and result.get("candidates_final_round"):
         final_set = [c["commodity_code"] for c in result["candidates_final_round"]]
 
+    # Normalised comparison (digits-only) - raw equality silently scored
+    # dotted/padded answers as wrong.
+    expected_n = _norm_code(expected)
+    final_set_n = [_norm_code(c) for c in final_set]
     final_top1 = final_set[0] if final_set else None
-    gold_in_final_set = expected in final_set
-    gold_rank = (final_set.index(expected) + 1) if gold_in_final_set else None
-    gold_in_top1 = final_top1 == expected if final_top1 else False
-    gold_in_top5 = expected in final_set[:5]
+    gold_in_final_set = expected_n in final_set_n
+    gold_rank = (final_set_n.index(expected_n) + 1) if gold_in_final_set else None
+    gold_in_top1 = (_norm_code(final_top1) == expected_n) if final_top1 else False
+    gold_in_top5 = expected_n in final_set_n[:5]
     survivor_set_size = result.get("survivor_count", len(final_set))
 
     classify_calls = result.get("total_classify_calls", 0)
@@ -245,7 +249,7 @@ async def run_config(conn, *, run_label: str, strategy: str, prompt_mode: str,
     with conn.cursor() as cur:
         sql = (
             "SELECT id, source_id, source_type, persona, query, expected_code FROM kg.eval_gold "
-            "WHERE source_type='atar' AND persona = ANY(%s) ORDER BY id"
+            "WHERE source_type='atar' AND active AND persona = ANY(%s) ORDER BY id"
         )
         params: list = [personas]
         if limit:
@@ -253,13 +257,20 @@ async def run_config(conn, *, run_label: str, strategy: str, prompt_mode: str,
             sql = (
                 "SELECT * FROM (SELECT id, source_id, source_type, persona, query, expected_code, "
                 "row_number() OVER (PARTITION BY persona ORDER BY id) rn FROM kg.eval_gold "
-                "WHERE source_type='atar' AND persona = ANY(%s)) t WHERE rn <= %s ORDER BY id"
+                "WHERE source_type='atar' AND active AND persona = ANY(%s)) t WHERE rn <= %s ORDER BY id"
             )
             params.append(limit)
         cur.execute(sql, tuple(params))
         gold_rows = [dict(r) for r in cur.fetchall()]
 
     loo_map = build_loo_map(conn, gold_rows)
+
+    # Stamp the exact gold set into config_json so cross-run comparisons are
+    # provably on the same rows.
+    import hashlib
+    gold_sig = hashlib.md5(
+        "|".join(f"{g['id']}:{g['expected_code']}" for g in sorted(gold_rows, key=lambda g: g["id"])).encode()
+    ).hexdigest()[:12]
     atar_ids = sorted({g["source_id"] for g in gold_rows})
     with conn.cursor() as cur:
         cur.execute("SELECT id, body FROM kg.kg_edges WHERE id = ANY(%s)", (atar_ids,))
@@ -290,6 +301,7 @@ async def run_config(conn, *, run_label: str, strategy: str, prompt_mode: str,
         res = await task
         if res is None:
             continue
+        res["config"] = {**res["config"], "gold_set": {"n": len(gold_rows), "md5": gold_sig}}
         results.append(res)
         with conn.cursor() as cur:
             cur.execute(

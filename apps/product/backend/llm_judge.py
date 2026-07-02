@@ -74,9 +74,8 @@ You are an expert evaluator for UK goods classification (HS/commodity code assig
 
 You will be given:
 1. The original goods description query
-2. A REFERENCE response (the pinned gold standard for this run)
-3. A TARGET response (the candidate being evaluated)
-4. The per-prompt fact store: a list of slot/value pairs the simulator
+2. A TARGET response (the candidate being evaluated)
+3. The per-prompt fact store: a list of slot/value pairs the simulator
    committed to while resolving the Q&A. Every candidate in this run classified
    the same hypothetical product, defined by these facts.
 
@@ -108,9 +107,10 @@ def _format_facts_block(facts: list[dict] | None) -> str:
     for f in facts:
         slot = f.get("slot", "?")
         ans = f.get("answer", "?")
-        src = f.get("source_model", "?")
         rnd = f.get("source_round", "?")
-        lines.append(f'- {slot} = "{ans}" (committed by {src} in round {rnd})')
+        # Deliberately omit which model committed the fact - naming it leaks
+        # candidate identity to the judge (self/brand-preference bias).
+        lines.append(f'- {slot} = "{ans}" (round {rnd})')
     return "\n".join(lines)
 
 
@@ -135,14 +135,14 @@ def _build_judge_prompt(
 ## Response (completed in {target_rounds} round{"s" if target_rounds != 1 else ""})
 {target_text[:max_len]}"""
 
+    # The reference response is deliberately NOT shown: neither rubric uses
+    # it, and including it anchors the judge against targets that diverge
+    # from the reference's prose.
     return f"""## Original Query
 {query}
 
 ## Per-prompt fact store
 {facts_block}
-
-## Reference Response (completed in {baseline_rounds} round{"s" if baseline_rounds != 1 else ""})
-{baseline_text[:max_len]}
 
 ## Target Response (completed in {target_rounds} round{"s" if target_rounds != 1 else ""})
 {target_text[:max_len]}"""

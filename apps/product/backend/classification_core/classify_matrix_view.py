@@ -1,6 +1,20 @@
 from __future__ import annotations
 
+import math
+import os
+
 from . import local_db
+
+
+def _wilson(successes: int, n: int, z: float = 1.96) -> tuple[float, float]:
+    """95% Wilson score interval for a proportion, as (lo, hi) fractions."""
+    if n <= 0:
+        return (0.0, 0.0)
+    p = successes / n
+    denom = 1 + z * z / n
+    centre = (p + z * z / (2 * n)) / denom
+    margin = (z / denom) * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n))
+    return (max(0.0, centre - margin), min(1.0, centre + margin))
 
 _PERSONA_ORDER = [
     "naive_vague",
@@ -47,6 +61,9 @@ def eval_classify_matrix() -> str:
                        avg(gold_in_final_set::int) AS in_set,
                        avg(gold_in_top1::int)      AS top1,
                        avg(gold_in_top5::int)      AS top5,
+                       sum(gold_in_final_set::int) AS in_set_n,
+                       sum(gold_in_top1::int)      AS top1_n,
+                       sum(est_cost_usd)           AS total_cost,
                        percentile_cont(0.5) WITHIN GROUP (ORDER BY gold_rank)
                          FILTER (WHERE gold_rank IS NOT NULL) AS med_rank,
                        percentile_cont(0.5) WITHIN GROUP (ORDER BY survivor_set_size) AS med_size,
@@ -77,9 +94,15 @@ def eval_classify_matrix() -> str:
                 "model": r["model"],
             },
         )
-    labels = sorted(rows_by_label, key=lambda l: (meta[l]["strategy"] != "eliminate", l))
+    baseline_label = (os.environ.get("CLASSIFY_BASELINE_RUN_LABEL") or "").strip()
+    have_baseline = baseline_label in rows_by_label
+    labels = sorted(
+        rows_by_label,
+        key=lambda l: (l != baseline_label if have_baseline else False,
+                       meta[l]["strategy"] != "eliminate", l),
+    )
 
-    def _cell(r):
+    def _cell(r, baseline_row=None, is_baseline_label=False):
         if not r:
             return '<td style="background:#1f2937;color:#6b7280;text-align:center">-</td>'
         v = float(r["in_set"] or 0)
@@ -96,16 +119,29 @@ def eval_classify_matrix() -> str:
         else:
             bg, fg = "#7f1d1d", "#fecaca"
         rank = r["med_rank"]
+        n = int(r["n"] or 0)
+        lo, hi = _wilson(int(r.get("in_set_n") or 0), n)
+        top1_n = int(r.get("top1_n") or 0)
+        total_cost = float(r.get("total_cost") or 0)
+        cost_per_correct = (total_cost / top1_n) if top1_n else None
         tip = (
-            f"n={r['n']} | gold-in-set {v * 100:.0f}% | top1 {float(r['top1'] or 0) * 100:.0f}% "
+            f"n={n} | gold-in-set {v * 100:.0f}% (95% CI {lo * 100:.0f}-{hi * 100:.0f}%) "
+            f"| top1 {float(r['top1'] or 0) * 100:.0f}% "
             f"| top5 {float(r['top5'] or 0) * 100:.0f}% | med rank "
             f"{('%.0f' % rank) if rank is not None else '-'} "
             f"| med survivors {float(r['med_size'] or 0):.0f} | med rounds "
             f"{float(r['med_rounds'] or 0):.1f} | est ${float(r['avg_cost'] or 0):.4f}/session"
+            + (f" | ${cost_per_correct:.4f}/correct-top1" if cost_per_correct is not None else "")
         )
+        sub = f"t1 {float(r['top1'] or 0) * 100:.0f}%"
+        if baseline_row and not is_baseline_label:
+            delta = (v - float(baseline_row["in_set"] or 0)) * 100
+            colour = "#6ee7b7" if delta >= 0 else "#fca5a5"
+            sub += f' &middot; <span style="color:{colour}">{delta:+.0f}pp vs live</span>'
         return (
             f'<td title="{tip}" style="background:{bg};color:{fg};text-align:center;'
-            f'font-variant-numeric:tabular-nums">{v * 100:.0f}%</td>'
+            f'font-variant-numeric:tabular-nums"><b>{v * 100:.0f}%</b>'
+            f'<div style="font-size:9px;opacity:.85">{sub}</div></td>'
         )
 
     header_cells = "".join(
@@ -114,13 +150,23 @@ def eval_classify_matrix() -> str:
         for p in porder
     )
     body_rows = []
+    baseline_rows = rows_by_label.get(baseline_label, {}) if have_baseline else {}
     for lbl in labels:
         m = meta[lbl]
         prow = rows_by_label[lbl]
-        cells = "".join(_cell(prow.get(p)) for p in porder)
+        is_base = have_baseline and lbl == baseline_label
+        cells = "".join(
+            _cell(prow.get(p), baseline_rows.get(p), is_baseline_label=is_base)
+            for p in porder
+        )
         strat_badge = "#6ee7b7" if m["strategy"] == "eliminate" else "#93c5fd"
+        base_badge = (
+            '<span style="background:#1d4ed8;color:#dbeafe;font-size:9px;padding:1px 6px;'
+            'border-radius:8px;margin-right:6px;vertical-align:middle">LIVE BASELINE</span>'
+            if is_base else ""
+        )
         body_rows.append(
-            f'<tr><td class="rl"><span class="lbl" style="color:{strat_badge}">'
+            f'<tr><td class="rl">{base_badge}<span class="lbl" style="color:{strat_badge}">'
             f'{m["strategy"]}</span> &middot; {m["prompt_mode"]} &middot; {m["augmentation"]}'
             f'<span class="key">{lbl} ({m["model"]})</span></td>{cells}</tr>'
         )

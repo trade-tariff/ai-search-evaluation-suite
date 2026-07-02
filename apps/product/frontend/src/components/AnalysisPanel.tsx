@@ -95,13 +95,25 @@ const DEFAULT_WEIGHTS: ScoringWeights = {
   // LLM (22%)
   fact_consistency: 0.15,
   question_quality: 0.07,
+  // Ground truth - used instead of the reference-agreement bucket when
+  // every compared model has gold-evaluated prompts
+  gold_top1: 0.35,
+  gold_hierarchical: 0.15,
 };
 
 function computeVerdict(summaries: ModelSummary[], weights: ScoringWeights) {
   if (summaries.length === 0) return null;
 
+  // When every compared model has gold-evaluated prompts, correctness vs
+  // gold replaces agreement-with-the-reference: a model that beats the
+  // reference on gold must not be penalised for disagreeing with it.
+  const useGold = summaries.every((x) => (x.gold_evaluated_count ?? 0) > 0);
+
   // Normalise weights to sum=1 so the UI can accept raw positive numbers.
-  const raw = weights;
+  const raw: Record<string, number> = { ...weights };
+  const referenceBucket = ["top1_match", "top3_hit", "mean_reciprocal_rank", "heading_match", "chapter_match", "top5_overlap"];
+  const goldBucket = ["gold_top1", "gold_hierarchical"];
+  for (const k of useGold ? referenceBucket : goldBucket) raw[k] = 0;
   const sum = Object.values(raw).reduce((a, b) => a + Math.max(0, b), 0);
   const W = sum > 0
     ? Object.fromEntries(
@@ -126,20 +138,33 @@ function computeVerdict(summaries: ModelSummary[], weights: ScoringWeights) {
     const factConsistency = (s.avg_judge_fact_consistency ?? 0) / 10;
     const questionQuality = (s.avg_judge_question_quality ?? 0) / 10;
 
-    const composite =
-      W.top1_match * top1 +
-      W.top3_hit * top3 +
-      W.mean_reciprocal_rank * mrr +
-      W.heading_match * heading +
-      W.chapter_match * chapter +
-      W.top5_overlap * top5 +
-      W.schema_valid * schema +
-      W.rounds_efficiency * roundsEff +
-      W.question_efficiency * questionEff +
-      W.speed * speed +
-      W.cost * cost +
-      W.fact_consistency * factConsistency +
-      W.question_quality * questionQuality;
+    const goldTop1 = s.gold_top1_rate;
+    const goldHier = s.avg_gold_hierarchical_score;
+
+    // [weight, value|null] - null means the dimension is unavailable for
+    // this model (e.g. judge call failed); renormalise over the available
+    // weights instead of silently scoring it 0.
+    const terms: Array<[number, number | null]> = [
+      [W.top1_match ?? 0, top1],
+      [W.top3_hit ?? 0, top3],
+      [W.mean_reciprocal_rank ?? 0, mrr],
+      [W.heading_match ?? 0, heading],
+      [W.chapter_match ?? 0, chapter],
+      [W.top5_overlap ?? 0, top5],
+      [W.gold_top1 ?? 0, goldTop1 ?? null],
+      [W.gold_hierarchical ?? 0, goldHier ?? null],
+      [W.schema_valid ?? 0, schema],
+      [W.rounds_efficiency ?? 0, roundsEff],
+      [W.question_efficiency ?? 0, questionEff],
+      [W.speed ?? 0, speed],
+      [W.cost ?? 0, cost],
+      [W.fact_consistency ?? 0, s.avg_judge_fact_consistency != null ? s.avg_judge_fact_consistency / 10 : null],
+      [W.question_quality ?? 0, s.avg_judge_question_quality != null ? s.avg_judge_question_quality / 10 : null],
+    ];
+    const availableWeight = terms.reduce((a, [w, v]) => a + (v != null ? w : 0), 0);
+    const composite = availableWeight > 0
+      ? terms.reduce((a, [w, v]) => a + (v != null ? w * v : 0), 0) / availableWeight
+      : 0;
 
     return {
       summary: s,
@@ -784,9 +809,11 @@ export default function AnalysisPanel() {
     "Total Cost ($)": Number(s.total_cost.toFixed(4)),
   }));
 
-  // Include consensus in verdict so it competes on the same scale
-  const verdictSummaries = consensusSummary ? [consensusSummary, ...summaries] : summaries;
-  const verdict = computeVerdict(verdictSummaries, weights);
+  // Consensus is deliberately EXCLUDED from the ranked verdict: its
+  // reference-agreement scores are perfect by construction, so ranking it
+  // against candidates presents a tautology as a result. It remains visible
+  // as a baseline row in the tables.
+  const verdict = computeVerdict(summaries, weights);
   // Lookup composite scores by model_id for the summary table
   const compositeByModel = new Map<string, number>();
   if (verdict) {
