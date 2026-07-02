@@ -269,6 +269,12 @@ function questionModeLabel(mode: QuestionMode | string) {
   return labels[mode] ?? mode.replace(/_/g, " ");
 }
 
+const QUESTION_MODE_OPTIONS: { mode: QuestionMode; description: string; paid: boolean }[] = [
+  { mode: "facet_rules", description: "Deterministic facet questions (free)", paid: false },
+  { mode: "facet_rules_llm_wording", description: "Same questions, LLM-phrased (paid)", paid: true },
+  { mode: "llm_generated", description: "LLM generates the question (paid)", paid: true },
+];
+
 function codeDotted(code: string) {
   const digits = code.replace(/\D/g, "");
   return digits.length === 10
@@ -1075,28 +1081,6 @@ export default function ExperimentsTab() {
                 <div className="mt-1 text-xs opacity-80">{hydrationStatusDetail}</div>
               </div>
               <div className="flex flex-wrap items-end gap-3">
-                <div>
-                  <span className="block text-xs font-medium text-gray-400">Question mode</span>
-                  <div className="mt-2 flex rounded border border-gray-800 bg-gray-900 p-1">
-                    {(["facet_rules", "facet_rules_llm_wording", "llm_generated"] as QuestionMode[]).map((mode) => (
-                      <button
-                        key={mode}
-                        type="button"
-                        onClick={() => {
-                          setQuestionMode(mode);
-                          resetHydratedQa();
-                        }}
-                        className={`px-3 py-1.5 text-xs font-medium ${
-                          questionMode === mode
-                            ? "rounded bg-emerald-700 text-white"
-                            : "text-gray-400 hover:text-gray-200"
-                        }`}
-                      >
-                        {questionModeLabel(mode)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
                 <label className="block">
                   <span className="block text-xs font-medium text-gray-400">Hydrate candidates</span>
                   <input
@@ -1118,6 +1102,43 @@ export default function ExperimentsTab() {
                   {hydrating ? "Hydrating..." : qaHistory.length ? "Restart Q&A" : "Build Q&A"}
                 </button>
               </div>
+            </div>
+            <div className="mt-4">
+              <div className="text-xs font-medium text-gray-400">Q&A strategy</div>
+              <div className="mt-2 grid gap-2 md:grid-cols-3" role="radiogroup" aria-label="Q&A strategy">
+                {QUESTION_MODE_OPTIONS.map((option) => {
+                  const locked = option.paid && !allowProviderCalls;
+                  const selected = questionMode === option.mode;
+                  return (
+                    <button
+                      key={option.mode}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      disabled={locked}
+                      title={locked ? "Enable Provider calls to use this paid strategy" : undefined}
+                      onClick={() => {
+                        setQuestionMode(option.mode);
+                        resetHydratedQa();
+                      }}
+                      className={`rounded border p-3 text-left text-xs ${
+                        selected
+                          ? "border-emerald-700 bg-emerald-950/40"
+                          : "border-gray-800 bg-gray-950 hover:border-gray-700"
+                      } ${locked ? "cursor-not-allowed opacity-50" : ""}`}
+                    >
+                      <div className={`font-medium ${selected ? "text-emerald-200" : "text-gray-200"}`}>
+                        {questionModeLabel(option.mode)}
+                      </div>
+                      <div className="mt-1 text-gray-500">{option.description}</div>
+                      {locked && <div className="mt-1 text-amber-300/80">Requires Provider calls</div>}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-xs text-gray-500">
+                Compare strategies here interactively; for batch strategy comparisons over the gold set use an e2e job (results land in Gold Eval - E2E).
+              </p>
             </div>
             {!allowProviderCalls && questionMode !== "facet_rules" && (
               <div className="mt-3 text-xs text-gray-500">
