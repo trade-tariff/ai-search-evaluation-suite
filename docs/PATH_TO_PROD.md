@@ -60,16 +60,14 @@ running system, not inferred from reading code.
 
 ## 3. Before any external audience
 
-1. **One money-control system instead of three.** Today there are three
-   separate mechanisms deciding whether an AI call may spend money, and
-   they disagree: the workbench's per-request opt-in, an environment
-   switch for batch jobs, and the journey's daily counter - which is
-   informational only, resets when the app restarts, and cuts nothing off.
-   Worse, the workbench front end silently ticks the "allow spend" box on
-   three of its own calls (benchmark runs, search previews, rulings
-   ingest), and single Q&A trials bypass the $10 cap entirely. Target: one
-   server-side rule - an enforced daily budget per app, with per-request
-   opt-in on top.
+1. **One money-control system instead of three.** Largely closed on
+   2026-07-02: the workbench's operator switch is now the master (no
+   request can spend while it is off, which defeats the front end's
+   previously hardcoded "allow spend" on benchmark/preview/ingest), Q&A
+   trials now respect the $10 cap, and the journey's daily counter is an
+   enforced cutoff rather than a banner. Remaining: the journey counter
+   resets if the container restarts (it is in-memory) - persist it if
+   that ever matters.
 2. **Turn on the second login layer.** Both apps contain a decent built-in
    login check that is fully wired up but dormant, because no environment
    variable activates it. Today the only protection is the single shared

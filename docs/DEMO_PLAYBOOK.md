@@ -260,7 +260,7 @@ duty-step dead end described above.
 | First question takes ~2.5 minutes | This is the honest speed of the current evaluation configuration | Narrate the status line; see the model-choice note |
 | Workbench error messages used to say only "500 Internal Server Error" | Fixed on the branch - real reasons now shown | Before then: read the server logs |
 | The Knowledge tab can edit/delete shared data with no confirmation | Open | Browse only during demos |
-| The Benchmark tab spends money as soon as you press Run | Open (on the improvement plan) | Keep the prompt/model selection small |
+| The Benchmark tab spends money as soon as you press Run | FIXED: it now asks for confirmation, and the server refuses all workbench spend unless the operator switch is on | Flip AI_FAN_OUT_WORKBENCH_SPEND_ENABLED=1 for benchmark demos |
 | The local `./start.sh` quickstart was broken | Fixed on the branch | Use the server deployment meanwhile |
 
 ## 7. Troubleshooting
