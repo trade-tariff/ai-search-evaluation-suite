@@ -101,7 +101,10 @@ def _estimated_sessions(req: "JobCreate") -> int:
     if req.sweep:
         return _env_int("CLASSIFY_EVAL_SWEEP_SESSION_ESTIMATE", 500)
     per_persona = req.limit if req.limit is not None else _env_int("CLASSIFY_EVAL_UNCAPPED_SESSION_ESTIMATE", 500)
-    return len(req.personas) * per_persona
+    modes = 1
+    if getattr(req, "harness", "classify") == "e2e" and req.question_modes:
+        modes = max(1, len([m for m in req.question_modes.split(",") if m.strip()]))
+    return len(req.personas) * per_persona * modes
 
 
 def _estimated_cost_usd(req: "JobCreate") -> float:
@@ -123,6 +126,13 @@ class JobCreate(BaseModel):
     max_rounds: int = Field(default=5, ge=1, le=12)
     sweep: bool = False
     allow_spend: bool = False
+    # harness="e2e" runs the fixed-retrieval end-to-end matrix instead of the
+    # classify matrix, so any experiment-catalogue retrieval base (including
+    # the top KG config) can feed the Q&A stage. Results land in
+    # kg.e2e_eval_runs and surface in the E2E/Q&A matrix tabs.
+    harness: Literal["classify", "e2e"] = "classify"
+    retrieval_run_label: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_.:-]{1,120}$")
+    question_modes: str | None = Field(default=None, pattern=r"^[A-Za-z0-9_,-]{1,200}$")
 
 
 class RetrievalSearch(BaseModel):
@@ -328,6 +338,23 @@ def _validate_request(req: JobCreate) -> None:
     unknown_personas = sorted(set(req.personas) - set(PERSONA_CHOICES))
     if unknown_personas:
         raise HTTPException(422, f"Unknown personas: {', '.join(unknown_personas)}")
+    if req.harness == "e2e":
+        if req.sweep:
+            raise HTTPException(422, "Sweep is not supported by the e2e harness.")
+        if req.retrieval_run_label:
+            try:
+                from experiment_retrieval import experiment_catalog
+
+                known = {row.get("run_label") for row in experiment_catalog()}
+            except Exception as exc:
+                raise HTTPException(500, f"Could not load the retrieval experiment catalogue: {exc}")
+            if req.retrieval_run_label not in known:
+                raise HTTPException(422, f"Unknown retrieval experiment: {req.retrieval_run_label}")
+    elif req.retrieval_run_label:
+        raise HTTPException(
+            422,
+            "retrieval_run_label requires harness='e2e' (the classify harness has a fixed retrieval config).",
+        )
     if req.model not in _allowed_models():
         raise HTTPException(422, "Model is not enabled for classification eval jobs.")
     if req.simulator_model not in _allowed_models():
@@ -367,6 +394,25 @@ def _validate_request(req: JobCreate) -> None:
 
 def _build_command(req: JobCreate) -> list[str]:
     python = os.environ.get("CLASSIFY_EVAL_PYTHON") or sys.executable
+    if req.harness == "e2e":
+        cmd = [
+            python,
+            "-m",
+            "classification_core.run_hydrated_e2e_matrix",
+            "--run-label", req.run_label,
+            "--retrieval-run-label", req.retrieval_run_label or "baseline_fts_only",
+            "--pair-limit", str(req.limit if req.limit is not None else 5),
+            "--personas", ",".join(req.personas),
+            "--retrieval-limit", str(req.candidate_limit),
+            "--max-rounds", str(req.max_rounds),
+            "--question-model", req.model,
+            "--concurrency", str(req.concurrency),
+            "--allow-spend",
+        ]
+        # The harness's own default runs ALL question modes, multiplying
+        # sessions (and spend) by three - default to one mode instead.
+        cmd.extend(["--question-modes", req.question_modes or "facet_rules"])
+        return cmd
     cmd = [
         python,
         "-m",
@@ -435,6 +481,9 @@ def options() -> dict:
         "strategies": ["converge", "eliminate"],
         "prompt_modes": ["baseline", "rule_reasoning", "exclusion_aware", "gir_citation", "self_verify"],
         "augmentations": ["none", "facts", "kg", "facts+kg"],
+        "harnesses": ["classify", "e2e"],
+        "e2e_question_modes": ["facet_rules", "facet_rules_llm_wording", "llm_generated"],
+        "e2e_retrieval_bases": "any run_label from GET /api/retrieval/experiments",
         "limits": {
             "max_running_jobs": _env_int("CLASSIFY_EVAL_MAX_RUNNING_JOBS", 1),
             "max_concurrency": _env_int("CLASSIFY_EVAL_MAX_CONCURRENCY", 4),

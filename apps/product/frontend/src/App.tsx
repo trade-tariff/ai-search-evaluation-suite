@@ -17,8 +17,15 @@ import E2EMatrixTab from "./components/E2EMatrixTab";
 import QAMatrixTab from "./components/QAMatrixTab";
 import ExperimentsTab from "./components/ExperimentsTab";
 
-const TABS = ["Experiments", "Matrix", "Q&A Matrix", "E2E Matrix", "Configuration", "Prompts", "ATaR", "Search References", "Simulator", "Judge", "Benchmark", "Analysis", "Financial", "Intercepts", "Complexity", "Knowledge"] as const;
-type Tab = (typeof TABS)[number];
+// Three entry points: try new things (Experiment), run/read the measurements
+// (Evaluate), set up the pipeline (Configure). Tab components are unchanged -
+// this is presentation-only grouping.
+const NAV_GROUPS = [
+  { label: "Experiment", tabs: ["Experiments", "ATaR", "Intercepts", "Complexity", "Knowledge"] },
+  { label: "Evaluate", tabs: ["Benchmark", "Analysis", "Matrix", "Q&A Matrix", "E2E Matrix", "Financial"] },
+  { label: "Configure", tabs: ["Configuration", "Prompts", "Search References", "Simulator", "Judge"] },
+] as const;
+type Tab = (typeof NAV_GROUPS)[number]["tabs"][number];
 
 export default function App() {
   const [tab, setTab] = useState<Tab>("Experiments");
@@ -45,19 +52,32 @@ export default function App() {
         </h1>
       </header>
 
-      <nav className="border-b border-gray-800 px-6 flex gap-1 max-w-full overflow-x-auto">
-        {TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              tab === t
-                ? "border-blue-500 text-blue-400"
-                : "border-transparent text-gray-400 hover:text-gray-200"
-            }`}
+      <nav className="border-b border-gray-800 px-6 flex max-w-full overflow-x-auto" aria-label="Primary">
+        {NAV_GROUPS.map((group, gi) => (
+          <div
+            key={group.label}
+            className={`shrink-0 flex flex-col ${gi > 0 ? "ml-3 pl-3 border-l border-gray-800/80" : ""}`}
           >
-            {t}
-          </button>
+            <span className="px-1 pt-1.5 text-[10px] font-semibold uppercase tracking-widest text-gray-600 select-none">
+              {group.label}
+            </span>
+            <div className="flex gap-1">
+              {group.tabs.map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  aria-current={tab === t ? "page" : undefined}
+                  className={`shrink-0 px-3 pb-2.5 pt-1 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
+                    tab === t
+                      ? "border-blue-500 text-blue-400"
+                      : "border-transparent text-gray-400 hover:text-gray-200"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
 
