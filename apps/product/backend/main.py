@@ -2211,7 +2211,10 @@ def api_intercepts_list_runs():
 @app.get("/api/intercepts/runs/{run_id}")
 def api_intercepts_load_run(run_id: str):
     import intercepts
-    rec = intercepts.load_run(run_id)
+    try:
+        rec = intercepts.load_run(run_id)
+    except intercepts.RunTooLarge as exc:
+        raise HTTPException(413, str(exc))
     if rec is None:
         raise HTTPException(404, "Run not found")
     return rec
@@ -2250,7 +2253,10 @@ def api_intercepts_run_rows_only(run_id: str):
     candidate-text payload. The DetailPanel can fetch one commodity's
     candidates separately via /candidates if needed."""
     import intercepts
-    rec = intercepts.load_run(run_id)
+    try:
+        rec = intercepts.load_run(run_id)
+    except intercepts.RunTooLarge as exc:
+        raise HTTPException(413, str(exc))
     if rec is None:
         raise HTTPException(404, "Run not found")
     lite = {k: v for k, v in rec.items() if k != "details"}
@@ -2261,7 +2267,10 @@ def api_intercepts_run_rows_only(run_id: str):
 def api_intercepts_run_candidates(run_id: str, code: str):
     """Return top_candidates for a single commodity from a saved run."""
     import intercepts
-    rec = intercepts.load_run(run_id)
+    try:
+        rec = intercepts.load_run(run_id)
+    except intercepts.RunTooLarge as exc:
+        raise HTTPException(413, str(exc))
     if rec is None:
         raise HTTPException(404, "Run not found")
     det = (rec.get("details") or {}).get(code) or {}
@@ -2277,7 +2286,10 @@ def api_intercepts_recall_summary(run_id: str):
     """Aggregate a gold-recall run by chapter for charting.
     Returns small JSON instead of the full multi-MB run."""
     import intercepts
-    rec = intercepts.load_run(run_id)
+    try:
+        rec = intercepts.load_run(run_id)
+    except intercepts.RunTooLarge as exc:
+        raise HTTPException(413, str(exc))
     if rec is None:
         raise HTTPException(404, "Run not found")
 

@@ -145,9 +145,14 @@ curl -s -X POST http://127.0.0.1:8100/api/jobs -H 'Content-Type: application/jso
    drill-down per term. Do not press "Analyze selected" unless you intend
    to spend money live.
 6. **Complexity.** Two big charts summarising how hard classification is
-   across the whole tariff (14,000+ points, one per commodity heading),
-   with the difficult terms overlaid. Below them, an audit of how often
-   the known-correct answer was found.
+   across the whole tariff (14,144 points, one per declarable commodity),
+   with the difficult terms overlaid. Below them, the gold-recall audit:
+   13,883 of 14,144 commodities (98.2%) had their known-correct code
+   retrieved, 9,297 of them at rank 1. Note: the two full-sweep run files
+   are 788MB each; on this host they are served from details-stripped
+   sidecars (run_<id>.rows.json + .meta.json) - a new full sweep saved on
+   this box needs those sidecars generated (see intercepts.py notes) or
+   the run will list as "metadata sidecar missing".
 7. **Knowledge Graph.** A browsable view of the extracted facts about each
    commodity (98.6% of real, declarable codes now have facts), plus an
    interactive graph view. CAUTION: the edit and delete buttons here

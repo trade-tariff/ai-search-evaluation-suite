@@ -87,10 +87,22 @@ def _composite(row: dict[str, Any], weights: dict[str, float] | None = None) -> 
     return (1 - rf) * wsum + rf * 1.0
 
 
+# Full-parsing 788MB sweep files OOM-kills small hosts; above this size only
+# a details-stripped run_<id>.rows.json sidecar is acceptable.
+_FULL_PARSE_MAX_BYTES = int(os.environ.get("INTERCEPT_RUN_OPEN_MAX_MB", "200")) * 1024 * 1024
+
+
 def _load_run(run_id: str) -> dict[str, Any]:
     path = DATA_DIR / f"run_{run_id}.json"
     if not path.exists():
         raise FileNotFoundError(f"Run not found: {run_id}")
+    if path.stat().st_size > _FULL_PARSE_MAX_BYTES:
+        sidecar = DATA_DIR / f"run_{run_id}.rows.json"
+        if sidecar.exists():
+            return json.loads(sidecar.read_text())
+        raise FileNotFoundError(
+            f"Run {run_id} is too large to open on this host and has no .rows.json sidecar"
+        )
     return json.loads(path.read_text())
 
 
@@ -106,10 +118,18 @@ def _find_term_analysis_run() -> str | None:
     """Find the most recent term-analysis run for the 728 overlay."""
     candidates = []
     for f in DATA_DIR.glob("run_*.json"):
-        if ".scatter" in f.name:
+        if ".scatter" in f.name or ".meta" in f.name or ".rows" in f.name:
             continue
         try:
-            d = json.loads(f.read_text())
+            # Metadata sidecar first; never full-parse an oversized run just
+            # to read its kind (the 788MB sweeps OOM-killed this scan).
+            meta = f.parent / (f.name[: -len(".json")] + ".meta.json")
+            if meta.exists():
+                d = json.loads(meta.read_text())
+            elif f.stat().st_size > _FULL_PARSE_MAX_BYTES:
+                continue
+            else:
+                d = json.loads(f.read_text())
         except Exception:
             continue
         kind = d.get("kind")

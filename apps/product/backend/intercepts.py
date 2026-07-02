@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 import time
 import uuid
@@ -463,18 +464,41 @@ _LIST_RUNS_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 # (path, mtime) we parse each file once per its lifetime instead of on every
 # /api/intercepts/runs call.
 
+# Full-parsing a run file for its handful of metadata fields is fine at a few
+# MB but fatal for the 788MB commodity sweeps on a small host (json.loads
+# expands several-fold in memory; the May sweeps OOM-killed a 4GB box). Above
+# this size the listing requires a run_<id>.meta.json sidecar instead.
+_METADATA_FULL_PARSE_MAX_BYTES = int(
+    os.environ.get("INTERCEPT_RUN_META_PARSE_MAX_MB", "100")
+) * 1024 * 1024
+
+
 def _read_run_metadata(p) -> dict[str, Any] | None:
     """Cached metadata read. Re-parses only when the file's mtime changes."""
     try:
-        mtime = p.stat().st_mtime
+        stat = p.stat()
+        mtime = stat.st_mtime
     except OSError:
         return None
     key = str(p)
     cached = _LIST_RUNS_CACHE.get(key)
     if cached and cached[0] == mtime:
         return cached[1]
+    sidecar = p.parent / (p.name[: -len(".json")] + ".meta.json")
     try:
-        d = json.loads(p.read_text())
+        if sidecar.exists():
+            d = json.loads(sidecar.read_text())
+        elif stat.st_size > _METADATA_FULL_PARSE_MAX_BYTES:
+            # Too big to parse here and no sidecar: list it with what the
+            # filename gives us rather than OOMing the host or hiding it.
+            d = {
+                "id": p.name[len("run_"): -len(".json")],
+                "name": f"{p.name} (large run - metadata sidecar missing)",
+                "kind": None,
+                "status": "metadata_unavailable",
+            }
+        else:
+            d = json.loads(p.read_text())
     except Exception:
         return None
     meta = {
@@ -495,8 +519,8 @@ def _read_run_metadata(p) -> dict[str, Any] | None:
 def list_runs() -> list[dict[str, Any]]:
     out = []
     for p in sorted(RUNS_DIR.glob("run_*.json")):
-        # Skip the .scatter.json companions — we only want the main run files.
-        if ".scatter" in p.name:
+        # Skip companions/sidecars — we only want the main run files.
+        if ".scatter" in p.name or ".meta" in p.name or ".rows" in p.name:
             continue
         meta = _read_run_metadata(p)
         if meta is not None:
@@ -504,10 +528,28 @@ def list_runs() -> list[dict[str, Any]]:
     return sorted(out, key=lambda r: r.get("saved_at") or "", reverse=True)
 
 
+_RUN_OPEN_MAX_BYTES = int(os.environ.get("INTERCEPT_RUN_OPEN_MAX_MB", "200")) * 1024 * 1024
+
+
+class RunTooLarge(RuntimeError):
+    pass
+
+
 def load_run(run_id: str) -> dict[str, Any] | None:
     path = RUNS_DIR / f"run_{run_id}.json"
     if not path.exists():
         return None
+    if path.stat().st_size > _RUN_OPEN_MAX_BYTES:
+        # Serve the details-stripped sidecar if one exists (rows + all
+        # top-level fields; only per-commodity candidate dumps are absent).
+        rows_sidecar = RUNS_DIR / f"run_{run_id}.rows.json"
+        if rows_sidecar.exists():
+            return json.loads(rows_sidecar.read_text())
+        raise RunTooLarge(
+            f"Run {run_id} is {path.stat().st_size // (1024 * 1024)}MB - too large to open "
+            "interactively on this host and no run_<id>.rows.json sidecar exists. Its charts "
+            "still render from the scatter companion; raise INTERCEPT_RUN_OPEN_MAX_MB to override."
+        )
     return json.loads(path.read_text())
 
 
