@@ -1,158 +1,184 @@
 # Path to Production - AI Search Evaluation Suite
 
-Produced by the 2026-07-02 deep-dive audit: 31-agent workflow over the
-deployed source (capability map, adversarially verified bloat audit, prod-gap
-sweep) plus a live probe of every route on both deployed apps. Everything
-below marked "verified" was checked against the running system, not inferred.
+This plan comes from a full audit on 2026-07-02: a 31-agent automated review
+of the deployed source code (what each part does, what is dead weight, what
+would break in production) plus a hands-on check of every screen and API on
+the live system. Everything below marked "verified" was checked against the
+running system, not inferred from reading code.
 
 ## 1. Where we are (verified)
 
-- One EC2 host runs everything: workbench app (8100), journey app (8200),
-  pgvector Postgres (uk + kg schemas incl. 105k fact embeddings), OpenSearch,
-  Caddy TLS/basicauth edge on sslip.io wildcard DNS.
-- Both apps are healthy; all read-only routes return 200; spend gates on the
-  workbench work as designed (403 without allow_spend, $10 job cap).
-- **Both images rebuild cleanly from the deployed trees** (verified 2026-07-02).
-  Earlier "cannot rebuild" fears are false.
-- The deployed source was NOT in version control: `/opt` trees are raw copies,
-  edited live, with 35 `.bak*` snapshot files (~34k lines) as the only history.
-  Two-way drift vs GitHub: 18 `classification_core` modules existed only on
-  the VM (now captured); the repo has the kg schema SQL + experiment scripts
-  the VM lacks.
-- Branch `vm-sync-20260702` (this checkout) reconciles that: deployed state
-  synced in, verified dead code removed (-1,284 lines), demo blockers fixed,
-  and the full uk+kg schema baseline committed to `migrations/`.
+- One cloud server runs everything: the evaluation workbench, the trader
+  journey app, the tariff database, the search index, and the web front
+  door that handles the login prompt and HTTPS.
+- Both apps are healthy. Every read-only page and API responds correctly.
+  The workbench's money controls genuinely work: anything that would spend
+  money on AI calls is refused unless explicitly allowed, and batch runs
+  are rejected above an estimated $10.
+- **Both apps rebuild cleanly from the code on the server** (proven
+  2026-07-02). An earlier fear that the running system could not be rebuilt
+  turned out to be false.
+- The deployed code was NOT under version control. The server held a raw
+  copy of the code, edited live over weeks, with 35 backup copies of files
+  (about 34,000 lines) as the only history. The server copy and the GitHub
+  repository had drifted apart in both directions: the core classification
+  engine (18 files) existed only on the server, while the repository held
+  database set-up scripts and experiment code the server never received.
+- Branch `vm-sync-20260702` fixes that: the server's code is captured into
+  git, 1,284 lines of confirmed-dead code are removed, the demo-blocking
+  bugs are fixed, and the full database structure is recorded in
+  `migrations/`. Deployed to the server on 2026-07-02.
 
-## 2. P0 - do this week
+## 2. Do this week
 
-1. **Push and adopt the sync branch.** `git push origin vm-sync-20260702`,
-   review, merge. From then on the rule is: no edit lands on the VM except
-   via git (deploy = fetch + rsync + compose build, per DEMO_PLAYBOOK
-   section 2). Delete the `.bak*` files on the VM (archived in
-   `~/backups/bak_archive_20260702.tgz` and locally).
-2. **Rotate the journey OpenAI key and gitignore the journey tree.** The
-   deployed journey tree has NO .gitignore and `.env.journey` contains the
-   live key + DB password in plaintext; a naive git init + push would leak
-   it. The key already exists on at least two machines - rotate it, then
-   move runtime secrets to SSM (`fetch_runtime_secrets_from_ssm.sh` exists
-   but is unwired).
-3. **Backups.** Taken 2026-07-02 and stored off-host (laptop:
-   `ai-fan-out/backups-20260702/`): product volumes tarball (includes the
-   irreplaceable curated gold prompt library `search_contexts.json` and
-   `config.json` - treat as secret), uk+kg schema-only dump, journey data
-   dir. Still missing: a scheduled full pg dump (the kg fact embeddings are
-   ~$37 of LLM spend to regenerate; uk schema has NO rebuild path except a
-   snapshot) and an OpenSearch snapshot, both shipped to S3 on cron. Extend
-   `export_eval_state.sh` to cover the two product volumes.
-4. **Commit the schema baseline** (done on this branch:
-   `migrations/000_baseline_uk_kg_schema.sql`, 187 CREATE TABLEs). This
-   closes the "greenfield DB renders silently empty dashboards" trap - the
-   app probes tables with `to_regclass` and hides errors.
+1. **Adopt the branch and the rule that comes with it.** Review and merge
+   `vm-sync-20260702`. From then on, nothing lands on the server except
+   through git (the deploy steps are in DEMO_PLAYBOOK.md section 2).
+   Give the server a read-only deploy key so it can pull from GitHub
+   itself - today it has no GitHub access, so deploys go over rsync from
+   a laptop. Delete the 35 leftover backup files on the server (already
+   archived twice).
+2. **Rotate the journey app's OpenAI key and protect its folder.** The
+   journey app's folder on the server has no ignore rules and its
+   environment file contains the live OpenAI key and the database password
+   in plain text - one careless `git init` and push would publish them.
+   The key already exists on at least two machines: rotate it, then move
+   runtime secrets to AWS's secret store (a fetch script already exists in
+   `scripts/`, it just is not wired in).
+3. **Backups.** First-ever off-server backups were taken 2026-07-02 (kept
+   on the operator's laptop): the app's data volume - which includes the
+   hand-curated test-question library, the one asset money cannot rebuild -
+   plus the database structure and the journey app's data files. Treat the
+   volume backup as secret: it contains a config file with API keys. Still
+   missing: a scheduled database dump shipped to S3 (the extracted facts
+   cost about $37 of AI calls to regenerate; the tariff data itself has no
+   rebuild path except a snapshot) and a search-index backup.
+4. **The database structure is now in the repo** (done on this branch:
+   `migrations/000_baseline_uk_kg_schema.sql`, 187 tables). Before this, a
+   fresh database produced silently empty dashboards, because the app hides
+   missing tables instead of reporting them.
 
-## 3. P1 - before any external audience
+## 3. Before any external audience
 
-1. **Consolidate spend guards.** Three coexisting systems: workbench
-   `_require_workbench_spend`, classification_core `provider_guard`
-   (subprocess env), journey's advisory in-memory day counter (resets on
-   restart, estimates only). Frontend hardcodes `allow_spend: true` in three
-   places (benchmark start, search preview, ATaR ingest), silently defeating
-   the per-request gate. Target: one server-side policy - per-day USD budget
-   per app, enforced (not advisory), with per-request opt-in on top.
-   Q&A trials currently bypass the $10 job cap entirely.
-2. **Activate the dormant in-app auth.** `auth.py` (bearer/basicauth
-   middleware, hmac.compare_digest) is wired into all three apps but no env
-   var activates it anywhere - the only wall is Caddy's single shared user.
-   Setting `AI_FAN_OUT_BASIC_AUTH_*` in the suite `.env` is a free second
-   layer. Real per-user auth + real DNS/TLS (not sslip.io) when this faces
-   anyone external.
-3. **Consolidate the journey deployment.** `/opt/ai-search-evaluation-suite-journey`
-   (apps/full layout) duplicates the repo's `apps/product/backend/journey`
-   package - verified byte-identical for the core modules today, but it will
-   drift again. Rebuild journey-app from this repo's `Dockerfile.journey` and
-   delete the parallel tree.
-4. **Knowledge tab safety.** One-click DELETE on shared `kg.commodity_facets`
-   / edges with no confirmation and no auth. Add confirm + role gate, or make
-   the demo deployment read-only on kg writes.
-5. **CI.** A single GitHub Actions workflow: build both images + `python -m
-   compileall` + frontend build on PR. Deploy job (push to ECR + SSM command
-   to the VM) can come later; the build check alone prevents the "edited
-   live, image no longer builds" class of failure.
+1. **One money-control system instead of three.** Today there are three
+   separate mechanisms deciding whether an AI call may spend money, and
+   they disagree: the workbench's per-request opt-in, an environment
+   switch for batch jobs, and the journey's daily counter - which is
+   informational only, resets when the app restarts, and cuts nothing off.
+   Worse, the workbench front end silently ticks the "allow spend" box on
+   three of its own calls (benchmark runs, search previews, rulings
+   ingest), and single Q&A trials bypass the $10 cap entirely. Target: one
+   server-side rule - an enforced daily budget per app, with per-request
+   opt-in on top.
+2. **Turn on the second login layer.** Both apps contain a decent built-in
+   login check that is fully wired up but dormant, because no environment
+   variable activates it. Today the only protection is the single shared
+   username/password at the front door. Setting two variables gives a free
+   second layer. Before anyone external gets access: individual accounts
+   and a proper domain name with a real certificate (today's address is an
+   IP-based convenience domain owned by a third party).
+3. **One journey codebase, not two.** The journey app on the server is a
+   separate, hand-copied folder that duplicates the repository's journey
+   code - byte-identical today (verified), but it will drift again.
+   Rebuild the journey app from this repository's own build file and
+   delete the parallel folder.
+4. **Make the Knowledge tab safe.** It can edit and delete records in the
+   shared knowledge base with one click, no confirmation, no login. Add a
+   confirmation and a role check, or make those buttons read-only in the
+   demo deployment.
+5. **A build check on every change.** A single GitHub Actions job that
+   builds both apps and compiles the code on every pull request would have
+   caught most of what this audit found. Automatic deployment can come
+   later; the build check alone prevents the "edited live until it no
+   longer builds" failure mode.
 
-## 4. P2 - production shape
+## 4. Production shape (later)
 
-- Split the edge (ALB/CloudFront + ACM), move Postgres to RDS or at minimum
-  EBS snapshots on schedule, OpenSearch to a managed domain or re-enable the
-  security plugin (currently DISABLE_SECURITY_PLUGIN=true).
-- One instance is a total SPOF (app + DB + search + edge). Acceptable for an
-  eval tool; document the restore-from-zero path instead of buying HA:
-  restore snapshot -> apply migrations -> `hydrate_opensearch_index.py
-  --recreate` (rehearse once - it imports asyncpg, which is in requirements
-  but was missing from the stale running container).
-- Dependency pinning: both requirements.txt files are `>=` only; pin or lock.
+- Move the front door to managed AWS services (load balancer + certificate),
+  the database to RDS or at minimum scheduled disk snapshots, and either
+  manage the search service properly or switch its security plugin back on
+  (it is currently disabled).
+- Everything runs on one machine, so any failure takes the whole service
+  down. For an internal evaluation tool that is acceptable - the cheap
+  insurance is a rehearsed restore-from-zero routine (restore the database
+  snapshot, apply the migrations, rebuild the search index with the
+  existing script) rather than buying high availability.
+- Pin dependency versions. Both requirements files say "this version or
+  newer", so every rebuild may pull different libraries.
 
-## 5. Bloat ledger
+## 5. What was removed, what is queued, what stays
 
-Removed on this branch (adversarially verified - no imports, no Dockerfile
-COPY, no doc references):
+Removed on this branch (each one adversarially checked - no imports, no
+build references, no documentation references):
 
 | Item | Size |
 |---|---|
-| `app.py index()` - orphaned pre-React inline HTML dashboard | 527 lines |
-| `classification_core/recall_curve.py` + its Dockerfile COPY | ~250 lines |
-| `classification_core/promote_llm_facts.py` | ~180 lines |
-| `etl_seeders/seed_facets_parallel.py` (superseded by extraction_pipeline) | ~300 lines |
-| Playwright config + devDep + script (testDir does not exist) | - |
-| `.dockerignore` now blocks `*.bak*` from images | - |
+| A 527-line abandoned dashboard living inside the main server file | 527 lines |
+| Two never-imported analysis modules (recall_curve, promote_llm_facts) | ~430 lines |
+| A superseded data-seeding script (seed_facets_parallel) | ~300 lines |
+| Browser-test tooling configured against a folder that does not exist | - |
+| Backup files can no longer sneak into built images | - |
 
-Still on the VM, delete after merge: 35 `.bak*` files (~34k lines, archived).
+Deleted from the server after deploy: the 35 backup files (~34,000 lines,
+archived on the server and on the operator's laptop).
 
-Staged for a team decision (verified unreferenced by the deployed apps, but
-they carry knowledge):
+Queued for a team decision (confirmed unused by the running apps, but they
+carry knowledge):
 
-- `apps/product/backend/exp2-exp11.py` - one-off experiment scripts, repo
-  only. Recommend: move to an `experiments/` dir or delete (git keeps them).
-- Journey tree `mcp-skill-eval/` (2.9MB) - DO NOT plain-delete: it holds the
-  canonical 40-row MCP-vs-pipeline eval evidence (the 92.5% result), the
-  auditable $180 spend log, and `MCP-note_mentions-BUG.md` documenting a LIVE
-  OTT production bug (knowledge_graph/queries 422s for every subject) that
-  should become a Jira ticket. Archive to S3/repo, raise the ticket, then
-  delete from the VM.
-- Journey backend offline harness (~15 seed_*.py, smoke_*, measure_*,
-  run_exp6, train_vec_adapter...) - not imported by the served app but used
-  for KG builds. Keep, but move under a `tools/` dir so the served package
-  is obviously small.
-- `apps/full` workbench duplicates (13 panels + backend modules identical to
-  apps/product) - dies naturally with P1.3 consolidation.
-- Root `var/` in the suite tree - host residue incl. dangling symlinks;
-  gitignored on this branch's rule set; delete on VM.
+- Ten one-off experiment scripts (`exp2.py` - `exp11.py`) that exist only in
+  the repository. Recommend moving them to an `experiments/` folder or
+  deleting them - git history keeps them either way.
+- The `mcp-skill-eval` folder in the journey deployment (2.9 MB). Do NOT
+  simply delete it: it holds the evidence behind the recorded
+  MCP-versus-pipeline comparison (the 92.5% result), the auditable $180
+  spend log, and a write-up of a LIVE bug in the production Trade Tariff
+  service (its knowledge-graph query endpoint rejects every request) that
+  should be raised as a Jira ticket. Archive the folder, raise the ticket,
+  then delete.
+- About 30 offline scripts inside the journey backend (data seeding, smoke
+  tests, one-off measurements). Not used by the running app, but used to
+  build the knowledge base. Keep them, move them into a `tools/` folder so
+  the served code is visibly small.
+- The journey deployment's duplicate copy of the workbench screens - goes
+  away by itself with the consolidation in section 3.
 
-Kept deliberately (verified live): the 16-tab workbench frontend (all tabs
-reachable and backed by working routes), both seed_eval_queries variants
-(both wired into extraction_pipeline steps), `start.sh` (documented
-quickstart - now fixed), dual `auth.py` copies (each imported by its own
-app), `suite_primer.py` (docs-referenced dry-run utility; RISKY to delete).
+Kept deliberately (all verified in use): all 16 workbench tabs (every one is
+reachable and backed by a working API), both versions of the test-question
+seeding script (both wired into the data pipeline), the local quickstart
+script (documented, now fixed), the small duplicated login module (each app
+imports its own copy), and the "suite primer" utility (referenced by
+documentation - risky to delete).
 
 ## 6. Decisions needed
 
-1. Merge `vm-sync-20260702` to main, or review-then-cherry-pick? (The sync
-   commit is 13.9k lines - mostly the classification_core capture.)
-2. Journey classify latency: 60-105s/round is the honest eval config. Add a
-   "demo mode" preset (smaller model / lower reasoning) clearly labelled as
-   non-eval, or keep it honest and narrate the wait?
-3. `exp*.py` and the journey offline harness: `tools/` dir or delete?
-4. Who owns rotating the leaked-to-two-machines OpenAI key and the SSM move?
-5. Approve the ~$10-16 re-enrichment of the 5,763 "Other" codes from
-   contextualised descriptions (see bench_sheet RCA) - separate workstream,
-   unlocked by the same backup/deploy hygiene.
+1. Merge `vm-sync-20260702` as-is, or review commit by commit? (The sync
+   commit is large - 13,900 lines - because it captures the previously
+   untracked classification engine.)
+2. Journey answer speed: 2.5 minutes to the first question and about 5 to
+   process an answer is the honest speed of the current evaluation
+   configuration. Add a clearly-labelled fast "demo mode", or keep it
+   honest and narrate the wait?
+3. The experiment scripts and offline tools: `tools/` folder or delete?
+4. Who owns rotating the exposed OpenAI key and moving secrets to the AWS
+   secret store?
+5. Approve roughly $10-16 of AI spend to re-extract facts for the ~5,763
+   catch-all ("Other") commodity codes from their contextualised
+   descriptions - the known next step for search quality (see the
+   benchmarking write-up in the project notes).
 
-## 7. Verified reference numbers (2026-07-02)
+## 7. Reference numbers (verified 2026-07-02)
 
-- Retrieval: top config ~96.3% recall@100 (ATAR 700-sample); retail E0 after
-  the June KG enrichment: recall@100 70.1% (was 64.1%), recall@500 81.2%
-  (was 78.6%), Easy 100% / Medium 57.1% / Complex 65.1%.
-- KG coverage: 21,868 codes enriched with description-LLM facts (98.6% of
-  declarable estate), 105,694 facts embedded.
-- Live journey probe: correct code (0207141000) in one Q&A round; full
-  deterministic chain valuation->duty->landed->declaration arithmetically
-  consistent; journey day-spend counter and $5 advisory cap working.
-- DB: 25,609 commodities, 25,606 embedded (uk schema).
+- Search quality: the best configuration finds the correct code in its top
+  100 results 96.3% of the time on the 700-question rulings test set. On
+  the harder retail test set, June's knowledge-base enrichment lifted the
+  top-100 figure from 64.1% to 70.1% (top-500: 78.6% to 81.2%; easy items
+  now 100%).
+- Knowledge base coverage: 21,868 commodity codes carry extracted facts
+  (98.6% of all real, declarable codes); 105,694 facts are indexed for
+  search.
+- Live journey check: correct code (0207141000, frozen boneless chicken)
+  reached in one question round with the stronger model; the value ->
+  duty -> import-cost -> declaration chain is arithmetically consistent
+  end to end; duty-by-weight verified (5,000 kg at 107 GBP per 100 kg =
+  £5,350.00).
+- Database: 25,609 commodities loaded, 25,606 indexed for AI search.
