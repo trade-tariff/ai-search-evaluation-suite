@@ -135,39 +135,69 @@ curl -s -X POST http://127.0.0.1:8100/api/evals/classification/trial \
 curl -s http://127.0.0.1:8100/api/jobs
 ```
 
-## 4. Demo script B - Trader journey e2e (~15 min, ~$0.10)
+## 4. Demo script B - Trader journey e2e (~25 min, ~$0.15)
 
-Open https://journey.18.175.148.215.sslip.io/ (basicauth).
+Open https://journey.18.175.148.215.sslip.io/ (basicauth). This script was
+walked in the deployed UI end-to-end on 2026-07-02; timings and figures
+below are what actually happened.
 
-1. **Classify.** Click an example chip or type your own (measured:
-   "frozen boneless chicken breast fillets, raw, packed for retail").
-   Streaming progress plays while the first question is prepared -
-   **expect 60-105 seconds per round** (gpt-5.5, high reasoning; measured
-   104.5s start / 68.3s answer). Fill the wait by narrating the streamed
-   milestones and the retrieval health panel. Answer the clarifying
-   question; the probe run converged in ONE round to the correct code
-   0207141000 with ranked alternates and the "What & why" transparency
-   panel (eliminate trace, extracted facts).
-2. **Get more detail.** After the fix: hydrates the top 24 candidates in
-   parallel (~5-10s). Single-code hydration (~1s) shows chapter/section
-   notes, KG edges, facets, measures, footnotes and live-scraped GOV.UK
-   ATAR rulings.
-3. **Value.** "I know the customs value" -> invoice 12,000 GBP + freight
-   800 + insurance 120 -> Method 1 customs value 12,920 GBP. Instant,
-   deterministic.
-4. **Duty.** Import date -> country (US) -> proof of origin -> review.
-   Real tariff-db measures: 0102291090 from US returned 10% MFN third
-   country duty = 1,292 GBP (verified). "Explain this" produces a
-   plain-English explanation.
-5. **Landed cost.** VAT base 14,212 GBP -> VAT 2,842.40 -> total landed
-   17,054.40 GBP (verified numbers - they add up on stage).
-6. **Declare.** CDS box values (DE 1/1 IM, DE 1/10 4000, ...), document
-   codes, "file intent" returns a DECL-xxxx reference and explicitly says
+**Model choice (decide before you start).** The UI default in "Advanced
+settings" is GPT-5 Nano (fastest/cheapest) with the "OTT staging + KG
+context" process. In the verified run, Nano's BEST MATCH for frozen
+chicken breast fillets was 0207441000 - frozen boneless DUCK - with the
+correct chicken code not in the top five. The same query through gpt-5.5
+returned the correct 0207141000. For an accuracy demo select GPT-5.5 and
+accept the latency; for a speed demo keep Nano and be ready to talk about
+the ranked alternates instead of the top-1 (this maps directly to the
+Q&A-loop RCA finding).
+
+1. **Classify.** Type your goods (verified: "frozen boneless chicken
+   breast fillets, raw, packed for retail") and click Start. A status
+   line shows "Retrieving candidates and building the first Q&A turn..." -
+   **measured ~2.5 minutes to the first question** in the UI. The question
+   card shows "Question 1 of up to 7", "80 candidate codes considered",
+   A-E description options plus "None of these", and expandable "What &
+   why" / "All matches we considered (80)" panels - good narration
+   material while the audience reads.
+2. **Answer.** Click an option. KNOWN ISSUE (pre-deploy): the answer
+   round shows a static "Processing your answer..." for **~5 minutes** -
+   the SSE stream emits no progress events and the client quietly falls
+   back to a second, duplicate non-stream call (double latency, double
+   spend). It DOES resolve: "Classification Q&A resolved" with a BEST
+   MATCH card and ranked ALSO-POSSIBLE alternates. Plan a talking segment
+   here (e.g. the "What & why" panel from turn 1), do not dead-air it.
+3. **Get more detail.** Post-deploy: hydrates the top 24 candidates in
+   parallel. Pre-deploy: do NOT click "Get more detail on all 80 codes"
+   (minutes-long hang); single-code hydration (~1s) is safe and shows
+   notes, KG edges, facets, measures and live GOV.UK ATAR rulings.
+4. **Value.** Click "Use <code> -> Customs value" -> "I know the customs
+   value" -> enter 12920 -> Review answers -> Calculate. Renders
+   "Customs value £12,920.00" instantly with the method reasoning table.
+5. **Duty details.** Carries the code + value across. Steps: import date
+   (prefilled today) -> country of origin (full live geo list; verified
+   Thailand) -> proof of origin (the app correctly detected a Thailand
+   preference exists and explained proofs of origin) -> review -> Calculate
+   duty. VAT auto-fills from the commodity (0% for poultry - zero-rated
+   food; 20% default otherwise). For a quantity-based duty the wizard adds
+   a quantity step (post-deploy - see known issues) and converts kg to the
+   duty unit: verified 5,000 kg at 107 GBP/DTN = **£5,350.00**. An
+   ad-valorem example: 0102291090 from US = 10% MFN = £1,292.00.
+6. **Import costs (landed).** Freight/insurance/other charges -> VAT base
+   and total: verified £12,920 value + £1,292 duty -> VAT base £14,212,
+   VAT £2,842.40, **total landed £17,054.40** - the numbers add up on
+   stage.
+7. **Declare.** CDS box values (DE 1/1 IM, DE 1/10 4000, ...), document
+   codes; "file intent" returns a DECL-xxxx reference and explicitly says
    nothing is submitted to HMRC; download exports the declaration JSON.
-7. **Eval views** (the "this is an eval framework" close): browse to
+8. **Eval views** (the "this is an eval framework" close): browse to
    `/eval/matrix` on the journey host - ranked retrieval configs with the
    two OTT baselines pinned on top; `/eval/classify-matrix` is the Q&A
    analogue. The cost banner top-right shows "Est. AI spend today $x / $5".
+
+Demo-product tip (pre-deploy): pick goods whose duty is ad-valorem (most
+manufactured goods - footwear, furniture, electronics) so the duty stage
+needs no quantity. Meat, sugar and dairy carry specific (per-100kg) duties
+and dead-end the wizard until the branch is deployed.
 
 ## 5. Latency and spend reference (measured 2026-07-02)
 
@@ -175,12 +205,13 @@ Open https://journey.18.175.148.215.sslip.io/ (basicauth).
 |---|---|---|
 | Workbench retrieval trial (keyword baseline) | <1s | $0 |
 | Matrix / Q&A / E2E matrix tabs | <1s | $0 |
-| Journey classify start (stream) | ~105s | ~$0.02-0.05 |
-| Journey classify answer round | ~70s | ~$0.02-0.05 |
+| Journey classify: first question (UI, default config) | ~2.5 min | ~$0.02-0.05 |
+| Journey classify: answer round (UI, pre-deploy - includes duplicate fallback run) | ~5 min | ~$0.04-0.10 |
+| Journey classify via raw API (backend default config) | 105s start / 68s answer | ~$0.02-0.05 each |
 | Single-code hydration | ~1s | $0 (deterministic summary) |
 | Hydrate 24 candidates (post-fix, parallel) | ~5-10s | $0 unless LLM summaries on |
 | Valuation / duty / landed / declaration | <1s each | $0 |
-| Full journey pass | ~4 min | ~$0.08-0.15 |
+| Full journey pass (UI, one Q&A round) | ~10-12 min | ~$0.10-0.20 |
 
 ## 6. Known issues and workarounds
 
@@ -188,7 +219,11 @@ Open https://journey.18.175.148.215.sslip.io/ (basicauth).
 |---|---|---|
 | "Get more detail on all N codes" hangs minutes | FIXED on `vm-sync-20260702`, deploy per section 2 | Pre-fix: use single-code hydration only |
 | Hydration 500 (KeyError 'score') on unscored candidates | FIXED on branch | Pre-fix: only hydrate from a fresh classify turn |
-| Classify rounds take 60-105s | By design (gpt-5.5 high reasoning eval config) | Narrate the stream; do not switch models mid-demo - it changes eval behaviour |
+| Specific-duty commodities dead-end the duty wizard (no quantity step, /api/duty 422) | FIXED on branch (requirements now detect per-unit duties; kg->DTN conversion added) | Pre-fix: demo ad-valorem goods (footwear, furniture); avoid meat/sugar/dairy |
+| Answer round: static "Processing..." ~5 min, stream falls back to a duplicate non-stream call | Open (UI walkthrough 2026-07-02): answer/stream sends only keep-alives + final turn; client aborts ~14s in and re-runs via fallback | Plan a talking segment; investigate postSseStream keep-alive handling + make the stream emit milestones |
+| UI default model (GPT-5 Nano) can top-rank the wrong code (duck vs chicken, verified) | Open - matches the Q&A-loop RCA | Select GPT-5.5 for accuracy demos; use ranked alternates as the story otherwise |
+| Journey bundle's hidden workbench panels 404 on /api/config etc. (13 console errors on load) | Open - cosmetic, invisible unless devtools open | None needed; dies with the P1 journey/workbench consolidation |
+| Classify first question ~2.5 min in UI | By design at the current eval config | Narrate the status line; see model-choice note |
 | Workbench error toasts show only "500 Internal Server Error" | FIXED on branch (api.ts now surfaces detail) | Pre-fix: check container logs |
 | Knowledge tab delete buttons write to shared kg tables | Open | Browse-only during demos |
 | Benchmark tab hardcodes allow_spend | Open (P1 in PATH_TO_PROD) | Run with few prompts/models |
