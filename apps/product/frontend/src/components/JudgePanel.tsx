@@ -344,8 +344,8 @@ export default function JudgePanel() {
         <p className="text-xs text-gray-500 mb-4">
           The judge scores only the two dimensions below. Accuracy, schema
           validity, rounds/question efficiency, speed, and cost are computed
-          deterministically from run data (see Scoring Weights on the Analysis
-          tab). This keeps the judge cheap and unbiased.
+          deterministically from run data (see Scoring Weights on Legacy &gt;
+          Benchmark Results). This keeps the judge cheap and unbiased.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {[
@@ -375,8 +375,8 @@ export default function JudgePanel() {
           Top-1 match, top-3 hit, MRR, heading/chapter match, top-5 overlap,
           schema valid, rounds efficiency, question efficiency, speed factor,
           cost per classification. All weights are editable in the Scoring
-          Weights panel on the Analysis tab; the composite verdict is a
-          weighted sum across all 13 dimensions.
+          Weights panel on Legacy &gt; Benchmark Results; the composite verdict
+          is a weighted sum across all 13 dimensions.
         </div>
       </section>
 

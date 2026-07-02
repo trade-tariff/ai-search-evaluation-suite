@@ -113,6 +113,7 @@ export default function PromptsPanel({
             <h3 className="text-sm font-medium">Add a prompt</h3>
             <p className="text-xs text-gray-500 mt-0.5">
               Hybrid retrieval against the local UK tariff DB (local OpenSearch keyword leg + pgvector cosine, RRF-fused).
+              Prompts saved here have no gold answer; to add gold-scored prompts, approve rulings on Experiment &gt; Rulings (ATaR).
             </p>
           </div>
           <div className="text-xs">
@@ -195,7 +196,7 @@ export default function PromptsPanel({
 
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">
-          Test Prompts ({selected.length}/{prompts.length} selected)
+          Gold Prompts ({selected.length}/{prompts.length} selected)
         </h2>
         <button
           onClick={toggleAll}
@@ -211,7 +212,7 @@ export default function PromptsPanel({
           <div>
             <h3 className="text-sm font-medium">OpenSearch Results per Prompt</h3>
             <p className="text-xs text-gray-400 mt-1">
-              How many of the 80 search results to include in the LLM prompt.
+              How many of the retrieved results (max 80) to include in the LLM prompt.
               Fewer = faster/cheaper. More = better context.
             </p>
           </div>
@@ -265,7 +266,7 @@ export default function PromptsPanel({
                   {p.gold_code && (
                     <span
                       className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-yellow-900/60 text-yellow-300 font-mono"
-                      title={`Ground-truth code: ${p.gold_code}`}
+                      title={`Gold (known-correct) code: ${p.gold_code}`}
                     >
                       gold {p.gold_code}
                     </span>

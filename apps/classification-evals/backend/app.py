@@ -1602,17 +1602,21 @@ def _render_live_e2e_matrix(*, qa_only: bool) -> str:
     else:
         error = ""
 
-    title = "Q&A Matrix" if qa_only else "End-to-End Journey Matrix"
+    title = "Gold Eval - Q&A" if qa_only else "Gold Eval - E2E"
     sub = (
-        "Question-mode comparison after retrieval. Keep/top1 rates are conditioned on gold being present in the retrieved shortlist."
+        "Every row is scored against gold (known-correct) answers: question-mode comparison after retrieval. Keep/top1 rates are conditioned on gold being present in the retrieved shortlist. Cells show per-run cost/latency and a delta vs the pinned live baseline."
         if qa_only
-        else "Full journey view from retrieval through Q&A and final result-list preservation/rank metrics."
+        else "Every row is scored against gold (known-correct) answers: retrieval -> Q&A -> final ranking. Cells show per-run cost/latency and a delta vs the pinned live baseline."
     )
     summary_html = ""
     if error:
         body = f"<div class='empty'>Could not load matrix: {esc(error)}</div>"
     elif not rows:
-        body = "<div class='empty'>No E2E/Q&A runs yet.</div>"
+        body = (
+            "<div class='empty'>No E2E/Q&A runs yet. Runs come from the e2e job harness "
+            "(POST /api/jobs with harness=e2e - see docs/DEMO_PLAYBOOK.md); rows appear here "
+            "from kg.e2e_eval_runs.</div>"
+        )
     else:
         def _top1_rate(row) -> float | None:
             nn = row.get("n_inputs") or row.get("input_count") or row.get("result_rows") or 0
@@ -1662,9 +1666,12 @@ def _render_live_e2e_matrix(*, qa_only: bool) -> str:
             if cost_bits:
                 segments.append(" and ".join(cost_bits) + " per classification")
             if segments:
+                headline_kind = (
+                    "Live baseline gold eval" if headline is baseline_row else "Latest gold eval"
+                )
                 summary_html = (
                     "<div class='summary'>"
-                    f"Latest gold eval (<b>{esc(headline.get('run_label'))}</b>, n={esc(h_n)}): "
+                    f"{headline_kind} (<b>{esc(headline.get('run_label'))}</b>, n={esc(h_n)}): "
                     f"{' - '.join(segments)}."
                     "</div>"
                 )

@@ -36,7 +36,7 @@ interface FacetRow {
 
 const TIER_INFO: Record<number, { label: string; color: string; description: string }> = {
   1: { label: "T1 Binding", color: "bg-red-700 text-white", description: "Binding legal rule (GIRs, chapter/section notes)" },
-  2: { label: "T2 Ruling", color: "bg-orange-700 text-white", description: "Binding ruling (ATARs)" },
+  2: { label: "T2 Ruling", color: "bg-orange-700 text-white", description: "Binding ruling (ATaR)" },
   3: { label: "T3 Guidance", color: "bg-amber-700 text-amber-50", description: "Authoritative interpretive guidance" },
   4: { label: "T4 Expert", color: "bg-emerald-700 text-white", description: "Curated expert classification (Search References, hand)" },
   5: { label: "T5 AI-Auth", color: "bg-blue-700 text-white", description: "AI-derived from authoritative source" },
@@ -101,7 +101,7 @@ export default function KnowledgePanel() {
                 : "border-transparent text-gray-400 hover:text-gray-200"
             }`}
           >
-            {v.charAt(0).toUpperCase() + v.slice(1)}
+            {v === "facets" ? "Facts" : v.charAt(0).toUpperCase() + v.slice(1)}
           </button>
         ))}
       </div>
@@ -361,7 +361,7 @@ function FacetsView() {
           <thead className="bg-gray-800 text-gray-400 text-xs">
             <tr>
               <th className="p-2 text-left">Code</th>
-              <th className="p-2 text-left">Facet</th>
+              <th className="p-2 text-left">Fact key</th>
               <th className="p-2 text-left">Value</th>
               <th className="p-2 text-left">Tier / Source</th>
               <th className="p-2 text-right">Conf.</th>

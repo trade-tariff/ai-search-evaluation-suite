@@ -49,7 +49,7 @@ const ACTION_COLORS: Record<string, string> = {
   "description.guidance": "#a855f7",   // purple
 };
 const ACTION_LABELS: Record<string, string> = {
-  "description.guidance": "Context dependant",
+  "description.guidance": "Context dependent",
 };
 const ACTION_KEYS = [
   "description.guidance",
@@ -510,7 +510,7 @@ const TOOLTIPS: Record<string, string> = {
   analyze_selected:
     "Sync batch (≤30 terms typical). Calls POST /api/intercepts/analyze, waits for the full response.",
   analyze_all:
-    "SSE-streamed bulk run via POST /api/intercepts/analyze/stream. Shows live progress; table fills in chunks of 10. ~9 min for all 728 terms at ~0.74s/term.",
+    "SSE-streamed bulk run via POST /api/intercepts/analyze/stream. Shows live progress; table fills in chunks of 10. ~9 min for the full term list at ~0.74s/term.",
   save_run:
     "Persist current analysis to data/intercept_runs/ so you can reload later without re-running retrieval. Useful for sharing snapshots or A/B-comparing weight schemes.",
   load_run:
@@ -1123,7 +1123,7 @@ export default function InterceptsPanel() {
               title={TOOLTIPS.analyze_selected}
               onClick={() => runAnalysis([...selected])}
             >
-              Analyze selected ({selected.size})
+              Analyse selected ({selected.size})
             </button>
             <button
               className="px-4 py-2 text-sm font-medium bg-purple-600 hover:bg-purple-500 rounded disabled:opacity-40"
@@ -1131,7 +1131,7 @@ export default function InterceptsPanel() {
               title={TOOLTIPS.analyze_all}
               onClick={() => runAnalysis(null)}
             >
-              Analyze all 728
+              Analyse all {terms.length}
             </button>
             <div className="flex flex-col gap-1">
               <div className="text-[10px] uppercase text-gray-500 tracking-wide">Neighbour density (self_text → retrieval)</div>
@@ -1865,8 +1865,8 @@ export function CommoditySweepView({
       {sweep && (
         <div className="bg-gray-900 border border-gray-800 rounded p-4">
           <div className="text-xs text-gray-400 mb-3">
-            Grey dots = commodity codes in this run. Legacy template colours (Generic / Hard-to-classify / Escalate) = HMRC's 728 curated intercept-list terms, never re-classified.
-            "Context dependant" = bucket-B commodities whose walked path has legal/lab/expert predicates (chapter notes, regulation refs, lab-measurable attributes) — the trader can't answer the differentiator without external context. The "MISS" column at the far right holds the 728 intercept terms with n_results=0 — same HMRC template colour as the rest, just placed in a gutter because they have no chapter to anchor on.
+            Grey dots = commodity codes in this run. Legacy template colours (Generic / Hard-to-classify / Escalate) = HMRC's curated intercept-list terms, never re-classified.
+            "Context dependent" = bucket-B commodities whose walked path has legal/lab/expert predicates (chapter notes, regulation refs, lab-measurable attributes) — the trader can't answer the differentiator without external context. The "MISS" column at the far right holds the intercept-list terms with n_results=0 — same HMRC template colour as the rest, just placed in a gutter because they have no chapter to anchor on.
             X-axis = chapter (commodity chapter for grey dots and triangles; top retrieved chapter for intercept-term circles), visually spread inside each chapter to reduce overlap.
             Y-axis = classification-complexity composite.{" "}
             <strong className="text-teal-300">Click a grey commodity dot</strong> to drill into the tree, candidates, and reason chips for that commodity.
@@ -2093,7 +2093,7 @@ function TermPickerEmptyState({
       <div className="text-sm text-gray-400 mb-3">
         {hasAnalysis
           ? `Pick more terms below to add to / replace the current analysis. ${selected.size} selected.`
-          : `No analysis loaded. Pick a few terms (use the checkboxes) and click "Analyze selected", or run all ${terms.length} at once.`}
+          : `No analysis loaded. Pick a few terms (use the checkboxes) and click "Analyse selected", or run all ${terms.length} at once.`}
       </div>
       <div className="flex items-center gap-3 mb-2">
         <input

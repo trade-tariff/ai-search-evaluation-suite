@@ -116,7 +116,7 @@ export default function ComplexityPanel() {
           <div className="text-[11px] text-gray-500 mb-2">
             Grey = commodity codes in the sweep. Coloured circles = HMRC's 728
             curated intercept list (legacy template, never re-classified).
-            Purple rings = bucket-B commodities flagged Context dependant (walked
+            Purple rings = bucket-B commodities flagged Context dependent (walked
             path has legal/lab/expert predicates). MISS gutter on the right holds
             intercept terms where retrieval returned zero candidates.
           </div>
@@ -138,8 +138,8 @@ export default function ComplexityPanel() {
             Each series normalised to within-series density so populations of very
             different sizes can be compared. If the three template distributions
             sit on top of the grey commodity baseline, there's no clean composite
-            threshold that separates HMRC templates — which matches the F1 sweep
-            result.
+            threshold that separates HMRC templates — which matches the earlier
+            threshold-search (F1) result.
           </div>
           <img
             src={densityUrl}

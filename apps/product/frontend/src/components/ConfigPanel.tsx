@@ -403,7 +403,7 @@ export default function ConfigPanel({ selectedModels, onModelsChange }: Props) {
             <p className="text-xs text-gray-500 mt-0.5">
               {selectedModels.length} model{selectedModels.length === 1 ? "" : "s"} currently selected.
               Each effort level (Low / Medium / High / XHigh) is its own model; the benchmark fans
-              out one API call per selected model per prompt.
+              out one API call per selected model per prompt; the gold evals use their own run configs.
             </p>
           </div>
           <div className="flex items-center gap-2">

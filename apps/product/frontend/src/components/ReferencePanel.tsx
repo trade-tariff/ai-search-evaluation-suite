@@ -99,11 +99,12 @@ export default function ReferencePanel() {
       <div>
         <h2 className="text-lg font-semibold mb-1">Reference</h2>
         <p className="text-sm text-gray-400">
-          The pinned gold anchor that runs for every prompt regardless of which
-          candidates you select. The judge scores candidates against this
-          anchor, and the fact store ensures every model faces the same
-          committed facts - so convergence with the reference is the
-          apples-to-apples signal you want.
+          The pinned reference model that runs for every prompt regardless of
+          which candidates you select (a model-built baseline, not the gold
+          answer set - gold answers live on the Gold Eval tabs). The judge
+          scores candidates against this reference, and the fact store ensures
+          every model faces the same committed facts - so convergence with the
+          reference is the apples-to-apples signal you want.
         </p>
       </div>
 
@@ -167,7 +168,7 @@ export default function ReferencePanel() {
             ))}
           </select>
           <p className="text-xs text-gray-500">
-            Tip: pick a strong reasoner with high effort. gpt-5.4 xhigh is the default.
+            Tip: pick a strong reasoner with high effort. gpt-5-nano (single pass) is the default.
           </p>
         </div>
       )}

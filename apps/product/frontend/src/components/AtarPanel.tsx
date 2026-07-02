@@ -167,7 +167,7 @@ export default function AtarPanel() {
           <div>
             <h3 className="text-sm font-medium">ATaR (Advance Tariff Rulings)</h3>
             <p className="text-xs text-gray-500 mt-0.5">
-              Scrape the GOV.UK ATaR search, extract a fact sheet via LLM, and approve as ground-truth prompts. Each ruling lands as a draft with gold_code + gold_facts + oracle_text; approval promotes it into the regular prompt pool.
+              Scrape the GOV.UK ATaR search, extract a fact sheet via LLM, and approve as gold prompts. Each ruling lands as a draft with gold_code + gold_facts + oracle_text; approval promotes it into the regular prompt pool.
             </p>
           </div>
           <div className="flex items-center gap-2 text-xs">

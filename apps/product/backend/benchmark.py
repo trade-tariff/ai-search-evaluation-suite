@@ -61,7 +61,8 @@ def get_current_run() -> BenchmarkRun | None:
     global _loaded_run_cache
     if _current_run is not None:
         return _current_run
-    files = sorted(RESULTS_DIR.glob("benchmark_*.json"), reverse=True)
+    # Newest by mtime - run ids are random hex, so name order is meaningless.
+    files = sorted(RESULTS_DIR.glob("benchmark_*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
     for f in files:
         try:
             if _loaded_run_cache and _loaded_run_cache[0] == f.name:

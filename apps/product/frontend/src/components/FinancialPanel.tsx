@@ -83,7 +83,9 @@ export default function FinancialPanel() {
             setResults(saved);
             setSelectedRunId(mostRecent.id);
           } else if (!cancelled) {
-            setErr("No benchmark results yet. Run a benchmark first.");
+            setErr(
+              "No legacy benchmark runs yet - project spend (fact extraction, embeddings, E2E Q&A, classification matrix) is shown below. To populate the benchmark cost tables, use Legacy > Run Benchmark.",
+            );
           }
         }
       } catch (e) {
@@ -112,10 +114,16 @@ export default function FinancialPanel() {
     }
   };
 
-  if (err) return <div className="text-gray-400">{err}</div>;
-  if (!results) return <div className="text-gray-400">Loading results...</div>;
+  if (!err && !results) return <div className="text-gray-400">Loading results...</div>;
 
-  const { summaries, evaluations, baseline_results, model_results } = results;
+  // With no benchmark results we still render the project-costs section below,
+  // with the notice above it; only the benchmark sections need results.
+  const { summaries, evaluations, baseline_results, model_results } =
+    results ??
+    ({ summaries: [], evaluations: [], baseline_results: [], model_results: [] } as Pick<
+      BenchmarkResults,
+      "summaries" | "evaluations" | "baseline_results" | "model_results"
+    >);
   const spendTotals = evalCost?.spend_totals;
 
   // -- Aggregate costs --
@@ -214,7 +222,7 @@ export default function FinancialPanel() {
   }));
 
   // -- Per-prompt cost detail --
-  const promptCosts = results.prompt_indices.map((pi) => {
+  const promptCosts = (results?.prompt_indices ?? []).map((pi) => {
     const baselineR = baseline_results.find((r) => r.prompt_index === pi);
     const modelRs = model_results.filter((r) => r.prompt_index === pi);
     const judgeC = evaluations.filter((e) => e.prompt_index === pi).reduce((s, e) => s + e.judge_cost, 0);
@@ -229,22 +237,26 @@ export default function FinancialPanel() {
 
   return (
     <div className="space-y-8">
+      {err && <div className="text-gray-400">{err}</div>}
+
       {/* Run selector */}
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-400">Run:</label>
-          <select
-            value={selectedRunId}
-            onChange={(e) => loadRun(e.target.value)}
-            className="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm"
-          >
-            <option value="current">Current (in-memory)</option>
-            {savedRuns.map((r) => (
-              <option key={r.id} value={r.id}>{runLabel(r)}</option>
-            ))}
-          </select>
+      {results && (
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-400">Run:</label>
+            <select
+              value={selectedRunId}
+              onChange={(e) => loadRun(e.target.value)}
+              className="bg-gray-800 border border-gray-700 rounded px-3 py-1.5 text-sm"
+            >
+              <option value="current">Current (in-memory)</option>
+              {savedRuns.map((r) => (
+                <option key={r.id} value={r.id}>{runLabel(r)}</option>
+              ))}
+            </select>
+          </div>
         </div>
-      </div>
+      )}
 
       {evalCost && (
         <section className="rounded-lg border border-emerald-900/60 bg-emerald-950/20 p-5">
@@ -445,6 +457,7 @@ export default function FinancialPanel() {
         </section>
       )}
 
+      {results && (<>
       {/* Aggregate summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-gray-900 rounded-lg p-4">
@@ -462,7 +475,7 @@ export default function FinancialPanel() {
           <div className="text-xs text-gray-500 mt-1">{model_results.length} classifications</div>
         </div>
         <div className="bg-gray-900 rounded-lg p-4">
-          <div className="text-xs text-gray-500 uppercase tracking-wider">Judge Cost (GPT-5.2)</div>
+          <div className="text-xs text-gray-500 uppercase tracking-wider">Judge Cost</div>
           <div className="text-2xl font-semibold mt-1 text-purple-400">${judgeCost.toFixed(4)}</div>
           <div className="text-xs text-gray-500 mt-1">{evaluations.length} evaluations</div>
         </div>
@@ -694,6 +707,7 @@ export default function FinancialPanel() {
           </table>
         </div>
       </section>
+      </>)}
     </div>
   );
 }

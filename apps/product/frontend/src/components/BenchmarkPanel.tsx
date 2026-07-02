@@ -261,7 +261,7 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
       case "evaluation:start":
         return "Evaluating candidates against consensus...";
       case "judge:start":
-        return `LLM Judge (${d.model || "GPT-5.2"}): scoring ${d.total} candidate responses...`;
+        return `LLM Judge (${d.model || "judge model"}): scoring ${d.total} candidate responses...`;
       case "judge:complete":
         return `Judge: ${d.done}/${d.total} scored${d.model_id ? ` (${d.model_id})` : ""}`;
       case "benchmark:complete":
@@ -339,7 +339,7 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
         </div>
         {done && (
           <span className="text-green-400 text-sm font-medium">
-            Complete - switch to Analysis tab
+            Complete - see Legacy &gt; Benchmark Results
           </span>
         )}
       </div>
@@ -375,7 +375,7 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
             <div>
               <h3 className="text-sm font-medium">Live Ranking</h3>
               <p className="text-xs text-gray-500 mt-0.5">
-                Running top-1 accuracy per candidate vs the reference, updated as each candidate-prompt completes. Approximate mid-run; final composite is on the Analysis tab.
+                Running top-1 accuracy per candidate vs the reference, updated as each candidate-prompt completes. Approximate mid-run; final composite is on the Benchmark Results tab.
               </p>
             </div>
           </div>
@@ -419,7 +419,7 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
               <div>
                 <div className="text-[10px] text-gray-500 mb-2">
                   {goldMode
-                    ? "Gold mode - no reference phase, so live top-1 vs reference is unavailable; final scoring vs gold is on the Analysis tab"
+                    ? "Gold mode - no reference phase, so live top-1 vs reference is unavailable; final scoring vs gold is on the Benchmark Results tab"
                     : `Reference top-codes known for ${referenceCodesKnown} / ${promptIndices.length || "?"} prompts`}
                 </div>
                 <table className="w-full text-xs">

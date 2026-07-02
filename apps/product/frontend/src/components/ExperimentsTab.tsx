@@ -271,8 +271,8 @@ function questionModeLabel(mode: QuestionMode | string) {
 
 const QUESTION_MODE_OPTIONS: { mode: QuestionMode; description: string; paid: boolean }[] = [
   { mode: "facet_rules", description: "Deterministic facet questions (free)", paid: false },
-  { mode: "facet_rules_llm_wording", description: "Same questions, LLM-phrased (paid)", paid: true },
-  { mode: "llm_generated", description: "LLM generates the question (paid)", paid: true },
+  { mode: "facet_rules_llm_wording", description: "Same questions, LLM-phrased (uses provider calls)", paid: true },
+  { mode: "llm_generated", description: "LLM generates the question (uses provider calls)", paid: true },
 ];
 
 // Must match the backend _QUESTION_MODEL_ALLOWLIST in main.py.
@@ -621,9 +621,9 @@ export default function ExperimentsTab() {
   const hydrationStatusDetail = hydrating
     ? `Loading evidence for up to ${Math.min(hydrateLimit, currentCandidatePool.length || hydrateLimit)} candidates`
       : hydration
-      ? `${hydration.qa_state?.in_scope_count ?? hydration.hydrated.length} active of ${hydration.candidate_count}, cache ${hydration.cache_hit_count ?? 0}/${hydration.cache_write_count ?? 0}, ${questionSourceLabel(hydration.question_hint?.source)}`
+      ? `${hydration.qa_state?.in_scope_count ?? hydration.hydrated.length} of ${hydration.candidate_count} candidates still in scope - ${hydration.cache_hit_count ?? 0} cache hits / ${hydration.cache_write_count ?? 0} writes - questions from ${questionSourceLabel(hydration.question_hint?.source).toLowerCase()}`
       : questionMode !== "facet_rules" && !allowProviderCalls
-        ? "LLM Q&A needs Provider calls"
+        ? "LLM Q&A needs provider calls"
         : "Ready to build Q&A";
 
   async function runTrial(event: FormEvent) {
@@ -801,7 +801,7 @@ export default function ExperimentsTab() {
                 {sortedExperiments.map((experiment) => (
                   <option key={experiment.run_label} value={experiment.run_label}>
                     #{experiment.rank ?? "-"} {experiment.title}
-                    {experiment.runnable ? "" : " (catalog only)"}
+                    {experiment.runnable ? "" : " (catalogue only)"}
                   </option>
                 ))}
               </select>
@@ -825,7 +825,7 @@ export default function ExperimentsTab() {
                   name="input_query"
                   autoComplete="off"
                   className="mt-2 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
-                  placeholder="Fresh goods description…"
+                  placeholder="Fresh goods description..."
                 />
               </div>
               <div>
@@ -840,7 +840,7 @@ export default function ExperimentsTab() {
                   autoComplete="off"
                   spellCheck={false}
                   className="mt-2 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
-                  placeholder="Optional 10 digit code…"
+                  placeholder="Optional 10-digit code..."
                 />
                 <div className="mt-1 text-xs text-gray-500">
                   Leave blank to explore retrieval without scoring a gold code.
@@ -894,11 +894,11 @@ export default function ExperimentsTab() {
                 disabled={!canRun}
                 className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/50 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 disabled:hover:bg-gray-700"
               >
-                {running ? "Running…" : "Run Retrieval"}
+                {running ? "Running..." : "Run Retrieval"}
               </button>
               {expectedNormalized && (
                 <span className="pb-2 text-sm text-gray-500">
-                  Normalized: {expectedNormalized}
+                  Normalised: {expectedNormalized}
                 </span>
               )}
               {selectedRequiresProvider && !allowProviderCalls && (
@@ -958,7 +958,7 @@ export default function ExperimentsTab() {
               </div>
             ) : (
               <div className="mt-3 text-sm text-gray-500">
-                {loading ? "Loading…" : "No experiments loaded"}
+                {loading ? "Loading..." : "No experiments loaded"}
               </div>
             )}
           </aside>
@@ -1076,7 +1076,7 @@ export default function ExperimentsTab() {
               <div>
                 <div className="text-sm font-medium text-gray-100">Hydrated facet Q&A</div>
                 <p className="mt-1 text-sm leading-6 text-gray-400">
-                  Builds the trader-facing question from the retrieved candidates plus live facet/KG/ATAR evidence.
+                  Builds the trader-facing question from the retrieved candidates plus live facet/KG/ATaR evidence.
                 </p>
               </div>
               <div className={`rounded border px-3 py-2 text-sm ${hydrationStatusTone}`}>
@@ -1148,7 +1148,7 @@ export default function ExperimentsTab() {
                         {questionModeLabel(option.mode)}
                       </div>
                       <div className="mt-1 text-gray-500">{option.description}</div>
-                      {locked && <div className="mt-1 text-amber-300/80">Requires Provider calls</div>}
+                      {locked && <div className="mt-1 text-amber-300/80">Requires provider calls</div>}
                     </button>
                   );
                 })}
@@ -1213,7 +1213,7 @@ export default function ExperimentsTab() {
                 </div>
               </div>
               <p className="mt-2 text-xs text-gray-500">
-                Compare strategies here interactively; for batch strategy comparisons over the gold set use an e2e job (results land in Gold Eval - E2E).
+                Compare strategies here interactively; for batch strategy comparisons over the gold set run an e2e job (POST /api/jobs, harness=e2e - results land in Results &gt; Gold Eval - E2E).
               </p>
             </div>
             {!allowProviderCalls && questionMode !== "facet_rules" && (
@@ -1474,7 +1474,7 @@ export default function ExperimentsTab() {
                           : "bg-amber-950/60 text-amber-200"
                       }`}
                     >
-                      {experiment.runnable ? "Runnable" : "Catalog only"}
+                      {experiment.runnable ? "Runnable" : "Catalogue only"}
                     </span>
                     {experiment.ott_baseline && (
                       <span className="rounded bg-gray-800 px-2 py-1 text-xs text-gray-300">

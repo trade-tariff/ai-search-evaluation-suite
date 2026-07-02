@@ -710,7 +710,7 @@ export default function AnalysisPanel() {
             setResults(saved);
             setSelectedRunId(mostRecent.id);
           } else {
-            setErr("No benchmark results yet. Run a benchmark first.");
+            setErr("No benchmark results yet. Start one on Legacy > Run Benchmark.");
           }
         }
       } catch (e) {
@@ -1156,8 +1156,8 @@ export default function AnalysisPanel() {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
           {([
-            ["gold_top1", "Ground truth · Top-1", "Exact 10-digit match at rank 1 vs gold answers. Active (and replaces the reference-agreement bucket) when the run has gold evaluations."],
-            ["gold_hierarchical", "Ground truth · Hierarchical", "Digit-prefix agreement vs gold answers (partial credit for chapter/heading). Active only when the run has gold evaluations."],
+            ["gold_top1", "Gold · Top-1", "Exact 10-digit match at rank 1 vs gold answers. Active (and replaces the reference-agreement bucket) when the run has gold evaluations."],
+            ["gold_hierarchical", "Gold · Hierarchical", "Digit-prefix agreement vs gold answers (partial credit for chapter/heading). Active only when the run has gold evaluations."],
             ["top1_match", "Det · Top-1 match", "Exact 10-digit match at rank 1 vs reference"],
             ["top3_hit", "Det · Top-3 hit", "Reference's top-1 appears anywhere in candidate's top-3"],
             ["mean_reciprocal_rank", "Det · MRR", "1/rank of reference's top-1 in candidate's ranked list (0 if missed top-5)"],
@@ -1716,7 +1716,7 @@ export default function AnalysisPanel() {
         return (
           <section className="bg-gray-900 rounded-lg p-4 border border-gray-800">
             <div className="mb-3">
-              <h3 className="text-sm font-medium">Accuracy by OTT Section</h3>
+              <h3 className="text-sm font-medium">Accuracy by tariff section</h3>
               <p className="text-xs text-gray-500 mt-0.5">
                 Top-1 accuracy broken down by UK{"/"}HS section (derived from the reference's top code per prompt). Shows which categories a model handles vs struggles with.
               </p>
@@ -1958,7 +1958,7 @@ export default function AnalysisPanel() {
                     {ev.judge_score != null && (
                       <div className="mt-3 border-t border-gray-800 pt-3">
                         <h4 className="text-xs font-medium text-purple-400 mb-2">
-                          LLM Judge (GPT-5.2) Evaluation
+                          LLM Judge Evaluation
                         </h4>
                         <div className="flex items-center gap-6 text-xs mb-2">
                           <span>Overall: <span className="text-purple-300 font-medium">{ev.judge_score.toFixed(1)}/10</span></span>

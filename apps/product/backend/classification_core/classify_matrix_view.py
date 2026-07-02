@@ -188,7 +188,7 @@ def eval_classify_matrix() -> str:
         msg = (
             "<div class='empty'>No classification-matrix runs yet. Populate "
             "<code>kg.classify_runs</code> with the harness:<br><br>"
-            "<code>cd ai-fan-out/backend &amp;&amp; .venv/bin/python -m classification_core.run_classify_matrix "
+            "<code>cd apps/product/backend &amp;&amp; .venv/bin/python -m classification_core.run_classify_matrix "
             "--run-label baseline_converge --strategy converge --prompt-mode baseline "
             "--augmentation facts+kg --model gpt-5-mini --personas naive_vague --limit 5</code>"
             "</div>"
