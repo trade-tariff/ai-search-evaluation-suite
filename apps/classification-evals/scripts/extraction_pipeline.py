@@ -9,6 +9,7 @@ services.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import subprocess
@@ -28,6 +29,7 @@ SEEDER_DIR = SCRIPT_DIR / "etl_seeders"
 STATE_DIR = Path(os.environ.get("CLASSIFY_EVAL_STATE_DIR", APP_ROOT / "var")).resolve()
 EXTRACTION_STATE_DIR = STATE_DIR / "extraction"
 MANIFEST_PATH = EXTRACTION_STATE_DIR / "manifest.json"
+LOCK_PATH = EXTRACTION_STATE_DIR / "run.lock"
 DEFAULT_TIMEOUT_SECONDS = int(os.environ.get("EXTRACTION_STEP_TIMEOUT_SECONDS", "10800"))
 
 
@@ -489,7 +491,37 @@ def _run_step(step: Step, *, dry_run: bool, allow_spend: bool, allow_network: bo
     return result
 
 
+def _acquire_run_lock():
+    """One extraction run at a time: the manual compose profile and the
+    scheduler can otherwise collide on the same tables and manifest."""
+    LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
+    handle = open(LOCK_PATH, "w")
+    try:
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        handle.close()
+        return None
+    return handle
+
+
 def execute_run(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
+    lock_handle = _acquire_run_lock()
+    if lock_handle is None:
+        manifest = {
+            "run_id": None,
+            "started_at": _iso(),
+            "status": "locked",
+            "error": f"Another extraction run holds {LOCK_PATH}; skipping.",
+        }
+        print(json.dumps({"status": "locked", "lock": str(LOCK_PATH)}), flush=True)
+        return 3, manifest
+    try:
+        return _execute_run_locked(args)
+    finally:
+        lock_handle.close()
+
+
+def _execute_run_locked(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
     selected = _selected_steps(args.profile, args.step or [])
     manifest: dict[str, Any] = {
         "run_id": uuid.uuid4().hex[:12],

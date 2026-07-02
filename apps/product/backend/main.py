@@ -58,19 +58,23 @@ RESULTS_DIR.mkdir(exist_ok=True)
 
 
 def _workbench_spend_enabled(payload: dict | object | None = None) -> bool:
-    if os.environ.get("AI_FAN_OUT_WORKBENCH_SPEND_ENABLED", "").strip() == "1":
-        return True
+    # The operator switch is the master: with it off, no product-route spend,
+    # regardless of what the request claims (the UI used to hardcode
+    # allow_spend=true on several calls). With it on, an explicit
+    # allow_spend=false in the request is still honoured as a refusal.
+    if os.environ.get("AI_FAN_OUT_WORKBENCH_SPEND_ENABLED", "").strip() != "1":
+        return False
     if isinstance(payload, dict):
-        return payload.get("allow_spend") is True
-    return bool(getattr(payload, "allow_spend", False))
+        return payload.get("allow_spend", True) is not False
+    return getattr(payload, "allow_spend", True) is not False
 
 
 def _require_workbench_spend(payload: dict | object | None = None) -> None:
     if not _workbench_spend_enabled(payload):
         raise HTTPException(
             403,
-            "Provider-backed workbench action blocked. Pass allow_spend=true "
-            "for this request or set AI_FAN_OUT_WORKBENCH_SPEND_ENABLED=1.",
+            "Provider-backed workbench action blocked. Spend is disabled on "
+            "this server; set AI_FAN_OUT_WORKBENCH_SPEND_ENABLED=1 to enable it.",
         )
 
 

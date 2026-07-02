@@ -64,6 +64,10 @@ export default function AtarPanel() {
   }, [selectedRef]);
 
   const runIngest = async () => {
+    if (!confirm(
+      `Ingest ${ingestCount} ruling${ingestCount === 1 ? "" : "s"} from GOV.UK? ` +
+      "Each one makes paid AI calls to draft its gold facts."
+    )) return;
     setIngestBusy(true);
     setIngestMsg("");
     try {

@@ -94,6 +94,10 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
 
   const start = () => {
     if (promptIndices.length === 0 || modelIds.length === 0) return;
+    if (!confirm(
+      `Run the benchmark on ${promptIndices.length} prompt${promptIndices.length === 1 ? "" : "s"} x ` +
+      `${modelIds.length} model${modelIds.length === 1 ? "" : "s"}? This spends real money on AI calls.`
+    )) return;
 
     setRunning(true);
     setDone(false);

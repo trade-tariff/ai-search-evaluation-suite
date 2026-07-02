@@ -20,9 +20,14 @@ import httpx
 import psycopg
 from psycopg.rows import dict_row
 
-from .seed_atars_for_chapters import (
-    ATAR_BASE, fetch_ruling, llm_extract_facts, upsert_atar, _flat,
-)
+try:
+    from .seed_atars_for_chapters import (
+        ATAR_BASE, fetch_ruling, llm_extract_facts, upsert_atar, _flat,
+    )
+except ImportError:  # extraction_pipeline runs this as a plain file, not a package
+    from seed_atars_for_chapters import (
+        ATAR_BASE, fetch_ruling, llm_extract_facts, upsert_atar, _flat,
+    )
 
 DSN = os.environ.get("TARIFF_DB_DSN", "postgresql:///tariff_db")
 TARGET_NEW_CODES = int(os.environ.get("TARGET_NEW_CODES", "50"))

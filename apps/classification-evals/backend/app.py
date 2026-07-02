@@ -1161,6 +1161,13 @@ def classify_trial(req: ClassifyTrial) -> dict:
         raise HTTPException(422, "Classifier model is not enabled for classification trials.")
     if req.simulator_model not in _allowed_models():
         raise HTTPException(422, "Trader emulator model is not enabled for classification trials.")
+    per_session = _env_float("CLASSIFY_EVAL_EST_USD_PER_SESSION", 0.05)
+    max_cost = _env_float("CLASSIFY_EVAL_MAX_EST_USD", 10.0)
+    if per_session > max_cost:
+        raise HTTPException(
+            422,
+            f"Estimated trial cost ${per_session:.2f} exceeds server cap CLASSIFY_EVAL_MAX_EST_USD=${max_cost:.2f}.",
+        )
 
     if req.gold_id is not None:
         gold, oracle = _load_gold_example(req.gold_id)

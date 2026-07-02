@@ -3,6 +3,10 @@
 Monkeypatches the OpenAI SDK create() methods so every chat / responses /
 embeddings call adds its token usage to a per-day USD ESTIMATE (not billing
 grade). Exposed via /api/cost so the UI can flash a banner past the cap.
+
+Past the cap, new provider calls are REFUSED (COST_CAP_ENFORCED=0 reverts to
+banner-only). Known limit: the counter is in-memory, so a container restart
+resets the day's total.
 """
 import os
 import threading
@@ -91,6 +95,16 @@ def snapshot():
     }
 
 
+def is_over() -> bool:
+    with _lock:
+        _roll(date.today().isoformat())
+        return _state["usd"] > _threshold()
+
+
+def _enforced() -> bool:
+    return os.environ.get("COST_CAP_ENFORCED", "1").strip() != "0"
+
+
 _installed = False
 
 
@@ -102,6 +116,13 @@ def install():
 
     def wrap(orig):
         def inner(self, *a, **k):
+            if _enforced() and is_over():
+                raise RuntimeError(
+                    "Daily AI spend cap reached (estimated $%.2f limit). New "
+                    "provider calls are blocked until tomorrow; raise "
+                    "COST_THRESHOLD_USD or set COST_CAP_ENFORCED=0 to override."
+                    % _threshold()
+                )
             r = orig(self, *a, **k)
             try:
                 record(k.get("model"), getattr(r, "usage", None))
