@@ -53,7 +53,6 @@ COPY apps/product/backend/classification_core/__init__.py \
      apps/product/backend/classification_core/multi_query.py \
      apps/product/backend/classification_core/provider_guard.py \
      apps/product/backend/classification_core/qa_loop.py \
-     apps/product/backend/classification_core/recall_curve.py \
      apps/product/backend/classification_core/run_classify_matrix.py \
      apps/product/backend/classification_core/run_eval.py \
      apps/product/backend/classification_core/run_hydrated_e2e_matrix.py \
