@@ -97,7 +97,11 @@ Open https://18.175.148.215.sslip.io/ and log in. Suggested order:
 
 The nav is grouped into three entry points: **Experiment** (try things),
 **Evaluate** (run and read the measurements), **Configure** (set up the
-pipeline). All tab names are unchanged.
+pipeline), and tabs are named for what they do: Retrieval Lab (was
+Experiments), Rulings (ATaR), Knowledge Graph, Run Benchmark, Benchmark
+Results (was Analysis), Retrieval Matrix (was Matrix), End-to-End Matrix,
+Costs (was Financial), Models & Keys (was Configuration), Gold Prompts,
+Reference Model (was Search References), Trader Simulator, LLM Judge.
 
 New since the walkthrough: an evaluation job can now be pointed at ANY
 retrieval configuration from the Experiments catalogue - including the
@@ -113,7 +117,7 @@ curl -s -X POST http://127.0.0.1:8100/api/jobs -H 'Content-Type: application/jso
   "limit": 5, "model": "gpt-5-nano", "max_rounds": 3, "allow_spend": true}'
 ```
 
-1. **Experiments** (the tab that opens first, and the highlight). A ranked
+1. **Retrieval Lab** (the tab that opens first, and the highlight). A ranked
    league table of every search configuration we have tried loads
    automatically; the winner finds the correct commodity code in its top
    100 results 96.3% of the time across a 700-question test set. Type a
@@ -125,14 +129,14 @@ curl -s -X POST http://127.0.0.1:8100/api/jobs -H 'Content-Type: application/jso
    AI-powered configurations WITHOUT ticking the spend box: the app
    refuses with a clear message. Show that on purpose - "it cannot spend
    money unless you let it" is a feature.
-2. **Matrix.** The full results table of every search experiment: one row
+2. **Retrieval Matrix.** The full results table of every search experiment: one row
    per configuration, one column per way of phrasing the question, with a
    download link. Free to browse.
-3. **Q&A Matrix / E2E Matrix.** The same idea for the question-asking
+3. **Q&A Matrix / End-to-End Matrix.** The same idea for the question-asking
    stage and for complete start-to-finish runs: which prompt style, which
    model, how often the right answer survived, how many questions were
    asked. Drawn live from the results database. Free to browse.
-4. **Financial.** A running total of what every part of the project has
+4. **Costs.** A running total of what every part of the project has
    spent on AI calls, broken down by activity, refreshing every 30
    seconds. A good closing screen: "we track what we spend".
 5. **Intercepts.** Analysis of the 728 search terms HMRC flagged as
@@ -144,14 +148,15 @@ curl -s -X POST http://127.0.0.1:8100/api/jobs -H 'Content-Type: application/jso
    across the whole tariff (14,000+ points, one per commodity heading),
    with the difficult terms overlaid. Below them, an audit of how often
    the known-correct answer was found.
-7. **Knowledge.** A browsable view of the extracted facts about each
+7. **Knowledge Graph.** A browsable view of the extracted facts about each
    commodity (98.6% of real, declarable codes now have facts), plus an
    interactive graph view. CAUTION: the edit and delete buttons here
    change the shared database with no undo - look, don't touch, during
    demos.
-8. **The benchmark suite** (Prompts, Search References, Simulator, Judge,
-   Benchmark, Analysis) - only if time allows. Prompts holds the library
-   of test questions with known answers; ATaR can pull real HMRC rulings
+8. **The benchmark suite** (Gold Prompts, Reference Model, Trader
+   Simulator, LLM Judge, Run Benchmark, Benchmark Results) - only if time
+   allows. Gold Prompts holds the library
+   of test questions with known answers; Rulings (ATaR) can pull real HMRC rulings
    off GOV.UK and turn them into new test questions (costs money).
    Benchmark runs the questions against your chosen models with a live
    progress log - it spends money the moment you press Run, so keep the

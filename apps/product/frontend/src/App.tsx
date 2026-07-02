@@ -18,14 +18,43 @@ import QAMatrixTab from "./components/QAMatrixTab";
 import ExperimentsTab from "./components/ExperimentsTab";
 
 // Three entry points: try new things (Experiment), run/read the measurements
-// (Evaluate), set up the pipeline (Configure). Tab components are unchanged -
-// this is presentation-only grouping.
+// (Evaluate), set up the pipeline (Configure). Tab ids are stable internal
+// keys (panel switching below); labels are what the user sees. Domain terms
+// the team already uses (ATaR, Intercepts) stay recognisable in the label.
 const NAV_GROUPS = [
-  { label: "Experiment", tabs: ["Experiments", "ATaR", "Intercepts", "Complexity", "Knowledge"] },
-  { label: "Evaluate", tabs: ["Benchmark", "Analysis", "Matrix", "Q&A Matrix", "E2E Matrix", "Financial"] },
-  { label: "Configure", tabs: ["Configuration", "Prompts", "Search References", "Simulator", "Judge"] },
+  {
+    label: "Experiment",
+    tabs: [
+      { id: "Experiments", label: "Retrieval Lab" },
+      { id: "ATaR", label: "Rulings (ATaR)" },
+      { id: "Intercepts", label: "Intercepts" },
+      { id: "Complexity", label: "Complexity" },
+      { id: "Knowledge", label: "Knowledge Graph" },
+    ],
+  },
+  {
+    label: "Evaluate",
+    tabs: [
+      { id: "Benchmark", label: "Run Benchmark" },
+      { id: "Analysis", label: "Benchmark Results" },
+      { id: "Matrix", label: "Retrieval Matrix" },
+      { id: "Q&A Matrix", label: "Q&A Matrix" },
+      { id: "E2E Matrix", label: "End-to-End Matrix" },
+      { id: "Financial", label: "Costs" },
+    ],
+  },
+  {
+    label: "Configure",
+    tabs: [
+      { id: "Configuration", label: "Models & Keys" },
+      { id: "Prompts", label: "Gold Prompts" },
+      { id: "Search References", label: "Reference Model" },
+      { id: "Simulator", label: "Trader Simulator" },
+      { id: "Judge", label: "LLM Judge" },
+    ],
+  },
 ] as const;
-type Tab = (typeof NAV_GROUPS)[number]["tabs"][number];
+type Tab = (typeof NAV_GROUPS)[number]["tabs"][number]["id"];
 
 export default function App() {
   const [tab, setTab] = useState<Tab>("Experiments");
@@ -64,16 +93,16 @@ export default function App() {
             <div className="flex gap-1">
               {group.tabs.map((t) => (
                 <button
-                  key={t}
-                  onClick={() => setTab(t)}
-                  aria-current={tab === t ? "page" : undefined}
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  aria-current={tab === t.id ? "page" : undefined}
                   className={`shrink-0 px-3 pb-2.5 pt-1 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
-                    tab === t
+                    tab === t.id
                       ? "border-blue-500 text-blue-400"
                       : "border-transparent text-gray-400 hover:text-gray-200"
                   }`}
                 >
-                  {t}
+                  {t.label}
                 </button>
               ))}
             </div>
