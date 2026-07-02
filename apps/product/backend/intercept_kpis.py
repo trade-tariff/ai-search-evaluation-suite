@@ -44,17 +44,24 @@ Plus aggregate signals:
     other_leaf_share    Fraction of "Other" catch-all leaves
                         (generation_type='ai' — AI-166 contextualised).
 
-Composite complexity (higher = harder, [0..1]):
+Composite complexity (higher = harder, [0..1]) - weights in DEFAULT_WEIGHTS
+below (the canonical set, shared with the charts and the UI sliders):
 
-    complexity = 0.20 * section_spread_norm
-               + 0.20 * chapter_spread_norm
-               + 0.30 * questions_expected_norm
-               + 0.15 * unresolved_digits / 10
-               + 0.10 * score_flatness
-               + 0.05 * other_leaf_share
+    weighted = 0.25 * section_spread_norm
+             + 0.25 * chapter_spread_norm
+             + 0.25 * questions_expected_norm
+             + 0.20 * vagueness
+             + 0.02 * score_flatness
+             + 0.02 * unresolved_digits / 10
+             + 0.01 * other_leaf_share
+    complexity = (1 - retrieval_failure) * weighted + retrieval_failure
+    (retrieval_failure blends toward 1.0 when a trader-style query returns
+    fewer than 5 candidates; total failure pins complexity to the vagueness
+    term alone.)
 
 Weights bias toward (a) cross-section + cross-chapter spread (retrieval is
-in the wrong domain) and (b) high expected Q&A burden (AI can't converge).
+in the wrong domain), (b) high expected Q&A burden (AI can't converge), and
+(c) vagueness (retrieval found little, weakly).
 """
 
 from __future__ import annotations
@@ -71,18 +78,24 @@ LEVELS = ["section", "chapter", "heading", "subheading", "eight_digit", "declara
 # prompt that allows wider picklists, lower it to stress-test the metric.
 DEFAULT_MAX_OPTIONS_PER_QUESTION = 4
 
+# CANONICAL composite weights - the single source of truth. complexity_charts
+# imports this dict, and the frontend slider defaults
+# (InterceptsPanel.DEFAULT_WEIGHTS) must stay equal to it, so the same term
+# shows the same composite in the Intercepts table, the Complexity charts and
+# every API response. (Three divergent weightings coexisted until 2026-07-02.)
 DEFAULT_WEIGHTS = {
-    "section_spread": 0.15,
-    "chapter_spread": 0.15,
+    "section_spread": 0.25,
+    "chapter_spread": 0.25,
     "questions_expected": 0.25,
-    "unresolved_digits": 0.10,
-    "score_flatness": 0.10,
-    "other_leaf_share": 0.05,
     # Vagueness fires when retrieval came back with few hits AND those hits had
     # weak cosines. Catches the "gift set" / "baby pink" failure mode where
     # spread/entropy norms collapse to 0 with n_results=1 — leaving composite
     # misleadingly low for textbook intercept candidates.
     "vagueness": 0.20,
+    # Shape signals - light tiebreakers only.
+    "score_flatness": 0.02,
+    "unresolved_digits": 0.02,
+    "other_leaf_share": 0.01,
 }
 
 

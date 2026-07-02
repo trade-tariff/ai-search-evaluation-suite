@@ -194,6 +194,11 @@ type SavedRun = { id: string; name: string; saved_at: string; n_terms: number; k
 // retrieval_failure is NOT part of this weighted sum — it's a blend
 // override that pulls composite toward 1.0 when retrieval gave up (≤1
 // candidate). See recomputeCompositeRows for the formula.
+//
+// MUST stay equal to the canonical backend set
+// (apps/product/backend/intercept_kpis.py DEFAULT_WEIGHTS) so the same term
+// shows the same composite in this table, the Complexity charts and every
+// API response.
 export const DEFAULT_WEIGHTS: Record<string, number> = {
   section_spread: 0.25,
   chapter_spread: 0.25,

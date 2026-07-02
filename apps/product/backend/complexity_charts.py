@@ -35,17 +35,8 @@ import numpy as np
 
 DATA_DIR = Path(__file__).parent.parent / "data" / "intercept_runs"
 
-# Match the frontend recomputeCompositeRows logic so the rendered chart
-# matches what we'd see if recharts could handle it.
-DEFAULT_WEIGHTS = {
-    "section_spread": 0.25,
-    "chapter_spread": 0.25,
-    "questions_expected": 0.25,
-    "vagueness": 0.20,
-    "score_flatness": 0.02,
-    "unresolved_digits": 0.02,
-    "other_leaf_share": 0.01,
-}
+# Single source of truth for composite weights - do not redefine here.
+from intercept_kpis import DEFAULT_WEIGHTS
 
 TEMPLATE_COLORS = {
     "Generic": "#3b82f6",
