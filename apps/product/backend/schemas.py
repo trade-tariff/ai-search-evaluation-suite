@@ -246,15 +246,17 @@ class EvaluationResult(BaseModel):
     model_id: str
     prompt_index: int
     # ── Deterministic code-agreement signals vs reference ─────────────
-    cosine_similarity: float
-    code_match_score: float        # legacy weighted aggregate (kept for back-compat)
-    top1_match: bool                  # exact top-1 code match
-    top3_hit: bool = False            # reference's top-1 appears in candidate's top-3
-    top5_overlap: float               # Jaccard of top-5 lists
-    mean_reciprocal_rank: float = 0.0 # 1/rank of ref's top-1 in candidate list
-    heading_match: bool = False       # first 4 digits agree
-    chapter_match: bool = False       # first 2 digits agree
-    hierarchical_score: float = 0.0   # 0-1 graded by deepest common prefix
+    # All Optional: in gold mode there is no reference/consensus, so every
+    # reference-agreement field is None ("not evaluated", distinct from 0).
+    cosine_similarity: Optional[float]
+    code_match_score: Optional[float]  # legacy weighted aggregate (kept for back-compat)
+    top1_match: Optional[bool]                  # exact top-1 code match
+    top3_hit: Optional[bool] = False            # reference's top-1 appears in candidate's top-3
+    top5_overlap: Optional[float]               # Jaccard of top-5 lists
+    mean_reciprocal_rank: Optional[float] = 0.0 # 1/rank of ref's top-1 in candidate list
+    heading_match: Optional[bool] = False       # first 4 digits agree
+    chapter_match: Optional[bool] = False       # first 2 digits agree
+    hierarchical_score: Optional[float] = 0.0   # 0-1 graded by deepest common prefix
     # ── Deterministic output-quality signals ─────────────────────────
     schema_valid: float = 0.0         # 0/0.3/0.5/1 - JSON shape compliance
     total_questions: int = 0          # how many clarifying questions this candidate asked
@@ -271,7 +273,7 @@ class EvaluationResult(BaseModel):
     gold_chapter_match: Optional[bool] = None
     gold_hierarchical_score: Optional[float] = None
     # ── Composite ─────────────────────────────────────────────────────
-    delta_score: float
+    delta_score: Optional[float]
     # Consensus panel agreement for this prompt (0-1, None if single baseline)
     panel_agreement: Optional[float] = None
     # LLM-as-Judge scores (0-10 scale, None if judge not run or API error)
@@ -284,14 +286,15 @@ class EvaluationResult(BaseModel):
     judge_cost: float = 0.0  # cost of the judge call itself
     # True when the judge call hit an API error - exclude these from averages
     judge_error: bool = False
-    # Total across all Q&A rounds
+    # Total across all Q&A rounds. baseline_*/speed_factor are None in gold
+    # mode (no reference to compare against).
     total_latency_ms: float
-    baseline_total_latency_ms: float
-    speed_factor: float
+    baseline_total_latency_ms: Optional[float]
+    speed_factor: Optional[float]
     total_cost: float
-    baseline_total_cost: float
+    baseline_total_cost: Optional[float]
     total_rounds: int
-    baseline_total_rounds: int
+    baseline_total_rounds: Optional[int]
 
 
 class ModelSummary(BaseModel):
@@ -345,6 +348,9 @@ class BenchmarkRun(BaseModel):
     progress: float = 0.0
     baseline_model_id: Optional[str] = None  # legacy single-baseline
     opensearch_limit: int = 80
+    # True when the run skipped the reference panel + consensus + judge and
+    # scored candidates against gold codes only.
+    gold_mode: bool = False
     # Consensus panel
     panel_model_ids: list[str] = []  # models that formed the panel
     panel_results: list[CompletionResult] = []  # raw results from each panel model
@@ -376,6 +382,10 @@ class BenchmarkRequest(BaseModel):
     model_ids: list[str]
     opensearch_limit: int = 80  # how many of the 80 OS results to include in the prompt
     allow_spend: bool = False
+    # Gold mode: skip the reference panel, consensus and LLM judge; score
+    # candidates against gold codes only. None = auto (enabled when every
+    # selected prompt has a gold code).
+    gold_mode: Optional[bool] = None
 
 
 class SSEEvent(BaseModel):

@@ -17,11 +17,24 @@ import E2EMatrixTab from "./components/E2EMatrixTab";
 import QAMatrixTab from "./components/QAMatrixTab";
 import ExperimentsTab from "./components/ExperimentsTab";
 
-// Three entry points: try new things (Experiment), run/read the measurements
-// (Evaluate), set up the pipeline (Configure). Tab ids are stable internal
-// keys (panel switching below); labels are what the user sees. Domain terms
-// the team already uses (ATaR, Intercepts) stay recognisable in the label.
+// Four entry points. Evaluate is the front door: the gold-set eval, where
+// prompts have known correct answers, so we score retrieval + Q&A directly
+// against gold (plus cost, time and rank). Experiment = try new things;
+// Configure = set up the pipeline. Legacy = the reference-model benchmark
+// loop - still the right tool for prompts WITHOUT gold answers and for
+// judge diagnostics. Tab ids are stable internal keys (panel switching
+// below); labels are what the user sees. Domain terms the team already
+// uses (ATaR, Intercepts) stay recognisable in the label.
 const NAV_GROUPS = [
+  {
+    label: "Evaluate",
+    tabs: [
+      { id: "E2E Matrix", label: "Gold Eval - E2E" },
+      { id: "Q&A Matrix", label: "Gold Eval - Q&A" },
+      { id: "Matrix", label: "Retrieval Matrix" },
+      { id: "Financial", label: "Costs" },
+    ],
+  },
   {
     label: "Experiment",
     tabs: [
@@ -30,17 +43,6 @@ const NAV_GROUPS = [
       { id: "Intercepts", label: "Intercepts" },
       { id: "Complexity", label: "Complexity" },
       { id: "Knowledge", label: "Knowledge Graph" },
-    ],
-  },
-  {
-    label: "Evaluate",
-    tabs: [
-      { id: "Benchmark", label: "Run Benchmark" },
-      { id: "Analysis", label: "Benchmark Results" },
-      { id: "Matrix", label: "Retrieval Matrix" },
-      { id: "Q&A Matrix", label: "Q&A Matrix" },
-      { id: "E2E Matrix", label: "End-to-End Matrix" },
-      { id: "Financial", label: "Costs" },
     ],
   },
   {
@@ -53,11 +55,18 @@ const NAV_GROUPS = [
       { id: "Judge", label: "LLM Judge" },
     ],
   },
+  {
+    label: "Legacy",
+    tabs: [
+      { id: "Benchmark", label: "Run Benchmark" },
+      { id: "Analysis", label: "Benchmark Results" },
+    ],
+  },
 ] as const;
 type Tab = (typeof NAV_GROUPS)[number]["tabs"][number]["id"];
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>("Experiments");
+  const [tab, setTab] = useState<Tab>("E2E Matrix");
   const [selectedPrompts, setSelectedPrompts] = useState<number[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [opensearchLimit, setOpensearchLimit] = useState(80);

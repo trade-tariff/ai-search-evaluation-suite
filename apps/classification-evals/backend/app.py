@@ -673,6 +673,8 @@ def eval_cost_summary(limit: int = 20) -> dict:
                 "provider_calls": 0,
                 "estimated_embedding_tokens": 0,
                 "estimated_cost_usd": 0.0,
+                "token_metered_runs": 0,
+                "flat_estimate_runs": 0,
                 "last_write": None,
             }
             cur.execute("SELECT to_regclass('kg.e2e_eval_runs') AS table_name")
@@ -687,6 +689,7 @@ def eval_cost_summary(limit: int = 20) -> dict:
                            r.config_json,
                            r.input_count,
                            r.provider_calls_used,
+                           r.est_cost_usd,
                            coalesce(sum(greatest(1, ceil(length(coalesce(res.query, '')) / 4.0))), 0)::bigint AS estimated_embedding_tokens,
                            r.started_at AS first_write,
                            r.finished_at AS last_write,
@@ -709,16 +712,24 @@ def eval_cost_summary(limit: int = 20) -> dict:
                     tokens = int(item.get("estimated_embedding_tokens") or 0) if vector_enabled else 0
                     provider_calls = int(item.get("provider_calls_used") or 0)
                     item["estimated_embedding_tokens"] = tokens
-                    item["estimated_cost_usd"] = (
-                        provider_calls * e2e_provider_call_est_usd
-                        + tokens * embedding_cost_per_million / 1_000_000.0
-                    )
+                    recorded_cost = item.pop("est_cost_usd", None)
+                    embedding_cost = tokens * embedding_cost_per_million / 1_000_000.0
+                    if recorded_cost is not None:
+                        item["cost_basis"] = "token_metered"
+                        item["estimated_cost_usd"] = float(recorded_cost) + embedding_cost
+                    else:
+                        item["cost_basis"] = "flat_call_estimate"
+                        item["estimated_cost_usd"] = (
+                            provider_calls * e2e_provider_call_est_usd + embedding_cost
+                        )
                     e2e_runs.append(item)
                 e2e_totals = {
                     "runs": len(e2e_runs),
                     "provider_calls": sum(int(row.get("provider_calls_used") or 0) for row in e2e_runs),
                     "estimated_embedding_tokens": sum(int(row.get("estimated_embedding_tokens") or 0) for row in e2e_runs),
                     "estimated_cost_usd": sum(float(row.get("estimated_cost_usd") or 0.0) for row in e2e_runs),
+                    "token_metered_runs": sum(1 for row in e2e_runs if row.get("cost_basis") == "token_metered"),
+                    "flat_estimate_runs": sum(1 for row in e2e_runs if row.get("cost_basis") == "flat_call_estimate"),
                     "last_write": max((row.get("last_write") for row in e2e_runs if row.get("last_write")), default=None),
                 }
                 e2e_runs = e2e_runs[:limit]
@@ -1566,6 +1577,8 @@ def _render_live_e2e_matrix(*, qa_only: bool) -> str:
                            r.avg_active_count,
                            r.provider_calls_used,
                            r.errors,
+                           r.est_cost_usd,
+                           avg(res.latency_seconds)::float8 AS avg_latency_seconds,
                            count(res.id)::int AS result_rows,
                            count(res.id) FILTER (WHERE res.final_state::text LIKE '%From retrieval%')::int AS fallback_rows,
                            coalesce(sum(
@@ -1595,6 +1608,7 @@ def _render_live_e2e_matrix(*, qa_only: bool) -> str:
         if qa_only
         else "Full journey view from retrieval through Q&A and final result-list preservation/rank metrics."
     )
+    summary_html = ""
     if error:
         body = f"<div class='empty'>Could not load matrix: {esc(error)}</div>"
     elif not rows:
@@ -1611,6 +1625,49 @@ def _render_live_e2e_matrix(*, qa_only: bool) -> str:
         if baseline_row is not None:
             rows = [baseline_row] + [row for row in rows if row is not baseline_row]
         baseline_rate = _top1_rate(baseline_row) if baseline_row is not None else None
+
+        headline = baseline_row
+        if headline is None:
+            finished = [row for row in rows if row.get("finished_at")]
+            clean = [row for row in finished if not int(row.get("errors") or 0)]
+            headline = (clean or finished or rows)[0]
+        if headline is not None:
+            h_n = headline.get("n_inputs") or headline.get("input_count") or headline.get("result_rows") or 0
+            h_eligible = int(headline.get("initial_gold_in_retrieval") or 0)
+            h_denom = h_eligible if qa_only else h_n
+            segments = []
+            if h_n and headline.get("initial_gold_in_retrieval") is not None:
+                segments.append(
+                    f"retrieval put the right code in the pool {100 * h_eligible / h_n:.1f}%"
+                )
+            if h_denom:
+                qa_bits = []
+                if headline.get("gold_kept") is not None:
+                    qa_bits.append(f"Q&A kept it {100 * int(headline.get('gold_kept') or 0) / h_denom:.1f}%")
+                if headline.get("gold_top1_after_qa") is not None:
+                    qa_bits.append(
+                        f"ranked it first {100 * int(headline.get('gold_top1_after_qa') or 0) / h_denom:.1f}%"
+                    )
+                if qa_bits:
+                    segments.append(" and ".join(qa_bits))
+            if headline.get("avg_initial_rank") is not None and headline.get("avg_post_qa_rank") is not None:
+                segments.append(
+                    f"avg rank {float(headline['avg_initial_rank']):.2f} -> {float(headline['avg_post_qa_rank']):.2f}"
+                )
+            cost_bits = []
+            if headline.get("est_cost_usd") is not None and h_n:
+                cost_bits.append(f"avg ${float(headline['est_cost_usd']) / h_n:.4f}")
+            if headline.get("avg_latency_seconds") is not None:
+                cost_bits.append(f"{float(headline['avg_latency_seconds']):.1f}s")
+            if cost_bits:
+                segments.append(" and ".join(cost_bits) + " per classification")
+            if segments:
+                summary_html = (
+                    "<div class='summary'>"
+                    f"Latest gold eval (<b>{esc(headline.get('run_label'))}</b>, n={esc(h_n)}): "
+                    f"{' - '.join(segments)}."
+                    "</div>"
+                )
 
         row_html = []
         for r in rows:
@@ -1637,6 +1694,16 @@ def _render_live_e2e_matrix(*, qa_only: bool) -> str:
                     f"<br><span style='color:{colour};font-size:11px'>"
                     f"{delta:+.1f}pp vs live</span>"
                 )
+            cost_txt = (
+                f"${float(r['est_cost_usd']) / n:.4f}/row"
+                if r.get("est_cost_usd") is not None and n
+                else "-"
+            )
+            latency_txt = (
+                f"{float(r['avg_latency_seconds']):.1f}s/row"
+                if r.get("avg_latency_seconds") is not None
+                else "-"
+            )
             row_html.append(
                 f"""
                 <tr>
@@ -1655,6 +1722,7 @@ def _render_live_e2e_matrix(*, qa_only: bool) -> str:
                   <td>{num(r.get('avg_initial_rank'))} -> {num(r.get('avg_post_qa_rank'))}</td>
                   <td>{num(r.get('avg_rounds'))}<br><span>active {num(r.get('avg_active_count'))}</span></td>
                   <td>{esc(r.get('provider_calls_used') or 0)}</td>
+                  <td>{esc(cost_txt)}<br><span>{esc(latency_txt)}</span></td>
                   <td class='{fallback_cls}'>{esc(fallback)} rows<br><span>{esc(fallback_rounds)} rounds</span></td>
                   <td class='{status_cls}'>{'done' if done else 'running'}<br><span>{esc(r.get('errors') or 0)} errors</span></td>
                 </tr>
@@ -1665,7 +1733,7 @@ def _render_live_e2e_matrix(*, qa_only: bool) -> str:
           <thead><tr>
             <th>Run</th><th>Config</th><th>Question mode</th><th>Models</th><th>N</th>
             <th>Gold in retrieval</th><th>Gold kept</th><th>Gold top1</th>
-            <th>Avg rank</th><th>Rounds / active</th><th>Calls</th><th>Fallback</th><th>Status</th>
+            <th>Avg rank</th><th>Rounds / active</th><th>Calls</th><th>Cost / time</th><th>Fallback</th><th>Status</th>
           </tr></thead>
           <tbody>{''.join(row_html)}</tbody>
         </table>
@@ -1688,9 +1756,11 @@ def _render_live_e2e_matrix(*, qa_only: bool) -> str:
       .bad {{ color:#fca5a5; }}
       .muted {{ color:#94a3b8; }}
       .empty {{ border:1px solid #263243; background:#0b1220; padding:18px; margin-top:18px; }}
+      .summary {{ border:1px solid #263243; background:#0b1220; padding:12px 16px; margin-top:14px; font-size:13px; }}
     </style></head><body>
       <h1>{esc(title)}</h1>
       <div class='sub'>{esc(sub)}</div>
+      {summary_html}
       {body}
     </body></html>
     """

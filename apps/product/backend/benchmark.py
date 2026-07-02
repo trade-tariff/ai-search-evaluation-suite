@@ -10,6 +10,7 @@ from typing import AsyncIterator
 
 from judge import (
     _extract_codes,
+    _schema_valid_score,
     compute_consensus,
     compute_gold_metrics,
     detect_response_type,
@@ -78,6 +79,7 @@ def list_saved_runs() -> list[dict]:
                 "timestamp": data["timestamp"],
                 "status": data["status"],
                 "opensearch_limit": data.get("opensearch_limit", 80),
+                "gold_mode": data.get("gold_mode", False),
                 "baseline_model_id": data.get("baseline_model_id"),
                 "panel_model_ids": data.get("panel_model_ids", []),
                 "prompt_count": len(data.get("prompt_indices", [])),
@@ -224,6 +226,70 @@ async def _simulate_answers_for_round(
             if sim["consistent_with_prior"]:
                 store_hits += 1
     return qa_entries, trace, total_cost, total_latency, store_hits
+
+
+def _none_safe_mean(values: list, digits: int) -> float:
+    """Mean over non-None values, 0.0 if none. Gold-mode evals leave every
+    reference-agreement metric None, so summaries must skip them."""
+    vals = [v for v in values if v is not None]
+    return round(sum(vals) / len(vals), digits) if vals else 0.0
+
+
+def _evaluate_gold_only(
+    result: CompletionResult, gold_code: str | None,
+) -> EvaluationResult:
+    """Gold-mode evaluation: there is no consensus reference, so every
+    reference-agreement field is None and the candidate is scored against the
+    prompt's gold code plus the deterministic quality signals that need no
+    baseline (schema validity, Q&A efficiency)."""
+    gold_metrics = compute_gold_metrics(_extract_codes(result.response_text), gold_code)
+
+    total_questions = 0
+    new_slots_set = 0
+    for rnd in result.rounds:
+        total_questions += len(rnd.questions_asked or [])
+        for t in rnd.simulator_trace or []:
+            if isinstance(t, dict) and not t.get("consistent_with_prior", False):
+                new_slots_set += 1
+    question_efficiency = (
+        new_slots_set / total_questions if total_questions > 0 else 1.0
+    )
+    rounds_efficiency = 1.0 - max(
+        0, min(result.total_rounds, MAX_ROUNDS) - 1
+    ) / max(1, MAX_ROUNDS - 1)
+
+    return EvaluationResult(
+        model_id=result.model_id,
+        prompt_index=result.prompt_index,
+        cosine_similarity=None,
+        code_match_score=None,
+        top1_match=None,
+        top3_hit=None,
+        top5_overlap=None,
+        mean_reciprocal_rank=None,
+        heading_match=None,
+        chapter_match=None,
+        hierarchical_score=None,
+        schema_valid=round(_schema_valid_score(result.response_text), 2),
+        total_questions=total_questions,
+        new_slots_set=new_slots_set,
+        question_efficiency=round(question_efficiency, 4),
+        rounds_efficiency=round(rounds_efficiency, 4),
+        gold_code=str(gold_code) if gold_code else None,
+        gold_top1_match=gold_metrics["gold_top1_match"],
+        gold_heading_match=gold_metrics["gold_heading_match"],
+        gold_chapter_match=gold_metrics["gold_chapter_match"],
+        gold_hierarchical_score=gold_metrics["gold_hierarchical_score"],
+        delta_score=None,
+        panel_agreement=None,
+        total_latency_ms=round(result.total_latency_ms, 1),
+        baseline_total_latency_ms=None,
+        speed_factor=None,
+        total_cost=round(result.total_cost, 6),
+        baseline_total_cost=None,
+        total_rounds=result.total_rounds,
+        baseline_total_rounds=None,
+    )
 
 
 async def _run_qa_loop(
@@ -420,6 +486,7 @@ async def run_benchmark(
     model_ids: list[str],
     config: AppConfig,
     opensearch_limit: int = 80,
+    gold_mode: bool | None = None,
 ) -> AsyncIterator[SSEEvent]:
     global _current_run, _cancel_event
     clear_provider_cache()
@@ -452,11 +519,22 @@ async def run_benchmark(
     oracle_by_prompt: dict[int, str | None] = {
         pi: get_oracle_text(pi) for pi in prompt_indices
     }
+    # Gold mode: when every prompt carries a gold code, the reference panel,
+    # consensus and LLM judge add no correctness signal - candidates are
+    # scored against gold directly, which saves the panel + judge spend.
+    # None = auto-detect; explicit True/False overrides.
+    if gold_mode is None:
+        gold_mode_effective = bool(prompt_indices) and all(
+            bool(get_gold_code(pi)) for pi in prompt_indices
+        )
+    else:
+        gold_mode_effective = gold_mode
     _current_run = BenchmarkRun(
         id=run_id,
         timestamp=datetime.now(timezone.utc).isoformat(),
         status="running",
         opensearch_limit=opensearch_limit,
+        gold_mode=gold_mode_effective,
         prompt_indices=prompt_indices,
         model_ids=model_ids,
     )
@@ -520,6 +598,10 @@ async def run_benchmark(
             continue
         candidate_mcs.append(mc)
 
+    if gold_mode_effective:
+        # No reference phase in gold mode - the panel is never launched.
+        panel_mcs = []
+
     if not panel_mcs and not candidate_mcs:
         _current_run.status = "error"
         yield SSEEvent(
@@ -529,7 +611,7 @@ async def run_benchmark(
         return
 
     _current_run.panel_model_ids = [mc.id for mc in panel_mcs]
-    _current_run.baseline_model_id = panel_mcs[0].id  # backward compat
+    _current_run.baseline_model_id = panel_mcs[0].id if panel_mcs else None  # backward compat
     panel_count = len(panel_mcs)
     candidate_count = len(candidate_mcs)
     total_tasks = len(prompt_indices) * (panel_count + candidate_count)
@@ -559,6 +641,19 @@ async def run_benchmark(
             "simulator_model": sim_cfg.model if simulator_client else None,
         },
     )
+
+    if gold_mode_effective:
+        # Tells the UI console why the panel/consensus/judge phases are absent.
+        yield SSEEvent(
+            event="benchmark:gold_mode",
+            data={
+                "enabled": True,
+                "reason": (
+                    "explicitly requested" if gold_mode
+                    else "all prompts have gold codes"
+                ),
+            },
+        )
 
     # Single event bus: simulator + Q&A loops + task wrappers all push into
     # this. The orchestrator drains it serially in each phase loop, yielding
@@ -597,10 +692,13 @@ async def run_benchmark(
         except Exception as exc:
             await event_bus.put(("panel_done", mc.id, pi, exc))
 
-    yield SSEEvent(event="panel:start", data={
-        "panel_models": [mc.id for mc in panel_mcs],
-        "total_tasks": panel_task_count,
-    })
+    # In gold mode panel_mcs is empty: no panel:start event, no panel tasks,
+    # and the drain loop below is a no-op (panel_task_count == 0).
+    if not gold_mode_effective:
+        yield SSEEvent(event="panel:start", data={
+            "panel_models": [mc.id for mc in panel_mcs],
+            "total_tasks": panel_task_count,
+        })
 
     for mc in panel_mcs:
         for pi in prompt_indices:
@@ -679,39 +777,58 @@ async def run_benchmark(
     consensus_results: dict[int, CompletionResult] = {}
     panel_agreements: dict[int, float] = {}
 
-    for pi in prompt_indices:
-        consensus, agreement = compute_consensus(_current_run.panel_results, pi)
-        consensus_results[pi] = consensus
-        panel_agreements[pi] = agreement
-        _current_run.consensus_results.append(consensus)
-        # Backward compat: also populate baseline_results
-        _current_run.baseline_results.append(consensus)
+    if gold_mode_effective:
+        # No consensus in gold mode. Sections are normally derived from the
+        # reference's top code; derive them from the gold code instead so the
+        # stratified summary views still work.
+        for pi in prompt_indices:
+            gold = get_gold_code(pi)
+            section = section_for_code(gold)
+            if section is not None:
+                _current_run.prompt_sections[str(pi)] = section
+                yield SSEEvent(event="prompt:section", data={
+                    "prompt_index": pi,
+                    "section_number": section["number"],
+                    "section_title": section["title"],
+                    "roman": section["roman"],
+                    "reference_top_code": gold,
+                })
+    else:
+        for pi in prompt_indices:
+            consensus, agreement = compute_consensus(_current_run.panel_results, pi)
+            consensus_results[pi] = consensus
+            panel_agreements[pi] = agreement
+            _current_run.consensus_results.append(consensus)
+            # Backward compat: also populate baseline_results
+            _current_run.baseline_results.append(consensus)
 
-        # Tag this prompt with its OTT section derived from the reference's
-        # top commodity code. Stratified summary views use this.
-        ref_top = _extract_top_code(consensus.response_text)
-        section = section_for_code(ref_top)
-        if section is not None:
-            _current_run.prompt_sections[str(pi)] = section
-            yield SSEEvent(event="prompt:section", data={
-                "prompt_index": pi,
-                "section_number": section["number"],
-                "section_title": section["title"],
-                "roman": section["roman"],
-                "reference_top_code": ref_top,
-            })
+            # Tag this prompt with its OTT section derived from the reference's
+            # top commodity code. Stratified summary views use this.
+            ref_top = _extract_top_code(consensus.response_text)
+            section = section_for_code(ref_top)
+            if section is not None:
+                _current_run.prompt_sections[str(pi)] = section
+                yield SSEEvent(event="prompt:section", data={
+                    "prompt_index": pi,
+                    "section_number": section["number"],
+                    "section_title": section["title"],
+                    "roman": section["roman"],
+                    "reference_top_code": ref_top,
+                })
 
-    yield SSEEvent(event="consensus:complete", data={
-        "prompt_count": len(prompt_indices),
-        "avg_panel_agreement": round(
-            sum(panel_agreements.values()) / len(panel_agreements), 4
-        ) if panel_agreements else 0.0,
-    })
+        yield SSEEvent(event="consensus:complete", data={
+            "prompt_count": len(prompt_indices),
+            "avg_panel_agreement": round(
+                sum(panel_agreements.values()) / len(panel_agreements), 4
+            ) if panel_agreements else 0.0,
+        })
 
     # ── Setup judge infrastructure (runs in parallel with candidates) ──
     judge_cfg = config.judge_config
     openai_key = api_keys.get("openai")
-    judge_enabled = bool(openai_key and judge_cfg.enabled)
+    # Gold mode forces the judge off: gold scoring is deterministic and the
+    # judge's dimensions add no correctness information there.
+    judge_enabled = bool(openai_key and judge_cfg.enabled) and not gold_mode_effective
     judge_client = None
     judge_count = 0
     judge_tasks: dict[int, asyncio.Task] = {}
@@ -883,7 +1000,14 @@ async def run_benchmark(
         # prompt's gold_code (if any) so candidates get scored against the
         # known-correct answer in addition to the reference.
         consensus = consensus_results.get(result.prompt_index)
-        if consensus and not result.error:
+        if gold_mode_effective and not result.error:
+            # Gold mode: no consensus exists. Score against gold only;
+            # reference-agreement fields stay None.
+            evaluation = _evaluate_gold_only(
+                result, get_gold_code(result.prompt_index),
+            )
+            _current_run.evaluations.append(evaluation)
+        elif consensus and not result.error:
             evaluation = evaluate_pair(
                 consensus, result, gold_code=get_gold_code(result.prompt_index),
             )
@@ -1075,21 +1199,21 @@ async def run_benchmark(
         summary = ModelSummary(
             model_id=mid,
             model_name=name,
-            avg_cosine_similarity=round(sum(e.cosine_similarity for e in evals) / n, 4),
-            avg_code_match_score=round(sum(e.code_match_score for e in evals) / n, 4),
-            avg_delta_score=round(sum(e.delta_score for e in evals) / n, 4),
+            avg_cosine_similarity=_none_safe_mean([e.cosine_similarity for e in evals], 4),
+            avg_code_match_score=_none_safe_mean([e.code_match_score for e in evals], 4),
+            avg_delta_score=_none_safe_mean([e.delta_score for e in evals], 4),
             avg_total_latency_ms=round(sum(e.total_latency_ms for e in evals) / n, 1),
-            avg_speed_factor=round(sum(e.speed_factor for e in evals) / n, 3),
+            avg_speed_factor=_none_safe_mean([e.speed_factor for e in evals], 3),
             total_cost=round(sum(e.total_cost for e in evals), 6),
             avg_cost_per_classification=round(sum(e.total_cost for e in evals) / n, 6),
             top1_accuracy=round(sum(1 for e in evals if e.top1_match) / n, 4),
-            avg_top5_overlap=round(sum(e.top5_overlap for e in evals) / n, 4),
+            avg_top5_overlap=_none_safe_mean([e.top5_overlap for e in evals], 4),
             avg_rounds=round(sum(e.total_rounds for e in evals) / n, 2),
             heading_match_rate=round(sum(1 for e in evals if e.heading_match) / n, 4),
             chapter_match_rate=round(sum(1 for e in evals if e.chapter_match) / n, 4),
             top3_hit_rate=round(sum(1 for e in evals if e.top3_hit) / n, 4),
-            avg_mean_reciprocal_rank=round(sum(e.mean_reciprocal_rank for e in evals) / n, 4),
-            avg_hierarchical_score=round(sum(e.hierarchical_score for e in evals) / n, 4),
+            avg_mean_reciprocal_rank=_none_safe_mean([e.mean_reciprocal_rank for e in evals], 4),
+            avg_hierarchical_score=_none_safe_mean([e.hierarchical_score for e in evals], 4),
             avg_schema_valid=round(sum(e.schema_valid for e in evals) / n, 4),
             avg_question_efficiency=round(sum(e.question_efficiency for e in evals) / n, 4),
             avg_rounds_efficiency=round(sum(e.rounds_efficiency for e in evals) / n, 4),

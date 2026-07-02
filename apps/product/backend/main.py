@@ -2531,7 +2531,10 @@ async def api_start_benchmark(req: BenchmarkRequest):
     cfg = load_config()
 
     async def event_stream():
-        async for event in run_benchmark(req.prompt_indices, req.model_ids, cfg, req.opensearch_limit):
+        async for event in run_benchmark(
+            req.prompt_indices, req.model_ids, cfg, req.opensearch_limit,
+            gold_mode=req.gold_mode,
+        ):
             data = json.dumps(event.data)
             yield f"event: {event.event}\ndata: {data}\n\n"
 
@@ -2582,6 +2585,7 @@ def _serialise_run(run) -> dict:
         "timestamp": run.timestamp,
         "status": run.status,
         "opensearch_limit": run.opensearch_limit,
+        "gold_mode": run.gold_mode,
         "baseline_model_id": run.baseline_model_id,
         "panel_model_ids": run.panel_model_ids,
         "panel_results": enrich(run.panel_results),

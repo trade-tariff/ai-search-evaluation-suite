@@ -283,6 +283,14 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
 
   return (
     <div className="space-y-6">
+      {/* Legacy notice */}
+      <div className="border border-amber-900/50 bg-amber-950/20 text-amber-200/80 text-xs rounded p-2">
+        Legacy exploratory eval - compares models against a model-built
+        reference. For measuring the system against known-correct answers use
+        Gold Eval - E2E (it is cheaper and anchored to gold). When every
+        selected prompt has a gold answer this run automatically skips the
+        reference, consensus and judge phases.
+      </div>
       {/* Controls */}
       <div className="flex items-center gap-4">
         {!running ? (

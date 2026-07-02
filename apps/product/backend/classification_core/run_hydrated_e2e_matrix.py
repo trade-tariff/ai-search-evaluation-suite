@@ -60,6 +60,104 @@ def _candidate_code(row: dict) -> str:
     return str(row.get("commodity_code") or row.get("code") or "")
 
 
+# ── Token-metered cost per row ────────────────────────────────────────────
+# LLM calls happen deep inside imported modules (retrieval embeddings, question
+# generation, the trader simulator), so per-row usage is captured with a
+# ContextVar accumulator installed around the OpenAI client methods. asyncio
+# tasks (and to_thread) copy the context, so concurrent rows do not mix.
+import contextvars
+
+_ROW_USAGE: contextvars.ContextVar[dict | None] = contextvars.ContextVar("e2e_row_usage", default=None)
+
+# $ per 1M tokens (input, output) - estimates, keep in sync with journey/cost.py.
+_TOKEN_PRICES = {
+    "gpt-5.5": (5.00, 30.00),
+    "gpt-5-mini": (0.25, 2.00),
+    "gpt-5-nano": (0.05, 0.40),
+    "gpt-4.1-mini": (0.40, 1.60),
+    "text-embedding-3-small": (0.02, 0.0),
+    "text-embedding-3-large": (0.13, 0.0),
+}
+_TOKEN_PRICE_DEFAULT = (1.0, 4.0)
+
+
+def _price_for(model: str) -> tuple[float, float]:
+    m = (model or "").strip()
+    for key, val in _TOKEN_PRICES.items():
+        if m.startswith(key):
+            return val
+    return _TOKEN_PRICE_DEFAULT
+
+
+def _record_usage(model, usage) -> None:
+    acc = _ROW_USAGE.get()
+    if acc is None or usage is None:
+        return
+    def _tok(*names):
+        for n in names:
+            v = getattr(usage, n, None)
+            if v is None and isinstance(usage, dict):
+                v = usage.get(n)
+            if isinstance(v, (int, float)):
+                return int(v)
+        return 0
+    tin = _tok("prompt_tokens", "input_tokens")
+    tout = _tok("completion_tokens", "output_tokens")
+    pin, pout = _price_for(str(model or ""))
+    acc["prompt_tokens"] = acc.get("prompt_tokens", 0) + tin
+    acc["completion_tokens"] = acc.get("completion_tokens", 0) + tout
+    acc["est_cost_usd"] = acc.get("est_cost_usd", 0.0) + tin / 1e6 * pin + tout / 1e6 * pout
+
+
+_METER_INSTALLED = False
+
+
+def _install_usage_meter() -> None:
+    global _METER_INSTALLED
+    if _METER_INSTALLED:
+        return
+    _METER_INSTALLED = True
+
+    def wrap_sync(orig):
+        def inner(self, *a, **k):
+            r = orig(self, *a, **k)
+            try:
+                _record_usage(k.get("model"), getattr(r, "usage", None))
+            except Exception:
+                pass
+            return r
+        return inner
+
+    def wrap_async(orig):
+        async def inner(self, *a, **k):
+            r = await orig(self, *a, **k)
+            try:
+                _record_usage(k.get("model"), getattr(r, "usage", None))
+            except Exception:
+                pass
+            return r
+        return inner
+
+    try:
+        from openai.resources.chat import completions as _c
+        _c.Completions.create = wrap_sync(_c.Completions.create)
+        _c.AsyncCompletions.create = wrap_async(_c.AsyncCompletions.create)
+    except Exception:
+        pass
+    try:
+        from openai.resources import responses as _r
+        _r.Responses.create = wrap_sync(_r.Responses.create)
+        _r.AsyncResponses.create = wrap_async(_r.AsyncResponses.create)
+    except Exception:
+        pass
+    try:
+        from openai.resources import embeddings as _e
+        _e.Embeddings.create = wrap_sync(_e.Embeddings.create)
+        _e.AsyncEmbeddings.create = wrap_async(_e.AsyncEmbeddings.create)
+    except Exception:
+        pass
+
+
 def ensure_tables(conn) -> None:
     with conn.cursor() as cur:
         cur.execute(
@@ -135,6 +233,13 @@ def ensure_tables(conn) -> None:
         cur.execute(
             f"CREATE INDEX IF NOT EXISTS e2e_eval_results_mode_idx ON {KG_SCHEMA}.e2e_eval_results(question_mode, answerer)"
         )
+        for ddl in (
+            f"ALTER TABLE {KG_SCHEMA}.e2e_eval_results ADD COLUMN IF NOT EXISTS prompt_tokens integer",
+            f"ALTER TABLE {KG_SCHEMA}.e2e_eval_results ADD COLUMN IF NOT EXISTS completion_tokens integer",
+            f"ALTER TABLE {KG_SCHEMA}.e2e_eval_results ADD COLUMN IF NOT EXISTS est_cost_usd numeric",
+            f"ALTER TABLE {KG_SCHEMA}.e2e_eval_runs ADD COLUMN IF NOT EXISTS est_cost_usd numeric",
+        ):
+            cur.execute(ddl)
     conn.commit()
 
 
@@ -199,8 +304,8 @@ def insert_result(conn, run_id: int, row: dict) -> None:
                post_qa_rank, post_qa_top_codes, gold_in_retrieval, gold_kept,
                gold_top1_after_qa, rounds, active_count, out_count, cache_hit_count,
                cache_write_count, provider_calls_used, latency_seconds, question_trace,
-               final_state, error)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::text[],%s,%s::text[],%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s)
+               final_state, error, prompt_tokens, completion_tokens, est_cost_usd)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::text[],%s,%s::text[],%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s::jsonb,%s,%s,%s,%s)
             """,
             (
                 run_id, row["gold_id"], row["source_id"], row["persona"], row["query"], row["expected_code"],
@@ -212,6 +317,7 @@ def insert_result(conn, run_id: int, row: dict) -> None:
                 int(row.get("provider_calls_used") or 0), row.get("latency_seconds"),
                 json.dumps(row.get("question_trace") or [], default=str),
                 json.dumps(row.get("final_state") or {}, default=str), row.get("error"),
+                row.get("prompt_tokens"), row.get("completion_tokens"), row.get("est_cost_usd"),
             ),
         )
     conn.commit()
@@ -231,6 +337,7 @@ def finalize_run(conn, run_id: int) -> dict:
                      avg(rounds) AS avg_rounds,
                      avg(active_count) AS avg_active_count,
                      sum(provider_calls_used) AS provider_calls_used,
+                     sum(est_cost_usd) AS est_cost_usd,
                      count(*) FILTER (WHERE error IS NOT NULL) AS errors
               FROM {KG_SCHEMA}.e2e_eval_results
               WHERE run_id = %s
@@ -246,6 +353,7 @@ def finalize_run(conn, run_id: int) -> dict:
                 avg_rounds = agg.avg_rounds,
                 avg_active_count = agg.avg_active_count,
                 provider_calls_used = COALESCE(agg.provider_calls_used, 0),
+                est_cost_usd = agg.est_cost_usd,
                 errors = agg.errors
             FROM agg
             WHERE r.id = %s
@@ -310,6 +418,8 @@ async def evaluate_row(gold: dict, ctx: EvalContext) -> dict:
     import main as product_main
 
     started = time.time()
+    usage_acc: dict = {}
+    _ROW_USAGE.set(usage_acc)
     result = {
         "gold_id": gold["id"],
         "source_id": gold["source_id"],
@@ -443,6 +553,10 @@ async def evaluate_row(gold: dict, ctx: EvalContext) -> dict:
         result["error"] = f"{type(exc).__name__}: {str(exc)[:500]}"
     finally:
         result["latency_seconds"] = round(time.time() - started, 3)
+        result["prompt_tokens"] = usage_acc.get("prompt_tokens")
+        result["completion_tokens"] = usage_acc.get("completion_tokens")
+        if usage_acc.get("est_cost_usd") is not None:
+            result["est_cost_usd"] = round(usage_acc["est_cost_usd"], 6)
     return result
 
 
@@ -527,6 +641,7 @@ def main() -> None:
     parser.add_argument("--allow-spend", action="store_true")
     args = parser.parse_args()
 
+    _install_usage_meter()
     personas = [p.strip() for p in args.personas.split(",") if p.strip()]
     modes = [m.strip() for m in args.question_modes.split(",") if m.strip()]
     invalid = [m for m in modes if m not in QUESTION_MODES]
