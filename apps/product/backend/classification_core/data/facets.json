@@ -1,0 +1,156 @@
+{
+  "_about": "Facet schema. Each facet has a slot key, value enum, human labels, and which chapters it applies to. The classification engine uses this to compute info-gain over the candidate set and to phrase the refining question.",
+  "facets": {
+    "material_upper": {
+      "label": "What is the upper of the shoe made of?",
+      "short_label": "Upper material",
+      "applies_to_chapters": ["64"],
+      "values": ["rubber_or_plastic", "leather", "textile", "composition", "other"],
+      "value_labels": {
+        "rubber_or_plastic": "Rubber or plastics",
+        "leather": "Leather",
+        "textile": "Textile (canvas, mesh, fabric)",
+        "composition": "Composition leather (bonded)",
+        "other": "Other / I don't know"
+      },
+      "rank": 1
+    },
+    "material_sole": {
+      "label": "What is the outer sole of the shoe made of?",
+      "short_label": "Outer sole material",
+      "applies_to_chapters": ["64"],
+      "values": ["rubber_or_plastic", "leather", "wood", "other"],
+      "value_labels": {
+        "rubber_or_plastic": "Rubber or plastics",
+        "leather": "Leather",
+        "wood": "Wood",
+        "other": "Other"
+      },
+      "rank": 0
+    },
+    "closure": {
+      "label": "How is the shoe closed or fastened?",
+      "short_label": "Closure",
+      "applies_to_chapters": ["64"],
+      "values": ["laces", "velcro", "slip_on", "strap_thong", "strap_buckle", "zip"],
+      "value_labels": {
+        "laces": "Laces",
+        "velcro": "Velcro",
+        "slip_on": "Slip-on (no fastening)",
+        "strap_thong": "Strap or thong (between toes)",
+        "strap_buckle": "Strap with buckle",
+        "zip": "Zip"
+      },
+      "rank": 3
+    },
+    "construction": {
+      "label": "How is the upper attached to the sole?",
+      "short_label": "Construction",
+      "applies_to_chapters": ["64"],
+      "values": ["plug_assembled", "moulded_or_stitched", "stitched"],
+      "value_labels": {
+        "plug_assembled": "Assembled by plugs or pegs (flip-flop style)",
+        "moulded_or_stitched": "Moulded or stitched",
+        "stitched": "Stitched"
+      },
+      "rank": 4
+    },
+    "intended_use": {
+      "label": "What is the shoe designed for?",
+      "short_label": "Intended use",
+      "applies_to_chapters": ["64"],
+      "values": ["sport", "casual", "work_outdoor", "indoor", "formal"],
+      "value_labels": {
+        "sport": "Sport / athletic",
+        "casual": "Casual / everyday",
+        "work_outdoor": "Work / outdoor / hiking",
+        "indoor": "Indoor / slippers",
+        "formal": "Formal"
+      },
+      "rank": 2
+    },
+    "ankle_covered": {
+      "label": "Does the shoe cover the ankle?",
+      "short_label": "Ankle coverage",
+      "applies_to_chapters": ["64"],
+      "values": ["yes", "no"],
+      "value_labels": {"yes": "Yes - covers the ankle", "no": "No - below the ankle"},
+      "rank": 5
+    },
+
+    "beverage_type": {
+      "label": "What kind of beverage is it?",
+      "short_label": "Beverage type",
+      "applies_to_chapters": ["22"],
+      "values": ["wine", "beer", "spirits", "soft_drink", "water", "other"],
+      "value_labels": {
+        "wine": "Wine (made from grapes)",
+        "beer": "Beer or ale (made from malt)",
+        "spirits": "Spirits (whisky, vodka, gin etc.)",
+        "soft_drink": "Soft drink / flavoured water",
+        "water": "Plain water / mineral water",
+        "other": "Other"
+      },
+      "rank": 0
+    },
+    "still_or_sparkling": {
+      "label": "Is it still or sparkling?",
+      "short_label": "Still / sparkling",
+      "applies_to_chapters": ["22"],
+      "values": ["still", "sparkling", "either"],
+      "value_labels": {"still": "Still", "sparkling": "Sparkling / carbonated", "either": "Mixed or doesn't apply"},
+      "rank": 1
+    },
+    "alcohol_band": {
+      "label": "What's the alcohol content?",
+      "short_label": "Alcohol band",
+      "applies_to_chapters": ["22"],
+      "values": ["non_alcoholic", "1.2_to_5.5", "5_to_15", "above_22"],
+      "value_labels": {
+        "non_alcoholic": "Below 1.2% ABV (non-alcoholic)",
+        "1.2_to_5.5": "1.2% to 5.5% (typical beer)",
+        "5_to_15": "5% to 15% (typical wine)",
+        "above_22": "22%+ (spirits)"
+      },
+      "rank": 2
+    },
+    "container_size": {
+      "label": "What container size?",
+      "short_label": "Container size",
+      "applies_to_chapters": ["22"],
+      "values": ["le_2L", "le_10L", "above_10L"],
+      "value_labels": {
+        "le_2L": "2 litres or less (bottle, can)",
+        "le_10L": "2 to 10 litres (small keg)",
+        "above_10L": "More than 10 litres (large keg, tanker)"
+      },
+      "rank": 3
+    },
+
+    "body_material": {
+      "label": "What is the main material?",
+      "short_label": "Body material",
+      "applies_to_chapters": ["73"],
+      "values": ["stainless_steel", "iron_or_steel", "other"],
+      "value_labels": {
+        "stainless_steel": "Stainless steel",
+        "iron_or_steel": "Iron or steel (other than stainless)",
+        "other": "Other metal or material"
+      },
+      "rank": 0
+    },
+    "sub_type": {
+      "label": "What is the product?",
+      "short_label": "Product type",
+      "applies_to_chapters": ["73"],
+      "values": ["sink", "kitchenware", "cooking_appliance", "other"],
+      "value_labels": {
+        "sink": "Sink or wash basin",
+        "kitchenware": "Pot, pan, kitchenware",
+        "cooking_appliance": "Cooker, hob, oven",
+        "other": "Other steel article"
+      },
+      "rank": 1
+    }
+  }
+}

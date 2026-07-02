@@ -140,14 +140,14 @@ class FactStore:
 
         Each fact: {slot: str, answer: str, source_question?: str}. Slots that
         already exist are skipped (first-writer-wins also applies to seeding).
-        Returns the number of facts that landed.
+        Returns the number of facts that were inserted.
 
         Synchronous - call before the run starts, when no models are racing.
         """
         if not facts:
             return 0
         pf = self.ensure_sync(prompt_index)
-        landed = 0
+        inserted = 0
         for f in facts:
             slot = str(f.get("slot", "")).strip()
             answer = str(f.get("answer", "")).strip()
@@ -172,8 +172,8 @@ class FactStore:
                 "source_model": "seed",
                 "source_round": 0,
             })
-            landed += 1
-        return landed
+            inserted += 1
+        return inserted
 
     def drain_new_commits(self, from_index: int) -> tuple[list[dict], int]:
         """Return commits appended to the log since `from_index`, and the new

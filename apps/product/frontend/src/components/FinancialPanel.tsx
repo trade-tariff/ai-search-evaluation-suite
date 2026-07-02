@@ -13,8 +13,8 @@ import {
   ZAxis,
   Cell,
 } from "recharts";
-import { getBenchmarkResults, listRuns, getRunResults } from "../api";
-import type { RunListItem } from "../api";
+import { getBenchmarkResults, getEvalCostSummary, listRuns, getRunResults } from "../api";
+import type { EvalCostSummary, RunListItem } from "../api";
 import type { BenchmarkResults } from "../types";
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#84cc16"];
@@ -23,19 +23,54 @@ function runLabel(r: RunListItem) {
   return `${new Date(r.timestamp).toLocaleString()} - ${r.prompt_count}p x ${r.model_count}m - OS:${r.opensearch_limit}`;
 }
 
+function usd(value: number | null | undefined) {
+  return `$${Number(value || 0).toFixed(4)}`;
+}
+
+function compactInt(value: number | null | undefined) {
+  return Number(value || 0).toLocaleString();
+}
+
+function duration(value: number | null | undefined) {
+  const seconds = Number(value || 0);
+  if (seconds <= 0) return "-";
+  if (seconds < 90) return `${seconds.toFixed(0)}s`;
+  const minutes = seconds / 60;
+  if (minutes < 90) return `${minutes.toFixed(1)}m`;
+  return `${(minutes / 60).toFixed(1)}h`;
+}
+
 export default function FinancialPanel() {
   const [results, setResults] = useState<BenchmarkResults | null>(null);
+  const [evalCost, setEvalCost] = useState<EvalCostSummary | null>(null);
   const [savedRuns, setSavedRuns] = useState<RunListItem[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string>("current");
   const [err, setErr] = useState("");
 
   useEffect(() => {
+    let cancelled = false;
+
+    const refreshEvalCost = () => {
+      getEvalCostSummary()
+        .then((summary) => {
+          if (!cancelled) setEvalCost(summary);
+        })
+        .catch(() => {
+          if (!cancelled) setEvalCost(null);
+        });
+    };
+
+    refreshEvalCost();
+    const evalCostTimer = window.setInterval(refreshEvalCost, 30000);
+
     (async () => {
       try {
         const runs = await listRuns();
+        if (cancelled) return;
         setSavedRuns(runs);
         try {
           const live = await getBenchmarkResults();
+          if (cancelled) return;
           setResults(live);
           setSelectedRunId("current");
         } catch {
@@ -44,16 +79,22 @@ export default function FinancialPanel() {
               (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
             )[0];
             const saved = await getRunResults(mostRecent.id);
+            if (cancelled) return;
             setResults(saved);
             setSelectedRunId(mostRecent.id);
-          } else {
+          } else if (!cancelled) {
             setErr("No benchmark results yet. Run a benchmark first.");
           }
         }
       } catch (e) {
-        setErr("Failed to load runs: " + String(e));
+        if (!cancelled) setErr("Failed to load runs: " + String(e));
       }
     })();
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(evalCostTimer);
+    };
   }, []);
 
   const loadRun = async (runId: string) => {
@@ -75,6 +116,7 @@ export default function FinancialPanel() {
   if (!results) return <div className="text-gray-400">Loading results...</div>;
 
   const { summaries, evaluations, baseline_results, model_results } = results;
+  const spendTotals = evalCost?.spend_totals;
 
   // -- Aggregate costs --
   const baselineInferenceCost = baseline_results.reduce((s, r) => s + r.total_cost, 0);
@@ -204,6 +246,205 @@ export default function FinancialPanel() {
         </div>
       </div>
 
+      {evalCost && (
+        <section className="rounded-lg border border-emerald-900/60 bg-emerald-950/20 p-5">
+          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-emerald-100">Project costs</h2>
+              <p className="mt-1 text-sm text-gray-400">
+                Tracked and estimated project spend across fact extraction, retrieval embeddings, E2E Q&A, and classification matrix runs. Benchmark run costs are shown below.
+              </p>
+            </div>
+            <div className="text-xs text-gray-500">
+              {evalCost.totals.last_write ? `updated ${new Date(evalCost.totals.last_write).toLocaleString()}` : "no writes yet"}
+            </div>
+          </div>
+
+          {spendTotals && (
+            <>
+              <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-5">
+                <div className="rounded border border-gray-800 bg-gray-950/70 p-4">
+                  <div className="text-xs uppercase tracking-wider text-gray-500">Tracked + Estimated Spend</div>
+                  <div className="mt-1 text-2xl font-semibold text-emerald-300">{usd(spendTotals.estimated_total_usd)}</div>
+                </div>
+                <div className="rounded border border-gray-800 bg-gray-950/70 p-4">
+                  <div className="text-xs uppercase tracking-wider text-gray-500">Fact Extraction</div>
+                  <div className="mt-1 text-2xl font-semibold text-gray-100">{usd(spendTotals.fact_eval_cost_usd)}</div>
+                  <div className="mt-1 text-xs text-gray-500">exact ledger</div>
+                </div>
+                <div className="rounded border border-gray-800 bg-gray-950/70 p-4">
+                  <div className="text-xs uppercase tracking-wider text-gray-500">Retrieval Embeddings</div>
+                  <div className="mt-1 text-2xl font-semibold text-gray-100">{usd(spendTotals.retrieval_embedding_est_cost_usd)}</div>
+                  <div className="mt-1 text-xs text-gray-500">estimated</div>
+                </div>
+                <div className="rounded border border-gray-800 bg-gray-950/70 p-4">
+                  <div className="text-xs uppercase tracking-wider text-gray-500">E2E Q&A</div>
+                  <div className="mt-1 text-2xl font-semibold text-gray-100">{usd(spendTotals.e2e_est_cost_usd)}</div>
+                  <div className="mt-1 text-xs text-gray-500">estimated</div>
+                </div>
+                <div className="rounded border border-gray-800 bg-gray-950/70 p-4">
+                  <div className="text-xs uppercase tracking-wider text-gray-500">Classification Matrix</div>
+                  <div className="mt-1 text-2xl font-semibold text-gray-100">{usd(spendTotals.classification_est_cost_usd)}</div>
+                  <div className="mt-1 text-xs text-gray-500">estimated</div>
+                </div>
+              </div>
+              <p className="mt-2 text-xs text-gray-500">
+                Estimates use ${spendTotals.embedding_cost_per_million_tokens.toFixed(4)}/1M embedding tokens and ${spendTotals.e2e_provider_call_est_usd.toFixed(4)} per E2E provider call when exact token usage is not stored.
+              </p>
+            </>
+          )}
+
+          <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+            <div className="rounded border border-gray-800 bg-gray-950/70 p-4">
+              <div className="text-xs uppercase tracking-wider text-gray-500">Fact Eval Spend</div>
+              <div className="mt-1 text-2xl font-semibold text-emerald-300">{usd(evalCost.totals.cost_usd)}</div>
+            </div>
+            <div className="rounded border border-gray-800 bg-gray-950/70 p-4">
+              <div className="text-xs uppercase tracking-wider text-gray-500">Calls</div>
+              <div className="mt-1 text-2xl font-semibold text-gray-100">{compactInt(evalCost.totals.calls)}</div>
+              <div className="mt-1 text-xs text-gray-500">{compactInt(evalCost.totals.failed)} failed</div>
+            </div>
+            <div className="rounded border border-gray-800 bg-gray-950/70 p-4">
+              <div className="text-xs uppercase tracking-wider text-gray-500">Prompt Tokens</div>
+              <div className="mt-1 text-2xl font-semibold text-gray-100">{compactInt(evalCost.totals.prompt_tokens)}</div>
+            </div>
+            <div className="rounded border border-gray-800 bg-gray-950/70 p-4">
+              <div className="text-xs uppercase tracking-wider text-gray-500">Completion Tokens</div>
+              <div className="mt-1 text-2xl font-semibold text-gray-100">{compactInt(evalCost.totals.completion_tokens)}</div>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(0,0.65fr)]">
+            <div className="overflow-x-auto">
+              <h3 className="mb-3 text-sm font-medium text-gray-200">Recent eval runs</h3>
+              <table className="w-full min-w-[760px] text-sm">
+                <thead>
+                  <tr className="border-b border-gray-800 text-left text-gray-400">
+                    <th className="py-2 pr-4">Run</th>
+                    <th className="py-2 pr-4 text-right">Calls</th>
+                    <th className="py-2 pr-4 text-right">CCs</th>
+                    <th className="py-2 pr-4 text-right">Prompts</th>
+                    <th className="py-2 pr-4 text-right">Cost</th>
+                    <th className="py-2 pr-4 text-right">Avg score</th>
+                    <th className="py-2 text-right">Duration</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {evalCost.runs.map((run) => (
+                    <tr key={run.run_id} className="border-b border-gray-900">
+                      <td className="max-w-[280px] truncate py-2 pr-4 font-mono text-xs text-gray-300" title={run.run_id}>
+                        {run.run_id}
+                      </td>
+                      <td className="py-2 pr-4 text-right">{compactInt(run.calls)}</td>
+                      <td className="py-2 pr-4 text-right">{compactInt(run.commodity_codes)}</td>
+                      <td className="py-2 pr-4 text-right">{compactInt(run.prompt_versions)}</td>
+                      <td className="py-2 pr-4 text-right text-emerald-300">{usd(run.cost_usd)}</td>
+                      <td className="py-2 pr-4 text-right">{run.avg_score == null ? "-" : run.avg_score.toFixed(1)}</td>
+                      <td className="py-2 text-right">{duration(run.duration_seconds)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="overflow-x-auto">
+              <h3 className="mb-3 text-sm font-medium text-gray-200">Eval spend by model</h3>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-800 text-left text-gray-400">
+                    <th className="py-2 pr-4">Model</th>
+                    <th className="py-2 pr-4 text-right">Calls</th>
+                    <th className="py-2 text-right">Cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {evalCost.model_totals.map((row) => (
+                    <tr key={row.model} className="border-b border-gray-900">
+                      <td className="py-2 pr-4 font-mono text-xs text-gray-300">{row.model}</td>
+                      <td className="py-2 pr-4 text-right">{compactInt(row.calls)}</td>
+                      <td className="py-2 text-right text-emerald-300">{usd(row.cost_usd)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {evalCost.retrieval && evalCost.e2e && evalCost.classification && (
+          <div className="mt-5 grid gap-5 lg:grid-cols-3">
+            <div className="overflow-x-auto">
+              <h3 className="mb-3 text-sm font-medium text-gray-200">Recent retrieval spend</h3>
+              <table className="w-full min-w-[520px] text-sm">
+                <thead>
+                  <tr className="border-b border-gray-800 text-left text-gray-400">
+                    <th className="py-2 pr-4">Run</th>
+                    <th className="py-2 pr-4 text-right">Queries</th>
+                    <th className="py-2 pr-4 text-right">Emb tokens</th>
+                    <th className="py-2 text-right">Est cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {evalCost.retrieval.runs.slice(0, 8).map((run) => (
+                    <tr key={run.id} className="border-b border-gray-900">
+                      <td className="max-w-[180px] truncate py-2 pr-4 font-mono text-xs text-gray-300" title={run.run_label}>{run.run_label}</td>
+                      <td className="py-2 pr-4 text-right">{compactInt(run.calls || run.n_queries)}</td>
+                      <td className="py-2 pr-4 text-right">{compactInt(run.estimated_embedding_tokens)}</td>
+                      <td className="py-2 text-right text-emerald-300">{usd(run.estimated_cost_usd)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="overflow-x-auto">
+              <h3 className="mb-3 text-sm font-medium text-gray-200">Recent E2E Q&A spend</h3>
+              <table className="w-full min-w-[560px] text-sm">
+                <thead>
+                  <tr className="border-b border-gray-800 text-left text-gray-400">
+                    <th className="py-2 pr-4">Run</th>
+                    <th className="py-2 pr-4">Mode</th>
+                    <th className="py-2 pr-4 text-right">Calls</th>
+                    <th className="py-2 text-right">Est cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {evalCost.e2e.runs.slice(0, 8).map((run) => (
+                    <tr key={run.id} className="border-b border-gray-900">
+                      <td className="max-w-[170px] truncate py-2 pr-4 font-mono text-xs text-gray-300" title={run.run_label}>{run.run_label}</td>
+                      <td className="py-2 pr-4 text-xs text-gray-300">{run.question_mode}</td>
+                      <td className="py-2 pr-4 text-right">{compactInt(run.provider_calls_used)}</td>
+                      <td className="py-2 text-right text-emerald-300">{usd(run.estimated_cost_usd)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="overflow-x-auto">
+              <h3 className="mb-3 text-sm font-medium text-gray-200">Classification matrix spend</h3>
+              <table className="w-full min-w-[520px] text-sm">
+                <thead>
+                  <tr className="border-b border-gray-800 text-left text-gray-400">
+                    <th className="py-2 pr-4">Run</th>
+                    <th className="py-2 pr-4 text-right">Sessions</th>
+                    <th className="py-2 text-right">Est cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {evalCost.classification.runs.slice(0, 8).map((run) => (
+                    <tr key={`${run.run_label}-${run.model}-${run.strategy}-${run.prompt_mode}`} className="border-b border-gray-900">
+                      <td className="max-w-[210px] truncate py-2 pr-4 font-mono text-xs text-gray-300" title={run.run_label}>{run.run_label}</td>
+                      <td className="py-2 pr-4 text-right">{compactInt(run.sessions)}</td>
+                      <td className="py-2 text-right text-emerald-300">{usd(run.estimated_cost_usd)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+        </section>
+      )}
+
       {/* Aggregate summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-gray-900 rounded-lg p-4">
@@ -309,7 +550,7 @@ export default function FinancialPanel() {
               <ZAxis range={[80, 80]} />
               <Tooltip
                 contentStyle={{ backgroundColor: "#1f2937", border: "none" }}
-                formatter={(value: unknown, name: unknown) => {
+                formatter={(value, name) => {
                   const numericValue = typeof value === "number" ? value : Number(value ?? 0);
                   const label = String(name ?? "");
                   return [

@@ -13,14 +13,15 @@ import InterceptsPanel from "./components/InterceptsPanel";
 import ComplexityPanel from "./components/ComplexityPanel";
 import KnowledgePanel from "./components/KnowledgePanel";
 import MatrixTab from "./components/MatrixTab";
+import E2EMatrixTab from "./components/E2EMatrixTab";
+import QAMatrixTab from "./components/QAMatrixTab";
 import ExperimentsTab from "./components/ExperimentsTab";
-import TraderJourneyTab from "./components/TraderJourneyTab";
 
-const TABS = ["Trader Journey"] as const;
+const TABS = ["Experiments", "Matrix", "Q&A Matrix", "E2E Matrix", "Configuration", "Prompts", "ATaR", "Search References", "Simulator", "Judge", "Benchmark", "Analysis", "Financial", "Intercepts", "Complexity", "Knowledge"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>("Trader Journey");
+  const [tab, setTab] = useState<Tab>("Experiments");
   const [selectedPrompts, setSelectedPrompts] = useState<number[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const [opensearchLimit, setOpensearchLimit] = useState(80);
@@ -40,7 +41,7 @@ export default function App() {
     <div className="min-h-screen bg-gray-950 text-gray-100">
       <header className="border-b border-gray-800 px-6 py-4">
         <h1 className="text-xl font-semibold">
-          Trade Tariff AI Assistant <span className="text-sm font-normal text-gray-400">(demo)</span>
+          AI Search Evaluation Suite
         </h1>
       </header>
 
@@ -100,8 +101,9 @@ export default function App() {
         {tab === "Complexity" && <ComplexityPanel />}
         {tab === "Knowledge" && <KnowledgePanel />}
         {tab === "Experiments" && <ExperimentsTab />}
-        {tab === "Trader Journey" && <TraderJourneyTab />}
         {tab === "Matrix" && <MatrixTab />}
+        {tab === "Q&A Matrix" && <QAMatrixTab />}
+        {tab === "E2E Matrix" && <E2EMatrixTab />}
       </main>
     </div>
   );

@@ -122,6 +122,133 @@ export async function getRunResults(runId: string): Promise<BenchmarkResults> {
   return json(`/benchmark/runs/${runId}`);
 }
 
+export interface EvalCostSummary {
+  totals: {
+    calls: number;
+    ok: number;
+    failed: number;
+    runs: number;
+    models: number;
+    prompt_versions: number;
+    cost_usd: number;
+    prompt_tokens: number;
+    completion_tokens: number;
+    first_write?: string | null;
+    last_write?: string | null;
+  };
+  runs: Array<{
+    run_id: string;
+    calls: number;
+    ok: number;
+    failed: number;
+    models: number;
+    prompt_versions: number;
+    commodity_codes: number;
+    cost_usd: number;
+    prompt_tokens: number;
+    completion_tokens: number;
+    avg_score?: number | null;
+    first_write?: string | null;
+    last_write?: string | null;
+    duration_seconds?: number | null;
+  }>;
+  model_totals: Array<{
+    model: string;
+    calls: number;
+    ok: number;
+    cost_usd: number;
+    prompt_tokens: number;
+    completion_tokens: number;
+    avg_score?: number | null;
+  }>;
+  prompt_totals: Array<{
+    prompt_version: string;
+    calls: number;
+    ok: number;
+    cost_usd: number;
+    avg_score?: number | null;
+  }>;
+  spend_totals?: {
+    fact_eval_cost_usd: number;
+    retrieval_embedding_est_cost_usd: number;
+    e2e_est_cost_usd: number;
+    classification_est_cost_usd: number;
+    estimated_total_usd: number;
+    embedding_cost_per_million_tokens: number;
+    e2e_provider_call_est_usd: number;
+  };
+  retrieval?: {
+    totals: {
+      runs: number;
+      calls: number;
+      estimated_embedding_tokens: number;
+      estimated_cost_usd: number;
+      last_write?: string | null;
+    };
+    runs: Array<{
+      id: number;
+      run_label: string;
+      n_queries: number;
+      retrieval_limit: number;
+      calls: number;
+      use_vector: boolean;
+      use_facts_vec: boolean;
+      use_kg_vec: boolean;
+      estimated_embedding_tokens: number;
+      estimated_cost_usd: number;
+      first_write?: string | null;
+      last_write?: string | null;
+      duration_seconds?: number | null;
+    }>;
+  };
+  e2e?: {
+    totals: {
+      runs: number;
+      provider_calls: number;
+      estimated_embedding_tokens: number;
+      estimated_cost_usd: number;
+      last_write?: string | null;
+    };
+    runs: Array<{
+      id: number;
+      run_label: string;
+      retrieval_run_label: string;
+      question_mode: string;
+      answerer: string;
+      input_count: number;
+      provider_calls_used: number;
+      estimated_embedding_tokens: number;
+      estimated_cost_usd: number;
+      first_write?: string | null;
+      last_write?: string | null;
+      duration_seconds?: number | null;
+    }>;
+  };
+  classification?: {
+    totals: {
+      runs: number;
+      sessions: number;
+      estimated_cost_usd: number;
+      last_write?: string | null;
+    };
+    runs: Array<{
+      run_label: string;
+      model: string;
+      strategy: string;
+      prompt_mode: string;
+      augmentation: string;
+      sessions: number;
+      estimated_cost_usd: number;
+      first_write?: string | null;
+      last_write?: string | null;
+    }>;
+  };
+}
+
+export async function getEvalCostSummary(limit = 20): Promise<EvalCostSummary> {
+  return json(`/eval-cost/summary?limit=${limit}`);
+}
+
 export function exportJsonUrl(): string {
   return `${BASE}/benchmark/export/json`;
 }

@@ -45,12 +45,12 @@ class ApiKeys(BaseModel):
 
 class JudgeConfig(BaseModel):
     enabled: bool = True
-    model: str = "gpt-5.2"
-    reasoning_effort: str = "xhigh"
+    model: str = "gpt-5-nano"
+    reasoning_effort: str = "low"
     temperature: float = 0.0
     max_response_length: int = 30000
-    input_cost_per_million: float = 2.0
-    output_cost_per_million: float = 8.0
+    input_cost_per_million: float = 0.05
+    output_cost_per_million: float = 0.40
     system_prompt: str = ""  # empty = use built-in default
 
 
@@ -64,15 +64,15 @@ class SimulatorConfig(BaseModel):
 
     The same simulator model is used for every candidate under test in a run,
     which gives the apples-to-apples property even when models word their
-    questions differently. gpt-5.4 low is the default: good enough at slot
+    questions differently. gpt-5-nano low is the default: good enough at slot
     canonicalisation, cheap enough to call per question.
     """
     enabled: bool = True
-    model: str = "gpt-5.4"
+    model: str = "gpt-5-nano"
     reasoning_effort: str = "low"
     temperature: float = 0.0
-    input_cost_per_million: float = 2.50
-    output_cost_per_million: float = 15.00
+    input_cost_per_million: float = 0.05
+    output_cost_per_million: float = 0.40
 
 
 class ScoringWeights(BaseModel):
@@ -148,11 +148,11 @@ class ReferenceConfig(BaseModel):
     """
     mode: str = "single"  # "single" | "multi_pass" | "panel"
     # Used in single and multi_pass modes
-    model_id: str = "gpt-5.4-xhigh"
+    model_id: str = "gpt-5-nano"
     # Used only in multi_pass mode; number of times to run model_id
-    passes: int = 3
+    passes: int = 1
     # Used only in panel mode; list of ModelConfig.id values
-    panel_model_ids: list[str] = ["gpt-5.4-xhigh", "gpt-5.2", "claude-sonnet-4.6"]
+    panel_model_ids: list[str] = ["gpt-5-nano", "gpt-5-mini"]
 
 
 class AppConfig(BaseModel):
@@ -164,7 +164,7 @@ class AppConfig(BaseModel):
     scoring_weights: ScoringWeights = ScoringWeights()
     # User's preferred model selection - auto-loaded on app start so picks
     # survive reloads. Persisted via the "Save selection as default" button.
-    default_selected_model_ids: list[str] = []
+    default_selected_model_ids: list[str] = ["gpt-5-mini"]
 
 
 class PromptInfo(BaseModel):

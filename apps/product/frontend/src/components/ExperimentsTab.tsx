@@ -27,12 +27,35 @@ type Candidate = {
 
 type QuestionMode = "facet_rules" | "facet_rules_llm_wording" | "llm_generated";
 
+type QuestionOptionMeta = {
+  value: string;
+  label: string;
+  candidate_count: number;
+  codes?: string[];
+};
+
 type QaHistoryEntry = {
   question: string;
   answer: string;
   facet_key?: string;
+  signal_key?: string;
   answer_value?: string;
+  options_meta?: QuestionOptionMeta[];
   mode?: QuestionMode | string;
+};
+
+type ScoreSignal = {
+  available?: boolean;
+  label?: string;
+  score?: number | null;
+  band?: string;
+  tone?: string;
+  basis?: string;
+  mode?: string;
+  note?: string;
+  explanation?: string;
+  metrics?: Record<string, unknown>;
+  signals?: Record<string, unknown>;
 };
 
 type TrialResult = {
@@ -47,6 +70,8 @@ type TrialResult = {
   hit_at_100: boolean;
   hit_within_limit: boolean;
   leg_counts: Record<string, number>;
+  lexical_specificity?: ScoreSignal;
+  query_difficulty?: ScoreSignal;
   top_candidates: Candidate[];
   candidates?: Candidate[];
 };
@@ -89,6 +114,9 @@ type CandidateHydrationRun = {
   candidate_count: number;
   hydrate_limit: number;
   coverage_totals: Record<string, number>;
+  lexical_specificity?: ScoreSignal;
+  query_difficulty?: ScoreSignal;
+  active_query_difficulty?: ScoreSignal;
   cache_hit_count?: number;
   cache_write_count?: number;
   cache_version?: string;
@@ -104,12 +132,8 @@ type CandidateHydrationRun = {
     facet_label?: string;
     entropy?: number;
     fallback_reason?: string;
-    options_meta?: {
-      value: string;
-      label: string;
-      candidate_count: number;
-      codes?: string[];
-    }[];
+    signal_key?: string;
+    options_meta?: QuestionOptionMeta[];
   };
   qa_state?: {
     qa_history?: QaHistoryEntry[];
@@ -122,14 +146,14 @@ type CandidateHydrationRun = {
   hydrated: HydratedCandidate[];
 };
 
-const TOP_RUN_LABEL = "no_curated_only";
+const TOP_RUN_LABEL = "all_legs_on_gpt54mini_scope_qna_plus_facts";
 
 const DEMO_EXPERIMENTS: Experiment[] = [
   {
     rank: 1,
     run_label: TOP_RUN_LABEL,
-    run_id: "demo-no-curated-only",
-    title: "Top overall: semantic + KG + commodity facts, no Search References",
+    run_id: "demo-gpt54mini-facts",
+    title: "All retrieval legs + GPT-5.4-mini scope_qna_plus facts",
     description:
       "Demo fallback for the shipped retrieval stack: commodity text plus semantic vector search, structured facts, and KG evidence. The live catalogue normally supplies the full matrix.",
     caveats: ["Fallback row shown only when the experiment catalogue is unavailable."],
@@ -143,15 +167,17 @@ const DEMO_EXPERIMENTS: Experiment[] = [
       use_facts_vec: true,
       use_kg_context: true,
       use_kg_vec: true,
-      use_curated: false,
+      use_curated: true,
       triage: false,
+      fact_author_model: "gpt-5.4-mini",
+      fact_prompt_version: "scope_qna_plus",
     },
   },
   {
     rank: 2,
     run_label: "all_legs_on",
     run_id: "demo-all-legs-on",
-    title: "Semantic + KG + commodity facts",
+    title: "Semantic + KG + facets",
     description:
       "Reference fallback for the full evidence stack when Search References are present in the matrix setup.",
     caveats: ["Fallback row shown only when the experiment catalogue is unavailable."],
@@ -190,13 +216,25 @@ function flagClass(enabled: boolean) {
     : "border-gray-800 bg-gray-900 text-gray-500";
 }
 
+function compactNumber(value: unknown) {
+  const numeric = typeof value === "number" ? value : Number(value || 0);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric.toLocaleString() : "-";
+}
+
+function configLabel(value: unknown) {
+  if (value === true) return "On";
+  if (value === false) return "Off";
+  if (value == null || value === "") return "-";
+  return String(value);
+}
+
 function retrievalSourceLabel(source: string) {
   const labels: Record<string, string> = {
     fts: "Keyword text",
     substring: "Description substring",
     reference: "Search References",
-    facts: "Fact FTS",
-    facts_vec: "Fact vector",
+    facts: "Facet FTS",
+    facts_vec: "Facet vector",
     kg_context: "KG FTS",
     kg_vec: "KG vector",
     vector: "Semantic vector",
@@ -276,6 +314,69 @@ function providerSteps(experiment: Experiment | null) {
   return steps;
 }
 
+
+function scoreTone(signal?: ScoreSignal): "neutral" | "good" | "bad" {
+  if (!signal?.available || typeof signal.score !== "number") return "neutral";
+  if (signal.label?.toLowerCase().includes("difficulty")) {
+    if (signal.score >= 70) return "bad";
+    if (signal.score < 35) return "good";
+    return "neutral";
+  }
+  if (signal.score >= 70) return "good";
+  if (signal.score < 35) return "bad";
+  return "neutral";
+}
+
+function scoreValue(signal?: ScoreSignal) {
+  return signal?.available && typeof signal.score === "number"
+    ? signal.score.toFixed(1)
+    : "n/a";
+}
+
+function ScorePanel({
+  signal,
+  title,
+}: {
+  signal?: ScoreSignal;
+  title: string;
+}) {
+  const tone = scoreTone(signal);
+  const toneClass =
+    tone === "good"
+      ? "border-emerald-900 bg-emerald-950/20"
+      : tone === "bad"
+        ? "border-red-900 bg-red-950/30"
+        : "border-gray-800 bg-gray-950";
+  const metrics = signal?.metrics || signal?.signals || {};
+  const metricKeys = Object.keys(metrics).slice(0, 4);
+  return (
+    <div className={`rounded border p-3 ${toneClass}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-gray-500">{title}</div>
+          <div className="mt-1 text-xl font-semibold text-gray-100">{scoreValue(signal)}</div>
+          <div className="mt-0.5 text-xs uppercase tracking-wide text-gray-500">
+            {signal?.band || signal?.mode || signal?.basis || "score"}
+          </div>
+        </div>
+        {metricKeys.length > 0 && (
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            {metricKeys.map((key) => (
+              <div key={key}>
+                <div className="text-gray-500">{key.replace(/_/g, " ")}</div>
+                <div className="text-gray-200">{configLabel(metrics[key])}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <div className="mt-2 text-xs leading-5 text-gray-400">
+        {signal?.explanation || signal?.note || "Calculated by the deployed backend for this query."}
+      </div>
+    </div>
+  );
+}
+
 function ExperimentFlags({ experiment }: { experiment: Experiment }) {
   const flags = [
     ["use_composite", "AI-enriched text"],
@@ -300,6 +401,38 @@ function ExperimentFlags({ experiment }: { experiment: Experiment }) {
           </span>
         );
       })}
+    </div>
+  );
+}
+
+function ExperimentConfigDetails({ experiment }: { experiment: Experiment }) {
+  const cfg = experiment.config;
+  const rows = [
+    ["Search References", configLabel(cfg.use_curated)],
+    ["Description vector", configLabel(cfg.use_vector)],
+    ["AI-enriched text", configLabel(cfg.use_composite)],
+    ["Fact FTS", configLabel(cfg.use_facts)],
+    ["Fact vector", configLabel(cfg.use_facts_vec)],
+    ["KG FTS", configLabel(cfg.use_kg_context)],
+    ["KG vector", configLabel(cfg.use_kg_vec)],
+    ["Rewrite/triage", configLabel(cfg.triage)],
+    ["Leave-one-out", configLabel(cfg.loo)],
+    ["Multi-query", configLabel(cfg.multi_query)],
+    ["Retrieval limit", compactNumber(cfg.retrieval_limit)],
+    ["Eval inputs", compactNumber(cfg.active_gold_count)],
+    ["Fact model", configLabel(cfg.fact_author_model)],
+    ["Fact prompt", configLabel(cfg.fact_prompt_version)],
+    ["Active LLM facts", compactNumber(cfg.fact_rows_active)],
+    ["Fact CC coverage", compactNumber(cfg.fact_codes_active)],
+  ];
+  return (
+    <div className="grid grid-cols-2 gap-2 text-xs md:grid-cols-3">
+      {rows.map(([label, value]) => (
+        <div key={label} className="rounded border border-gray-800 bg-gray-950/70 px-2 py-1.5">
+          <div className="text-[10px] uppercase tracking-wide text-gray-500">{label}</div>
+          <div className="mt-0.5 truncate text-gray-200" title={value}>{value}</div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -516,6 +649,8 @@ export default function ExperimentsTab() {
           question_mode: questionMode,
           qa_history: history,
           summarize: false,
+          lexical_specificity: trial.lexical_specificity,
+          query_difficulty: trial.query_difficulty,
           allow_spend: allowProviderCalls && questionMode !== "facet_rules",
           config: {
             retrieval: { limit: trial.retrieval_limit },
@@ -567,7 +702,9 @@ export default function ExperimentsTab() {
         question: hydration.question_hint.question,
         answer: option,
         facet_key: hydration.question_hint.facet_key,
+        signal_key: hydration.question_hint.signal_key,
         answer_value: meta?.value,
+        options_meta: hydration.question_hint.options_meta,
         mode: hydration.question_hint.mode || questionMode,
       },
     ];
@@ -586,12 +723,12 @@ export default function ExperimentsTab() {
               Experiment workspace
             </div>
             <h2 className="mt-2 text-2xl font-semibold text-gray-100">
-              Retrieval experiments
+              Retrieval experiment workbench
             </h2>
             {selectedExperiment && (
               <div className="mt-4 space-y-3">
                 <div>
-                  <div className="text-sm text-gray-400">Current top pick</div>
+                  <div className="text-sm text-gray-400">Selected matrix row</div>
                   <div className="mt-1 text-lg font-medium text-gray-100">
                     #{selectedExperiment.rank ?? "-"} {selectedExperiment.title}
                   </div>
@@ -637,7 +774,7 @@ export default function ExperimentsTab() {
                   setTrialError(null);
                   setHydrationError(null);
                 }}
-                className="mt-2 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100"
+                className="mt-2 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
               >
                 {sortedExperiments.map((experiment) => (
                   <option key={experiment.run_label} value={experiment.run_label}>
@@ -663,8 +800,10 @@ export default function ExperimentsTab() {
                     setTrialError(null);
                     setHydrationError(null);
                   }}
-                  className="mt-2 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100"
-                  placeholder="fresh goods description"
+                  name="input_query"
+                  autoComplete="off"
+                  className="mt-2 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
+                  placeholder="Fresh goods description…"
                 />
               </div>
               <div>
@@ -674,8 +813,12 @@ export default function ExperimentsTab() {
                 <input
                   value={expectedCode}
                   onChange={(event) => setExpectedCode(event.target.value)}
-                  className="mt-2 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100"
-                  placeholder="optional 10 digit code"
+                  name="expected_commodity_code"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="mt-2 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
+                  placeholder="Optional 10 digit code…"
                 />
                 <div className="mt-1 text-xs text-gray-500">
                   Leave blank to explore retrieval without scoring a gold code.
@@ -695,10 +838,20 @@ export default function ExperimentsTab() {
                   step={10}
                   value={retrievalLimit}
                   onChange={(event) => setRetrievalLimit(Number(event.target.value))}
-                  className="mt-2 w-36 rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100"
+                  name="retrieval_limit"
+                  autoComplete="off"
+                  className="mt-2 w-36 rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
                 />
               </label>
-              <label className="flex min-h-[40px] items-center gap-2 rounded border border-gray-800 bg-gray-950 px-3 py-2 text-sm text-gray-300">
+              <label
+                className={`flex min-h-[40px] items-center gap-2 rounded border px-3 py-2 text-sm ${
+                  selectedRequiresProvider
+                    ? allowProviderCalls
+                      ? "border-emerald-800 bg-emerald-950/30 text-emerald-100"
+                      : "border-amber-800 bg-amber-950/20 text-amber-100"
+                    : "border-gray-800 bg-gray-950 text-gray-300"
+                }`}
+              >
                 <input
                   type="checkbox"
                   checked={allowProviderCalls}
@@ -710,16 +863,16 @@ export default function ExperimentsTab() {
                       resetHydratedQa();
                     }
                   }}
-                  className="h-4 w-4 rounded border-gray-700 bg-gray-950"
+                  className="h-4 w-4 rounded border-gray-700 bg-gray-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/50"
                 />
-                Provider calls
+                Allow provider calls
               </label>
               <button
                 type="submit"
                 disabled={!canRun}
-                className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400"
+                className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/50 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 disabled:hover:bg-gray-700"
               >
-                {running ? "Running..." : "Run retrieval"}
+                {running ? "Running…" : "Run Retrieval"}
               </button>
               {expectedNormalized && (
                 <span className="pb-2 text-sm text-gray-500">
@@ -727,35 +880,63 @@ export default function ExperimentsTab() {
                 </span>
               )}
               {selectedRequiresProvider && !allowProviderCalls && (
-                <span className="pb-2 text-sm text-amber-300">
-                  Requires {selectedProviderSteps.join(" + ")}
+                <span className="pb-2 text-sm font-medium text-amber-200" aria-live="polite">
+                  Enable provider calls for {selectedProviderSteps.join(" + ")}
                 </span>
               )}
             </div>
           </form>
 
           <aside className="rounded border border-gray-800 bg-gray-950 p-4">
-            <div className="text-sm font-medium text-gray-200">Selected experiment</div>
+            <div className="text-sm font-medium text-gray-200">Run Setup</div>
             {selectedExperiment ? (
               <div className="mt-3 space-y-3">
-                <div>
-                  <div className="text-xs uppercase tracking-wide text-gray-500">
+                <div className="rounded border border-gray-800 bg-gray-900/60 p-3">
+                  <div className="text-[10px] uppercase tracking-wide text-gray-500">Selected row</div>
+                  <div className="mt-1 text-sm font-medium text-gray-100">
+                    #{selectedExperiment.rank ?? "-"} Matrix row
+                  </div>
+                  <div className="mt-1 break-words font-mono text-[11px] uppercase tracking-wide text-gray-500">
                     {selectedExperiment.run_label}
                   </div>
-                  <div className="mt-1 text-sm text-gray-300">
-                    {selectedExperiment.title}
-                  </div>
                 </div>
-                <ExperimentFlags experiment={selectedExperiment} />
-                <ul className="space-y-2 text-sm leading-5 text-gray-400">
-                  {selectedExperiment.caveats.map((caveat) => (
-                    <li key={caveat}>{caveat}</li>
-                  ))}
-                </ul>
+                <div
+                  className={`rounded border p-3 ${
+                    selectedRequiresProvider
+                      ? allowProviderCalls
+                        ? "border-emerald-900 bg-emerald-950/20"
+                        : "border-amber-900 bg-amber-950/20"
+                      : "border-gray-800 bg-gray-900/60"
+                  }`}
+                >
+                  <div className="text-[10px] uppercase tracking-wide text-gray-500">Provider calls</div>
+                  <div className={`mt-1 text-sm font-medium ${selectedRequiresProvider && !allowProviderCalls ? "text-amber-200" : "text-gray-100"}`}>
+                    {selectedRequiresProvider
+                      ? allowProviderCalls
+                        ? "Enabled for this run"
+                        : "Required before retrieval"
+                      : "Not required"}
+                  </div>
+                  {selectedRequiresProvider && (
+                    <p className="mt-2 text-xs leading-5 text-gray-400">
+                      This configuration uses {selectedProviderSteps.join(" + ")} before candidates can be retrieved.
+                    </p>
+                  )}
+                </div>
+                {selectedExperiment.caveats.length > 0 && (
+                  <div className="border-t border-gray-800 pt-3">
+                    <div className="text-[10px] uppercase tracking-wide text-gray-500">Matrix notes</div>
+                    <ul className="mt-2 space-y-2 text-sm leading-5 text-gray-400">
+                      {selectedExperiment.caveats.map((caveat) => (
+                        <li key={caveat}>{caveat}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="mt-3 text-sm text-gray-500">
-                {loading ? "Loading..." : "No experiments loaded"}
+                {loading ? "Loading…" : "No experiments loaded"}
               </div>
             )}
           </aside>
@@ -810,6 +991,11 @@ export default function ExperimentsTab() {
                 </>
               )}
             </div>
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-2">
+            <ScorePanel title="Lexical specificity" signal={trial.lexical_specificity} />
+            <ScorePanel title="Query difficulty" signal={trial.query_difficulty} />
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2">
@@ -931,6 +1117,11 @@ export default function ExperimentsTab() {
                     </div>
                   </div>
                 </div>
+                {hydration.active_query_difficulty && (
+                  <div className="mt-4">
+                    <ScorePanel title="Active shortlist difficulty" signal={hydration.active_query_difficulty} />
+                  </div>
+                )}
                 {qaHistory.length > 0 && (
                   <div className="mt-4 space-y-2">
                     {qaHistory.map((entry, index) => (
@@ -1171,6 +1362,9 @@ export default function ExperimentsTab() {
                 </div>
                 <div className="lg:w-[360px]">
                   <ExperimentFlags experiment={experiment} />
+                  <div className="mt-3">
+                    <ExperimentConfigDetails experiment={experiment} />
+                  </div>
                   <details className="mt-3 rounded border border-gray-800 bg-gray-900">
                     <summary className="cursor-pointer px-3 py-2 text-sm text-gray-300">
                       Config JSON

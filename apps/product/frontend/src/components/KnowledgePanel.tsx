@@ -611,9 +611,6 @@ const USE_SCOPE_LABELS: Record<string, string> = {
   retrieval: "Retrieval",
   classification: "Classification",
   qa: "Q&A",
-  valuation: "Value",
-  duty: "Duty",
-  declaration: "Declaration",
   audit: "Audit",
 };
 
@@ -628,9 +625,6 @@ function UseScopeChip({ scope }: { scope: string }) {
     scope === "retrieval" ? "bg-sky-950 text-sky-200 border-sky-800"
     : scope === "classification" ? "bg-emerald-950 text-emerald-200 border-emerald-800"
     : scope === "qa" ? "bg-teal-950 text-teal-200 border-teal-800"
-    : scope === "valuation" ? "bg-indigo-950 text-indigo-200 border-indigo-800"
-    : scope === "duty" ? "bg-amber-950 text-amber-200 border-amber-800"
-    : scope === "declaration" ? "bg-purple-950 text-purple-200 border-purple-800"
     : "bg-gray-800 text-gray-300 border-gray-700";
   return (
     <span className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded border ${colour}`}>
@@ -666,12 +660,6 @@ const EVIDENCE_ROLE_LABELS: Record<string, string> = {
   classification_rationale: "Rationale",
   interpretive_guidance: "Guidance",
   heading_guidance: "Heading guidance",
-  measure_condition: "Measure condition",
-  document_requirement: "Document requirement",
-  duty_rate_measure: "Duty measure",
-  valuation_input: "Valuation input",
-  valuation_method: "Valuation method",
-  declaration_data: "Declaration data",
   footnote: "Footnote",
   index_text: "Index text",
   unknown: "Unknown",
@@ -687,9 +675,8 @@ function EvidenceRoleChip({ role }: { role: string }) {
   const colour =
     role === "alias" ? "bg-sky-950 text-sky-200 border-sky-800"
     : role.startsWith("legal_") || role === "classification_order" ? "bg-red-950 text-red-200 border-red-800"
-    : role.includes("duty") || role === "measure_condition" ? "bg-amber-950 text-amber-200 border-amber-800"
-    : role.includes("document") || role === "footnote" ? "bg-purple-950 text-purple-200 border-purple-800"
-    : role.includes("valuation") ? "bg-indigo-950 text-indigo-200 border-indigo-800"
+    : role === "footnote" ? "bg-purple-950 text-purple-200 border-purple-800"
+    : role.includes("value") ? "bg-indigo-950 text-indigo-200 border-indigo-800"
     : role.includes("guidance") || role === "classification_rationale" ? "bg-blue-950 text-blue-200 border-blue-800"
     : "bg-gray-800 text-gray-300 border-gray-700";
   return (

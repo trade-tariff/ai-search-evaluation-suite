@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test:e2e": "playwright test --config playwright.config.ts"
+    "test:browser": "playwright test --config playwright.config.ts"
   },
   "dependencies": {
     "cytoscape": "^3.34.0",
