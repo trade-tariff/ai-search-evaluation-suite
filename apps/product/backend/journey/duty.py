@@ -57,6 +57,17 @@ def commodity_requirements(code: str) -> CommodityRequirements:
     chapter = flat[:2]
 
     sup_code = local_db.supplementary_unit_for(code)
+    if not sup_code:
+        # A specific (per-unit) duty needs a quantity even when the code has
+        # no supplementary-unit measure (e.g. 0207441000: 107 GBP/DTN).
+        # Probe the erga-omnes MFN rate so the wizard asks for the quantity
+        # up front instead of the duty calculation failing at the end.
+        try:
+            mfn = (local_db.best_applicable_duty(code, "") or {}).get("mfn") or {}
+            if mfn.get("kind") not in (None, "ad_valorem", "free") and mfn.get("per_unit"):
+                sup_code = mfn["per_unit"]
+        except Exception:
+            pass
 
     needs_excise = False
     excise_category = None
@@ -431,15 +442,36 @@ _UNIT_CONVERSIONS = {
     ("KGM", "KGM"): 1.0,
     ("KGM", "TNE"): 0.001,
     ("TNE", "KGM"): 1000.0,
+    # DTN (decitonne) = 100 kg; common on specific duties (e.g. GBP/DTN).
+    ("KGM", "DTN"): 0.01,
+    ("DTN", "KGM"): 100.0,
+    ("TNE", "DTN"): 10.0,
+    ("DTN", "TNE"): 0.1,
+}
+
+# Traders type "kg"/"tonne"/"litre"; measures use TARIC unit codes.
+_UNIT_ALIASES = {
+    "KG": "KGM",
+    "KGS": "KGM",
+    "T": "TNE",
+    "TONNE": "TNE",
+    "TONNES": "TNE",
+    "L": "LTR",
+    "LITRE": "LTR",
+    "LITRES": "LTR",
 }
 
 
 def _convert_quantity(qty: Optional[float], from_unit: Optional[str], to_unit: Optional[str]) -> Optional[float]:
     if qty is None or from_unit is None or to_unit is None:
         return None
-    if from_unit == to_unit:
+    f = str(from_unit).strip().upper()
+    t = str(to_unit).strip().upper()
+    f = _UNIT_ALIASES.get(f, f)
+    t = _UNIT_ALIASES.get(t, t)
+    if f == t:
         return float(qty)
-    factor = _UNIT_CONVERSIONS.get((from_unit, to_unit))
+    factor = _UNIT_CONVERSIONS.get((f, t))
     if factor is None:
         return None
     return float(qty) * factor
