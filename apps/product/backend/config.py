@@ -26,6 +26,41 @@ DEFAULT_MODELS: list[ModelConfig] = [
         output_cost_per_million=30.00,
     ),
     ModelConfig(
+        id="gpt-5.5-low",
+        name="GPT-5.5 (low)",
+        provider=ProviderType.OPENAI,
+        model_id="gpt-5.5",
+        reasoning_effort="low",
+        enabled=False,
+        category="tier1_paid",
+        input_cost_per_million=5.00,
+        output_cost_per_million=30.00,
+    ),
+    ModelConfig(
+        id="gpt-5.5-high",
+        name="GPT-5.5 (high)",
+        provider=ProviderType.OPENAI,
+        model_id="gpt-5.5",
+        reasoning_effort="high",
+        # The trader-journey headline config runs gpt-5.5 at high reasoning -
+        # enabled so the benchmark can measure exactly what the journey ships.
+        enabled=True,
+        category="tier1_paid",
+        input_cost_per_million=5.00,
+        output_cost_per_million=30.00,
+    ),
+    ModelConfig(
+        id="gpt-5.5-xhigh",
+        name="GPT-5.5 (xhigh)",
+        provider=ProviderType.OPENAI,
+        model_id="gpt-5.5",
+        reasoning_effort="xhigh",
+        enabled=False,
+        category="tier1_paid",
+        input_cost_per_million=5.00,
+        output_cost_per_million=30.00,
+    ),
+    ModelConfig(
         id="gpt-5.4",
         name="GPT-5.4",
         provider=ProviderType.OPENAI,
@@ -649,6 +684,12 @@ def load_config() -> AppConfig:
             if default_m.id not in saved_ids:
                 config.models.append(default_m)
                 added.append(default_m.id)
+        # Present the roster in DEFAULT_MODELS order (newest families first)
+        # instead of append order, which buried newly added models at the
+        # bottom of a 50+ row list. Saved per-model settings are preserved;
+        # user-defined custom ids keep their saved order at the end.
+        default_order = {m.id: i for i, m in enumerate(DEFAULT_MODELS)}
+        config.models.sort(key=lambda m: default_order.get(m.id, len(default_order)))
         if added:
             # Re-save so next load is fast
             save_config(config)
