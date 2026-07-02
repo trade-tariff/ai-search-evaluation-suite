@@ -334,6 +334,21 @@ def _watch_process(job_id: str, process: subprocess.Popen) -> None:
     _record_exit(job_id, returncode)
 
 
+def _openai_api_key() -> str | None:
+    """Env var first; fall back to the key saved via the Configuration tab
+    (product config.json) - previously invisible to eval-native jobs."""
+    key = (os.environ.get("OPENAI_API_KEY") or "").strip()
+    if key:
+        return key
+    try:
+        cfg_path = PRODUCT_BACKEND.parent / "data" / "config.json"
+        data = json.loads(cfg_path.read_text())
+        key = str((data.get("api_keys") or {}).get("openai") or "").strip()
+        return key or None
+    except Exception:
+        return None
+
+
 def _validate_request(req: JobCreate) -> None:
     unknown_personas = sorted(set(req.personas) - set(PERSONA_CHOICES))
     if unknown_personas:
@@ -386,8 +401,11 @@ def _validate_request(req: JobCreate) -> None:
             403,
             "Classification evals call provider models. Set allow_spend=true for this job.",
         )
-    if not os.environ.get("OPENAI_API_KEY"):
-        raise HTTPException(400, "OPENAI_API_KEY is required for classification eval jobs.")
+    if not _openai_api_key():
+        raise HTTPException(
+            400,
+            "No OpenAI key available: set OPENAI_API_KEY or save one in the Configuration tab.",
+        )
     if not PRODUCT_BACKEND.exists():
         raise HTTPException(500, "Product backend is not available.")
 
@@ -1322,6 +1340,11 @@ def create_job(req: JobCreate) -> dict:
     env = os.environ.copy()
     env.setdefault("PYTHONPATH", str(PRODUCT_BACKEND))
     env["CLASSIFICATION_ALLOW_PROVIDER_CALLS"] = "1"
+    key = _openai_api_key()
+    if key and not env.get("OPENAI_API_KEY"):
+        # Not setdefault: the container env carries OPENAI_API_KEY as an
+        # EMPTY string, which setdefault would preserve.
+        env["OPENAI_API_KEY"] = key
     env["CLASSIFY_LLM_MODEL"] = req.model
     env["QA_SIMULATOR_MODEL"] = req.simulator_model
     estimated_sessions = _estimated_sessions(req)

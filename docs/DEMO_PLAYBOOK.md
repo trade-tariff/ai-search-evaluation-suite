@@ -95,6 +95,24 @@ so this deploy carries low risk.
 
 Open https://18.175.148.215.sslip.io/ and log in. Suggested order:
 
+The nav is grouped into three entry points: **Experiment** (try things),
+**Evaluate** (run and read the measurements), **Configure** (set up the
+pipeline). All tab names are unchanged.
+
+New since the walkthrough: an evaluation job can now be pointed at ANY
+retrieval configuration from the Experiments catalogue - including the
+96.3% one - and its results land in the E2E Matrix. Verified live: run
+"ui_kg_base_smoke2" (gold entered retrieval at rank 17, the Q&A stage
+lifted it to rank 1 in 2 rounds). Launch:
+
+```bash
+curl -s -X POST http://127.0.0.1:8100/api/jobs -H 'Content-Type: application/json' -d '{
+  "harness": "e2e",
+  "retrieval_run_label": "all_legs_on_gpt54mini_scope_qna_plus_facts",
+  "run_label": "demo_kg_base", "personas": ["emu_ordinary"],
+  "limit": 5, "model": "gpt-5-nano", "max_rounds": 3, "allow_spend": true}'
+```
+
 1. **Experiments** (the tab that opens first, and the highlight). A ranked
    league table of every search configuration we have tried loads
    automatically; the winner finds the correct commodity code in its top
