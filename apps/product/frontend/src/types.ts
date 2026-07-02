@@ -201,7 +201,7 @@ export interface EvaluationResult {
   judge_error?: boolean;
   total_latency_ms: number;
   baseline_total_latency_ms: number;
-  speed_factor: number;
+  speed_factor: number | null;
   total_cost: number;
   baseline_total_cost: number;
   total_rounds: number;
@@ -211,15 +211,16 @@ export interface EvaluationResult {
 export interface ModelSummary {
   model_id: string;
   model_name: string;
-  avg_cosine_similarity: number;
-  avg_code_match_score: number;
-  avg_delta_score: number;
+  // Reference-comparison aggregates: null in gold mode (no reference)
+  avg_cosine_similarity: number | null;
+  avg_code_match_score: number | null;
+  avg_delta_score: number | null;
   avg_total_latency_ms: number;
-  avg_speed_factor: number;
+  avg_speed_factor: number | null;
   total_cost: number;
   avg_cost_per_classification: number;
-  top1_accuracy: number;
-  avg_top5_overlap: number;
+  top1_accuracy: number | null;
+  avg_top5_overlap: number | null;
   avg_rounds: number;
   avg_judge_score?: number;
   avg_judge_classification_accuracy?: number;
@@ -231,12 +232,12 @@ export interface ModelSummary {
   total_judge_cost: number;
   total_simulator_cost?: number;
   avg_simulator_store_hit_rate?: number;
-  // Deterministic aggregates
-  heading_match_rate?: number;
-  chapter_match_rate?: number;
-  top3_hit_rate?: number;
-  avg_mean_reciprocal_rank?: number;
-  avg_hierarchical_score?: number;
+  // Deterministic aggregates (reference-based ones are null in gold mode)
+  heading_match_rate?: number | null;
+  chapter_match_rate?: number | null;
+  top3_hit_rate?: number | null;
+  avg_mean_reciprocal_rank?: number | null;
+  avg_hierarchical_score?: number | null;
   avg_schema_valid?: number;
   avg_question_efficiency?: number;
   avg_rounds_efficiency?: number;

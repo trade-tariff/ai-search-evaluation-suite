@@ -52,8 +52,26 @@ _current_run: BenchmarkRun | None = None
 _cancel_event: asyncio.Event | None = None
 
 
+_loaded_run_cache: tuple[str, "BenchmarkRun"] | None = None
+
+
 def get_current_run() -> BenchmarkRun | None:
-    return _current_run
+    """The in-memory run, else the newest saved run (survives restarts -
+    the results endpoint 404'd after every container rebuild otherwise)."""
+    global _loaded_run_cache
+    if _current_run is not None:
+        return _current_run
+    files = sorted(RESULTS_DIR.glob("benchmark_*.json"), reverse=True)
+    for f in files:
+        try:
+            if _loaded_run_cache and _loaded_run_cache[0] == f.name:
+                return _loaded_run_cache[1]
+            run = BenchmarkRun(**json.loads(f.read_text()))
+            _loaded_run_cache = (f.name, run)
+            return run
+        except Exception:
+            continue
+    return None
 
 
 def cancel_current_run() -> bool:
@@ -228,11 +246,12 @@ async def _simulate_answers_for_round(
     return qa_entries, trace, total_cost, total_latency, store_hits
 
 
-def _none_safe_mean(values: list, digits: int) -> float:
-    """Mean over non-None values, 0.0 if none. Gold-mode evals leave every
-    reference-agreement metric None, so summaries must skip them."""
+def _none_safe_mean(values: list, digits: int) -> float | None:
+    """Mean over non-None values, None if every input is None. Gold-mode evals
+    leave every reference-agreement metric None ("not evaluated"), so the
+    summary must surface None rather than a misleading 0.0."""
     vals = [v for v in values if v is not None]
-    return round(sum(vals) / len(vals), digits) if vals else 0.0
+    return round(sum(vals) / len(vals), digits) if vals else None
 
 
 def _evaluate_gold_only(
@@ -1196,6 +1215,12 @@ async def run_benchmark(
             gold_chapter_rate = None
             avg_gold_hier = None
 
+        # Reference-comparison boolean rates are only meaningful when at
+        # least one eval was scored against a reference. In gold mode every
+        # reference field (top1_match etc.) is None, so the rates are None
+        # ("not evaluated"), not 0.0.
+        has_reference = any(e.top1_match is not None for e in evals)
+
         summary = ModelSummary(
             model_id=mid,
             model_name=name,
@@ -1206,12 +1231,12 @@ async def run_benchmark(
             avg_speed_factor=_none_safe_mean([e.speed_factor for e in evals], 3),
             total_cost=round(sum(e.total_cost for e in evals), 6),
             avg_cost_per_classification=round(sum(e.total_cost for e in evals) / n, 6),
-            top1_accuracy=round(sum(1 for e in evals if e.top1_match) / n, 4),
+            top1_accuracy=round(sum(1 for e in evals if e.top1_match) / n, 4) if has_reference else None,
             avg_top5_overlap=_none_safe_mean([e.top5_overlap for e in evals], 4),
             avg_rounds=round(sum(e.total_rounds for e in evals) / n, 2),
-            heading_match_rate=round(sum(1 for e in evals if e.heading_match) / n, 4),
-            chapter_match_rate=round(sum(1 for e in evals if e.chapter_match) / n, 4),
-            top3_hit_rate=round(sum(1 for e in evals if e.top3_hit) / n, 4),
+            heading_match_rate=round(sum(1 for e in evals if e.heading_match) / n, 4) if has_reference else None,
+            chapter_match_rate=round(sum(1 for e in evals if e.chapter_match) / n, 4) if has_reference else None,
+            top3_hit_rate=round(sum(1 for e in evals if e.top3_hit) / n, 4) if has_reference else None,
             avg_mean_reciprocal_rank=_none_safe_mean([e.mean_reciprocal_rank for e in evals], 4),
             avg_hierarchical_score=_none_safe_mean([e.hierarchical_score for e in evals], 4),
             avg_schema_valid=round(sum(e.schema_valid for e in evals) / n, 4),

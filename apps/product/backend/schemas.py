@@ -300,22 +300,25 @@ class EvaluationResult(BaseModel):
 class ModelSummary(BaseModel):
     model_id: str
     model_name: str
-    avg_cosine_similarity: float
-    avg_code_match_score: float
-    avg_delta_score: float
+    # Reference-comparison aggregates are Optional: in gold mode there is no
+    # reference/consensus, so they are None ("not evaluated"), never 0.0.
+    avg_cosine_similarity: Optional[float]
+    avg_code_match_score: Optional[float]
+    avg_delta_score: Optional[float]
     avg_total_latency_ms: float
-    avg_speed_factor: float
+    avg_speed_factor: Optional[float]
     total_cost: float
     avg_cost_per_classification: float
-    top1_accuracy: float
-    avg_top5_overlap: float
+    top1_accuracy: Optional[float]
+    avg_top5_overlap: Optional[float]
     avg_rounds: float
-    # Deterministic aggregates (0-1 unless noted; computed per-run)
-    heading_match_rate: float = 0.0
-    chapter_match_rate: float = 0.0
-    top3_hit_rate: float = 0.0
-    avg_mean_reciprocal_rank: float = 0.0
-    avg_hierarchical_score: float = 0.0
+    # Deterministic aggregates (0-1 unless noted; computed per-run).
+    # Reference-based ones are None in gold mode, like the fields above.
+    heading_match_rate: Optional[float] = 0.0
+    chapter_match_rate: Optional[float] = 0.0
+    top3_hit_rate: Optional[float] = 0.0
+    avg_mean_reciprocal_rank: Optional[float] = 0.0
+    avg_hierarchical_score: Optional[float] = 0.0
     avg_schema_valid: float = 0.0
     avg_question_efficiency: float = 0.0
     avg_rounds_efficiency: float = 0.0

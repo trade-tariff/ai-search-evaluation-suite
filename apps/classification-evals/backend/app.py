@@ -1770,7 +1770,21 @@ def _render_live_e2e_matrix(*, qa_only: bool) -> str:
 def retrieval_matrix() -> Response:
     matrix_path = MATRIX_DIR / "retrieval_matrix.html"
     if not matrix_path.exists():
-        raise HTTPException(404, "Exported retrieval matrix snapshot is missing.")
+        placeholder = f"""
+    <!doctype html><html><head><meta charset='utf-8'><title>Retrieval matrix unavailable</title>
+    <style>
+      body {{ margin:0; background:#0b0f19; color:#e5e7eb; font-family:Inter,system-ui,sans-serif; padding:24px; }}
+      h1 {{ margin:0 0 6px; font-size:24px; }}
+      .sub {{ color:#94a3b8; }}
+      .empty {{ border:1px solid #263243; background:#0b1220; padding:18px; margin-top:18px; }}
+      code {{ color:#c4b5fd; font-size:12px; }}
+    </style></head><body>
+      <h1>Retrieval matrix unavailable</h1>
+      <div class='sub'>The retrieval matrix snapshot has not been exported on this deployment.</div>
+      <div class='empty'>Expected file: <code>{matrix_path}</code></div>
+    </body></html>
+    """
+        return Response(placeholder, media_type="text/html")
     html_text = matrix_path.read_text(encoding="utf-8")
     try:
         from experiment_retrieval import matrix_input_quality_html

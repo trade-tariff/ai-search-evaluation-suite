@@ -73,7 +73,10 @@ function SlotTag({ slot }: { slot: string }) {
 
 export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimit }: Props) {
   const [running, setRunning] = useState(false);
-  const [progress, setProgress] = useState(0);
+  // Count of completed tasks (reference + candidate); progress is derived
+  // from this so the denominator can settle as start events arrive.
+  const [tasksDone, setTasksDone] = useState(0);
+  const [goldMode, setGoldMode] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [done, setDone] = useState(false);
   const [fanoutTotal, setFanoutTotal] = useState(0);
@@ -102,7 +105,8 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
     setRunning(true);
     setDone(false);
     setLogs([]);
-    setProgress(0);
+    setTasksDone(0);
+    setGoldMode(false);
     setFanoutTotal(0);
     setFanoutDone(0);
     setCommits([]);
@@ -118,6 +122,11 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
 
         addLog(event, data);
 
+        if (event === "benchmark:gold_mode") {
+          // Gold mode: the reference/consensus/judge phases are skipped, so
+          // no panel:* events will arrive for this run.
+          setGoldMode(Boolean(data.enabled));
+        }
         if (event === "fanout:start") {
           setFanoutTotal(Number(data.total_tasks) || 0);
           setFanoutDone(0);
@@ -143,10 +152,10 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
           ]);
         }
         if (event === "panel:complete" || event === "model:complete") {
-          setProgress((prev) => {
-            const total = promptIndices.length * modelIds.length;
-            return Math.min((prev * total + 1) / total, 1);
-          });
+          // Both reference (panel) and candidate (model) completions count
+          // toward overall progress; the denominator is derived at render
+          // time from fanout:start + panel:start totals.
+          setTasksDone((prev) => prev + 1);
         }
         if (event === "panel:complete") {
           // Track reference top-code per prompt for live accuracy calc. Use
@@ -200,9 +209,6 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
             },
           ]);
         }
-        if (event === "benchmark:complete") {
-          setProgress(1);
-        }
       },
       () => {
         setRunning(false);
@@ -236,6 +242,8 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
         const panelInfo = panel && panel.length > 1 ? ` (panel: ${panel.join(", ")})` : "";
         return `Starting benchmark: ${d.total_prompts} prompts x ${d.total_models} models${panelInfo} (max ${d.max_rounds} rounds/loop)`;
       }
+      case "benchmark:gold_mode":
+        return `Gold mode: skipping reference, consensus and judge phases${d.reason ? ` (${d.reason})` : ""}`;
       case "panel:start":
         return `Consensus panel: running ${(d.panel_models as string[])?.join(", ") ?? "?"} on all prompts (${d.total_tasks} tasks)...`;
       case "panel:complete":
@@ -280,6 +288,18 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
   };
 
   const canStart = promptIndices.length > 0 && modelIds.length > 0;
+
+  // Overall progress denominator: candidate tasks plus (unless gold mode
+  // skipped them) reference/panel tasks. fanout:start carries the real
+  // candidate total; fall back to the selection size so the bar cannot
+  // overshoot during the panel phase before fanout:start arrives.
+  const candidateTaskTotal = fanoutTotal || promptIndices.length * modelIds.length;
+  const totalTaskCount = candidateTaskTotal + (goldMode ? 0 : referenceTotalTasks);
+  const progress = done
+    ? 1
+    : totalTaskCount > 0
+    ? Math.min(tasksDone / totalTaskCount, 1)
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -398,7 +418,9 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
             return (
               <div>
                 <div className="text-[10px] text-gray-500 mb-2">
-                  Reference top-codes known for {referenceCodesKnown} / {promptIndices.length || "?"} prompts
+                  {goldMode
+                    ? "Gold mode - no reference phase, so live top-1 vs reference is unavailable; final scoring vs gold is on the Analysis tab"
+                    : `Reference top-codes known for ${referenceCodesKnown} / ${promptIndices.length || "?"} prompts`}
                 </div>
                 <table className="w-full text-xs">
                   <thead>
@@ -440,8 +462,16 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
         </div>
       )}
 
-      {/* Reference Build - per-prompt status for each reference call */}
-      {(running || referenceRows.length > 0) && (
+      {/* Reference Build - per-prompt status for each reference call. In
+          gold mode the reference/consensus phases are skipped, so show a
+          one-line note instead of waiting on panel events that never come. */}
+      {goldMode && (running || done) && (
+        <div className="bg-gray-900 rounded-lg p-4 text-xs text-gray-500 italic">
+          Reference Build skipped - gold mode (prompts are anchored to gold
+          answers; no reference, consensus or judge phases).
+        </div>
+      )}
+      {!goldMode && (running || referenceRows.length > 0) && (
         <div className="bg-gray-900 rounded-lg p-4">
           <div className="flex items-end justify-between mb-3">
             <div>

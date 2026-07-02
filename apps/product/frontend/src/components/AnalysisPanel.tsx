@@ -40,7 +40,7 @@ const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"
 
 const COLUMN_TOOLTIPS: Record<string, string> = {
   "Model": "Model name / identifier",
-  "Composite": "Weighted verdict score (0-1). Sum of all 13 dimensions using the Scoring Weights above.",
+  "Composite": "Weighted verdict score (0-1). Weighted sum of the active dimensions using the Scoring Weights above (ground-truth bucket replaces the reference-agreement bucket when the run has gold evaluations).",
   // Deterministic accuracy (6) - ranked-list aware
   "Top-1": "Exact top-1 code match rate vs reference (strict).",
   "Top-3": "Reference's top-1 in candidate's top-3. UX-realistic - traders scan top-3.",
@@ -133,7 +133,9 @@ function computeVerdict(summaries: ModelSummary[], weights: ScoringWeights) {
     const schema = s.avg_schema_valid ?? 0;
     const roundsEff = s.avg_rounds_efficiency ?? 0;
     const questionEff = s.avg_question_efficiency ?? 0;
-    const speed = Math.min(s.avg_speed_factor, 3) / 3;
+    // Null in gold-mode runs (reference/consensus skipped) - exclude from
+    // the composite instead of scoring 0.
+    const speed = s.avg_speed_factor != null ? Math.min(s.avg_speed_factor, 3) / 3 : null;
     const cost = 1 - s.avg_cost_per_classification / maxCost;
     const factConsistency = (s.avg_judge_fact_consistency ?? 0) / 10;
     const questionQuality = (s.avg_judge_question_quality ?? 0) / 10;
@@ -192,7 +194,15 @@ function computeVerdict(summaries: ModelSummary[], weights: ScoringWeights) {
   // Build reasoning - lead with judge quality, then operational
   const reasons: string[] = [];
 
-  reasons.push("Top-1 accuracy: " + (bs.top1_accuracy * 100).toFixed(0) + "% exact match vs reference");
+  if (useGold && bs.gold_top1_rate != null) {
+    // Gold-scored runs: lead with correctness vs gold answers.
+    reasons.push("Gold top-1: " + (bs.gold_top1_rate * 100).toFixed(0) + "% exact match vs gold answers");
+    if (bs.avg_gold_hierarchical_score != null) {
+      reasons.push("Gold hierarchical: " + bs.avg_gold_hierarchical_score.toFixed(2));
+    }
+  } else {
+    reasons.push("Top-1 accuracy: " + ((bs.top1_accuracy ?? 0) * 100).toFixed(0) + "% exact match vs reference");
+  }
   if ((bs.avg_mean_reciprocal_rank ?? 0) > 0) {
     reasons.push("MRR: " + (bs.avg_mean_reciprocal_rank ?? 0).toFixed(2) + " (rank-aware)");
   }
@@ -202,10 +212,13 @@ function computeVerdict(summaries: ModelSummary[], weights: ScoringWeights) {
   if (bs.avg_judge_question_quality != null && bs.avg_judge_question_quality >= 6) {
     reasons.push("Question quality: " + bs.avg_judge_question_quality.toFixed(1) + "/10");
   }
-  if (bs.avg_speed_factor >= 1) {
-    reasons.push(bs.avg_speed_factor.toFixed(1) + "x faster than reference");
-  } else {
-    reasons.push(bs.avg_speed_factor.toFixed(2) + "x reference speed");
+  // avg_speed_factor is null in gold-mode runs (no reference to compare to).
+  if (bs.avg_speed_factor != null) {
+    if (bs.avg_speed_factor >= 1) {
+      reasons.push(bs.avg_speed_factor.toFixed(1) + "x faster than reference");
+    } else {
+      reasons.push(bs.avg_speed_factor.toFixed(2) + "x reference speed");
+    }
   }
   reasons.push(bs.avg_rounds.toFixed(1) + " rounds avg, $" + bs.avg_cost_per_classification.toFixed(4) + "/classification");
 
@@ -213,16 +226,16 @@ function computeVerdict(summaries: ModelSummary[], weights: ScoringWeights) {
   let tradeoff: string | null = null;
   if (runner && best.composite - runner.composite < 0.05) {
     const rName = runner.summary.model_name;
-    if (runner.judgeAccuracy > best.judgeAccuracy) {
-      tradeoff = rName + " scored higher on accuracy (top-1 " + (runner.summary.top1_accuracy * 100).toFixed(0) + "%) but is slower.";
-    } else if (runner.speed > best.speed) {
-      tradeoff = rName + " is faster (" + runner.summary.avg_speed_factor.toFixed(1) + "x) but lower judge scores.";
+    if ((runner.judgeAccuracy ?? 0) > (best.judgeAccuracy ?? 0)) {
+      tradeoff = rName + " scored higher on accuracy (top-1 " + ((runner.summary.top1_accuracy ?? 0) * 100).toFixed(0) + "%) but is slower.";
+    } else if (runner.speed != null && best.speed != null && runner.speed > best.speed) {
+      tradeoff = rName + " is faster (" + (runner.summary.avg_speed_factor ?? 0).toFixed(1) + "x) but lower judge scores.";
     } else {
       tradeoff = rName + " is a close alternative (" + (runner.composite * 100).toFixed(1) + "% vs " + (best.composite * 100).toFixed(1) + "%).";
     }
   }
 
-  return { best, runner, scored, reasons, tradeoff };
+  return { best, runner, scored, reasons, tradeoff, useGold };
 }
 
 function runLabel(r: RunListItem) {
@@ -755,6 +768,11 @@ export default function AnalysisPanel() {
   const consensusSummary = allSummaries.find((s) => s.model_id === "consensus");
   const summaries = allSummaries.filter((s) => s.model_id !== "consensus");
 
+  // Gold-mode runs skip the reference/consensus/judge phases entirely, so
+  // all comparison-to-reference summary fields are null. (Field is on the
+  // run payload but not yet in the BenchmarkResults type.)
+  const goldMode = (results as BenchmarkResults & { gold_mode?: boolean }).gold_mode === true;
+
   // Build lookup for compare run summaries
   const compareSummaryMap = new Map<string, ModelSummary>();
   if (compareResults) {
@@ -792,13 +810,17 @@ export default function AnalysisPanel() {
   );
   const radarData = [
     { metric: "Top-1", ...Object.fromEntries(radarModels.map((s) => [s.model_name, s.top1_accuracy])) },
-    { metric: "MRR", ...Object.fromEntries(radarModels.map((s) => [s.model_name, s.avg_mean_reciprocal_rank ?? 0])) },
+    ...(radarModels.some((s) => s.avg_mean_reciprocal_rank != null)
+      ? [{ metric: "MRR", ...Object.fromEntries(radarModels.map((s) => [s.model_name, s.avg_mean_reciprocal_rank ?? 0])) }]
+      : []),
     { metric: "Heading", ...Object.fromEntries(radarModels.map((s) => [s.model_name, s.heading_match_rate ?? 0])) },
     { metric: "Fact Consist.", ...Object.fromEntries(radarModels.map((s) => [s.model_name, (s.avg_judge_fact_consistency ?? 0) / 10])) },
     { metric: "Q Quality", ...Object.fromEntries(radarModels.map((s) => [s.model_name, (s.avg_judge_question_quality ?? 0) / 10])) },
     { metric: "Schema", ...Object.fromEntries(radarModels.map((s) => [s.model_name, s.avg_schema_valid ?? 0])) },
     { metric: "R-eff", ...Object.fromEntries(radarModels.map((s) => [s.model_name, s.avg_rounds_efficiency ?? 0])) },
-    { metric: "Speed", ...Object.fromEntries(radarModels.map((s) => [s.model_name, Math.min(s.avg_speed_factor, 2) / 2])) },
+    ...(radarModels.some((s) => s.avg_speed_factor != null)
+      ? [{ metric: "Speed", ...Object.fromEntries(radarModels.map((s) => [s.model_name, Math.min(s.avg_speed_factor ?? 0, 2) / 2])) }]
+      : []),
     { metric: "Cost", ...Object.fromEntries(radarModels.map((s) => [s.model_name, 1 - s.avg_cost_per_classification / maxCostForRadar])) },
   ];
 
@@ -867,8 +889,9 @@ export default function AnalysisPanel() {
   const findResult = (modelId: string, promptIndex: number, list: CompletionResult[]) =>
     list.find((r) => r.model_id === modelId && r.prompt_index === promptIndex);
 
-  const deltaCell = (a: number, b: number | undefined, fmt: (v: number) => string, higherIsBetter = true) => {
-    if (b === undefined) return null;
+  const deltaCell = (a: number | null | undefined, b: number | null | undefined, fmt: (v: number) => string, higherIsBetter = true) => {
+    // == null also catches nulls from gold-mode compare runs.
+    if (a == null || b == null) return null;
     const diff = a - b;
     if (Math.abs(diff) < 0.0005) return <span className="text-gray-600 text-xs">-</span>;
     const good = higherIsBetter ? diff > 0 : diff < 0;
@@ -949,6 +972,13 @@ export default function AnalysisPanel() {
         )}
       </div>
 
+      {/* Gold-mode notice: comparison-to-reference metrics are absent by design */}
+      {goldMode && (
+        <section className="rounded-lg border border-yellow-800/50 bg-yellow-950/20 px-3 py-2 text-xs text-yellow-200">
+          Gold mode run - reference/consensus/judge phases were skipped; correctness is scored against gold answers.
+        </section>
+      )}
+
       {/* Regression summary banner - visible when Compare With is active */}
       {comparing && compareResults && (() => {
         // Score deltas per model on our strongest signal (top1_accuracy).
@@ -963,6 +993,9 @@ export default function AnalysisPanel() {
         for (const [mid, before] of candByIdCmp) {
           const after = candByIdCur.get(mid);
           if (!after) { missing.push(before.model_name); continue; }
+          // Regression tracking only makes sense for reference-scored runs;
+          // gold-mode runs carry null reference top-1.
+          if (after.top1_accuracy == null || before.top1_accuracy == null) continue;
           const delta = after.top1_accuracy - before.top1_accuracy;
           if (delta <= -THRESHOLD) regressions.push({ name: after.model_name, before: before.top1_accuracy, after: after.top1_accuracy, delta });
           else if (delta >= THRESHOLD) improvements.push({ name: after.model_name, before: before.top1_accuracy, after: after.top1_accuracy, delta });
@@ -1039,8 +1072,14 @@ export default function AnalysisPanel() {
         <section className="bg-gradient-to-r from-emerald-950/40 to-gray-900 border border-emerald-800/50 rounded-lg p-5">
           <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
             <span className="text-emerald-400">Verdict</span>
-            <span className="text-xs px-2 py-0.5 rounded bg-purple-900 text-purple-300 font-normal">Judge-led</span>
-            <span className="text-xs font-normal text-gray-600">judge quality 60% + speed/cost/rounds 40%</span>
+            <span className="text-xs px-2 py-0.5 rounded bg-purple-900 text-purple-300 font-normal">
+              {verdict.useGold ? "Gold-anchored" : "Reference-based"}
+            </span>
+            <span className="text-xs font-normal text-gray-600">
+              {verdict.useGold
+                ? "weights: ground truth + efficiency + judge"
+                : "weights: reference agreement + efficiency + judge"}
+            </span>
           </h2>
           <div className="flex items-start gap-6">
             {/* Recommendation */}
@@ -1102,7 +1141,7 @@ export default function AnalysisPanel() {
           <div>
             <h3 className="text-sm font-medium">Scoring Weights</h3>
             <p className="text-xs text-gray-500 mt-0.5">
-              Verdict is a weighted composite over these dimensions. Raw positive numbers are auto-normalised to sum=1. Change weights live to see which model wins under your priorities. Set any weight to 0 to exclude it from the composite (still shown in the summary table).
+              Verdict is a weighted composite over these dimensions. Raw positive numbers are auto-normalised to sum=1. Change weights live to see which model wins under your priorities. Set any weight to 0 to exclude it from the composite (still shown in the summary table). Ground-truth weights apply when the run has gold evaluations, in which case the reference-agreement weights (Det accuracy) are ignored - and vice versa.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -1117,6 +1156,8 @@ export default function AnalysisPanel() {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
           {([
+            ["gold_top1", "Ground truth · Top-1", "Exact 10-digit match at rank 1 vs gold answers. Active (and replaces the reference-agreement bucket) when the run has gold evaluations."],
+            ["gold_hierarchical", "Ground truth · Hierarchical", "Digit-prefix agreement vs gold answers (partial credit for chapter/heading). Active only when the run has gold evaluations."],
             ["top1_match", "Det · Top-1 match", "Exact 10-digit match at rank 1 vs reference"],
             ["top3_hit", "Det · Top-3 hit", "Reference's top-1 appears anywhere in candidate's top-3"],
             ["mean_reciprocal_rank", "Det · MRR", "1/rank of reference's top-1 in candidate's ranked list (0 if missed top-5)"],
@@ -1222,12 +1263,12 @@ export default function AnalysisPanel() {
                     {compositeByModel.has("consensus") ? compositeByModel.get("consensus")!.toFixed(3) : "1.000"}
                   </td>
                   {/* Deterministic accuracy - reference matches itself */}
-                  <td className="py-3 pr-4 text-right text-amber-300">{consensusSummary.top1_accuracy.toFixed(2)}</td>
+                  <td className="py-3 pr-4 text-right text-amber-300">{(consensusSummary.top1_accuracy ?? 0).toFixed(2)}</td>
                   <td className="py-3 pr-4 text-right text-amber-300">{(consensusSummary.top3_hit_rate ?? 0).toFixed(2)}</td>
                   <td className="py-3 pr-4 text-right text-amber-300">{(consensusSummary.avg_mean_reciprocal_rank ?? 0).toFixed(2)}</td>
                   <td className="py-3 pr-4 text-right text-amber-300">{(consensusSummary.heading_match_rate ?? 0).toFixed(2)}</td>
                   <td className="py-3 pr-4 text-right text-amber-300">{(consensusSummary.chapter_match_rate ?? 0).toFixed(2)}</td>
-                  <td className="py-3 pr-4 text-right text-amber-300">{consensusSummary.avg_top5_overlap.toFixed(2)}</td>
+                  <td className="py-3 pr-4 text-right text-amber-300">{(consensusSummary.avg_top5_overlap ?? 0).toFixed(2)}</td>
                   {/* Gold truth - reference scored vs gold (NOT by construction) */}
                   {hasGoldEvals && (
                     <>
@@ -1281,7 +1322,7 @@ export default function AnalysisPanel() {
                     </td>
                     {/* Deterministic accuracy */}
                     <td className="py-3 pr-4 text-right">
-                      {s.top1_accuracy.toFixed(2)}
+                      {s.top1_accuracy != null ? s.top1_accuracy.toFixed(2) : <span className="text-gray-600">-</span>}
                       {comparing && <div>{deltaCell(s.top1_accuracy, cmp?.top1_accuracy, v => v.toFixed(2))}</div>}
                     </td>
                     <td className="py-3 pr-4 text-right">
@@ -1301,15 +1342,15 @@ export default function AnalysisPanel() {
                       {comparing && <div>{deltaCell(s.chapter_match_rate ?? 0, cmp?.chapter_match_rate, v => v.toFixed(2))}</div>}
                     </td>
                     <td className="py-3 pr-4 text-right">
-                      {s.avg_top5_overlap.toFixed(2)}
-                      {comparing && <div>{deltaCell(s.avg_top5_overlap, cmp?.avg_top5_overlap, v => v.toFixed(2))}</div>}
+                      {s.avg_top5_overlap != null ? s.avg_top5_overlap.toFixed(2) : <span className="text-gray-600">-</span>}
+                      {comparing && s.avg_top5_overlap != null && <div>{deltaCell(s.avg_top5_overlap, cmp?.avg_top5_overlap, v => v.toFixed(2))}</div>}
                     </td>
                     {/* Gold truth */}
                     {hasGoldEvals && (
                       <>
-                        {goldCell(s.gold_top1_rate)}
-                        {goldCell(s.gold_heading_rate)}
-                        {goldCell(s.gold_chapter_rate)}
+                        {goldCell(s.gold_top1_rate, goldMode ? "text-emerald-300 font-medium" : "")}
+                        {goldCell(s.gold_heading_rate, goldMode ? "text-emerald-300" : "")}
+                        {goldCell(s.gold_chapter_rate, goldMode ? "text-emerald-300" : "")}
                         <td className="py-3 pr-4 text-right text-xs text-gray-500">
                           {s.gold_evaluated_count ?? 0}
                         </td>
@@ -1354,10 +1395,14 @@ export default function AnalysisPanel() {
                     </td>
                     {/* Operational */}
                     <td className="py-3 pr-4 text-right">
-                      <span className={s.avg_speed_factor > 1 ? "text-green-400" : "text-red-400"}>
-                        {s.avg_speed_factor.toFixed(2)}x
-                      </span>
-                      {comparing && <div>{deltaCell(s.avg_speed_factor, cmp?.avg_speed_factor, v => v.toFixed(2) + "x")}</div>}
+                      {s.avg_speed_factor != null ? (
+                        <span className={s.avg_speed_factor > 1 ? "text-green-400" : "text-red-400"}>
+                          {s.avg_speed_factor.toFixed(2)}x
+                        </span>
+                      ) : (
+                        <span className="text-gray-600">-</span>
+                      )}
+                      {comparing && s.avg_speed_factor != null && <div>{deltaCell(s.avg_speed_factor, cmp?.avg_speed_factor, v => v.toFixed(2) + "x")}</div>}
                     </td>
                     <td className="py-3 pr-4 text-right">
                       {s.avg_rounds.toFixed(1)}
@@ -1386,12 +1431,12 @@ export default function AnalysisPanel() {
                     {/* Composite - not computed for compare-only models */}
                     <td className="py-3 pr-4 text-right text-gray-600">-</td>
                     {/* Deterministic accuracy */}
-                    <td className="py-3 pr-4 text-right">{cs.top1_accuracy.toFixed(2)}</td>
+                    <td className="py-3 pr-4 text-right">{cs.top1_accuracy != null ? cs.top1_accuracy.toFixed(2) : "-"}</td>
                     <td className="py-3 pr-4 text-right">{(cs.top3_hit_rate ?? 0).toFixed(2)}</td>
                     <td className="py-3 pr-4 text-right">{(cs.avg_mean_reciprocal_rank ?? 0).toFixed(2)}</td>
                     <td className="py-3 pr-4 text-right">{(cs.heading_match_rate ?? 0).toFixed(2)}</td>
                     <td className="py-3 pr-4 text-right">{(cs.chapter_match_rate ?? 0).toFixed(2)}</td>
-                    <td className="py-3 pr-4 text-right">{cs.avg_top5_overlap.toFixed(2)}</td>
+                    <td className="py-3 pr-4 text-right">{cs.avg_top5_overlap != null ? cs.avg_top5_overlap.toFixed(2) : "-"}</td>
                     {/* Gold truth */}
                     {hasGoldEvals && (
                       <>
@@ -1416,7 +1461,7 @@ export default function AnalysisPanel() {
                         : "-"}
                     </td>
                     {/* Operational */}
-                    <td className="py-3 pr-4 text-right">{cs.avg_speed_factor.toFixed(2)}x</td>
+                    <td className="py-3 pr-4 text-right">{cs.avg_speed_factor != null ? cs.avg_speed_factor.toFixed(2) + "x" : "-"}</td>
                     <td className="py-3 pr-4 text-right">{cs.avg_rounds.toFixed(1)}</td>
                     <td className="py-3 pr-4 text-right">${cs.avg_cost_per_classification.toFixed(4)}</td>
                     <td className="py-3 text-right">${cs.total_cost.toFixed(4)}</td>
@@ -1431,12 +1476,12 @@ export default function AnalysisPanel() {
       {/* Per-model breakdown of the 5 primary scoring dimensions on a 0-10
           scale: 4 deterministic (Top-1, MRR, Heading, Fact Consist. scaled)
           + 2 LLM (Fact Consist., Q Quality). Composite verdict is separate. */}
-      {(summaries.some((s) => s.top1_accuracy > 0 || s.avg_judge_fact_consistency != null)) && (() => {
+      {(summaries.some((s) => (s.top1_accuracy ?? 0) > 0 || s.avg_judge_fact_consistency != null)) && (() => {
         const scoreToTen = (v: number) => v * 10;
         const judgeScoreData = [
           ...(consensusSummary ? [{
             name: consensusSummary.model_name,
-            "Top-1": scoreToTen(consensusSummary.top1_accuracy),
+            "Top-1": scoreToTen(consensusSummary.top1_accuracy ?? 0),
             "MRR": scoreToTen(consensusSummary.avg_mean_reciprocal_rank ?? 0),
             "Heading": scoreToTen(consensusSummary.heading_match_rate ?? 0),
             "Fact Consist.": consensusSummary.avg_judge_fact_consistency ?? 0,
@@ -1445,7 +1490,7 @@ export default function AnalysisPanel() {
           }] : []),
           ...summaries.map((s) => ({
             name: s.model_name,
-            "Top-1": scoreToTen(s.top1_accuracy),
+            "Top-1": scoreToTen(s.top1_accuracy ?? 0),
             "MRR": scoreToTen(s.avg_mean_reciprocal_rank ?? 0),
             "Heading": scoreToTen(s.heading_match_rate ?? 0),
             "Fact Consist.": s.avg_judge_fact_consistency ?? 0,
@@ -1814,9 +1859,13 @@ export default function AnalysisPanel() {
                     )}
                     <span>MRR: {(ev.mean_reciprocal_rank ?? 0).toFixed(2)}</span>
                     <span>{ev.total_latency_ms.toFixed(0)}ms ({ev.total_rounds}r)</span>
-                    <span className={ev.speed_factor > 1 ? "text-green-400" : "text-red-400"}>
-                      {ev.speed_factor.toFixed(2)}x
-                    </span>
+                    {ev.speed_factor != null ? (
+                      <span className={ev.speed_factor > 1 ? "text-green-400" : "text-red-400"}>
+                        {ev.speed_factor.toFixed(2)}x
+                      </span>
+                    ) : (
+                      <span className="text-gray-600">-</span>
+                    )}
                     <span>{isExpanded ? "[-]" : "[+]"}</span>
                   </div>
                 </div>
@@ -1829,7 +1878,7 @@ export default function AnalysisPanel() {
                         <h4 className="text-xs font-medium text-amber-400 mb-2 flex items-center gap-3 flex-wrap">
                           <span>
                             Reference ({baselineResult?.total_rounds || 0} rounds,{" "}
-                            {baselineResult?.total_latency_ms.toFixed(0)}ms, ${baselineResult?.total_cost.toFixed(4)})
+                            {baselineResult?.total_latency_ms?.toFixed(0) ?? "-"}ms, ${baselineResult?.total_cost?.toFixed(4) ?? "-"})
                           </span>
                           {(baselineResult?.total_simulator_cost ?? 0) > 0 && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-300 font-normal">

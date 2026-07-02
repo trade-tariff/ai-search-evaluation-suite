@@ -187,7 +187,7 @@ export default function FinancialPanel() {
     name: s.model_name,
     model_id: s.model_id,
     cost: Number(s.avg_cost_per_classification.toFixed(6)),
-    quality: s.top1_accuracy * 10,
+    quality: (s.top1_accuracy ?? s.gold_top1_rate ?? 0) * 10,
   }));
   const paretoSet = new Set<string>();
   for (const a of scatterRaw) {

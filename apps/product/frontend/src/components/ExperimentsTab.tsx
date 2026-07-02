@@ -275,6 +275,28 @@ const QUESTION_MODE_OPTIONS: { mode: QuestionMode; description: string; paid: bo
   { mode: "llm_generated", description: "LLM generates the question (paid)", paid: true },
 ];
 
+// Must match the backend _QUESTION_MODEL_ALLOWLIST in main.py.
+const QUESTION_MODEL_OPTIONS = ["gpt-5-nano", "gpt-5-mini", "gpt-5.5"] as const;
+type QuestionModel = (typeof QUESTION_MODEL_OPTIONS)[number];
+
+type QaContextKey = "facets" | "llm_facts" | "footnotes" | "measures";
+
+// Must match the backend _QUESTION_CONTEXT_KEYS in main.py. Descriptions,
+// self-texts, and goods labels always feed Q&A and are not toggleable.
+const QA_CONTEXT_OPTIONS: { key: QaContextKey; label: string; description: string }[] = [
+  { key: "facets", label: "KG facets", description: "Facet signals (all wording modes)" },
+  { key: "llm_facts", label: "LLM-enriched facts", description: "Validated KG facts (all wording modes)" },
+  { key: "footnotes", label: "Footnotes", description: "Direct footnotes (LLM generated only)" },
+  { key: "measures", label: "Measure context", description: "Measure retrieval doc (LLM generated only)" },
+];
+
+const DEFAULT_QA_CONTEXT: Record<QaContextKey, boolean> = {
+  facets: true,
+  llm_facts: true,
+  footnotes: true,
+  measures: true,
+};
+
 function codeDotted(code: string) {
   const digits = code.replace(/\D/g, "");
   return digits.length === 10
@@ -509,6 +531,8 @@ export default function ExperimentsTab() {
   const [hydrating, setHydrating] = useState(false);
   const [hydrateLimit, setHydrateLimit] = useState(80);
   const [questionMode, setQuestionMode] = useState<QuestionMode>("facet_rules");
+  const [questionModel, setQuestionModel] = useState<QuestionModel>("gpt-5-nano");
+  const [qaContext, setQaContext] = useState<Record<QaContextKey, boolean>>(DEFAULT_QA_CONTEXT);
   const [qaHistory, setQaHistory] = useState<QaHistoryEntry[]>([]);
   const [hydrationError, setHydrationError] = useState<string | null>(null);
   const [hydration, setHydration] = useState<CandidateHydrationRun | null>(null);
@@ -653,6 +677,7 @@ export default function ExperimentsTab() {
           candidate_limit: candidates.length,
           hydrate_limit: limit,
           question_mode: questionMode,
+          question_model: questionModel,
           qa_history: history,
           summarize: false,
           lexical_specificity: trial.lexical_specificity,
@@ -661,18 +686,9 @@ export default function ExperimentsTab() {
           config: {
             retrieval: { limit: trial.retrieval_limit },
             use_llm_question_wording: allowProviderCalls && questionMode !== "facet_rules",
-            question_wording_model: "gpt-5-nano",
+            question_wording_model: questionModel,
           },
-          sources: {
-            facets: true,
-            footnotes: true,
-            measures: true,
-            section_notes: true,
-            chapter_notes: true,
-            hsen: true,
-            atar: true,
-            girs: true,
-          },
+          sources: { ...qaContext },
         }),
       });
       const result = await readJson<CandidateHydrationRun>(response);
@@ -1104,8 +1120,9 @@ export default function ExperimentsTab() {
               </div>
             </div>
             <div className="mt-4">
-              <div className="text-xs font-medium text-gray-400">Q&A strategy</div>
-              <div className="mt-2 grid gap-2 md:grid-cols-3" role="radiogroup" aria-label="Q&A strategy">
+              <div className="text-xs font-medium text-gray-400">Q&A experiment</div>
+              <div className="mt-2 text-xs text-gray-500">Question wording</div>
+              <div className="mt-1 grid gap-2 md:grid-cols-3" role="radiogroup" aria-label="Question wording">
                 {QUESTION_MODE_OPTIONS.map((option) => {
                   const locked = option.paid && !allowProviderCalls;
                   const selected = questionMode === option.mode;
@@ -1135,6 +1152,65 @@ export default function ExperimentsTab() {
                     </button>
                   );
                 })}
+              </div>
+              <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,220px)_minmax(0,1fr)]">
+                <label className="block">
+                  <span className="block text-xs text-gray-500">Question model</span>
+                  <select
+                    value={questionModel}
+                    disabled={!allowProviderCalls || questionMode === "facet_rules"}
+                    title={
+                      !allowProviderCalls
+                        ? "Enable Provider calls to pick a paid question model"
+                        : questionMode === "facet_rules"
+                          ? "Facet rules is deterministic; the model only applies to LLM wording modes"
+                          : undefined
+                    }
+                    onChange={(event) => {
+                      setQuestionModel(event.target.value as QuestionModel);
+                      resetHydratedQa();
+                    }}
+                    className="mt-1 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {QUESTION_MODEL_OPTIONS.map((model) => (
+                      <option key={model} value={model}>
+                        {model}
+                        {model === "gpt-5-nano" ? " (default)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <span className="mt-1 block text-xs text-gray-600">
+                    Words or generates the question in LLM modes.
+                  </span>
+                </label>
+                <div>
+                  <span className="block text-xs text-gray-500">Context fed to Q&A</span>
+                  <div className="mt-1 grid gap-2 sm:grid-cols-2">
+                    {QA_CONTEXT_OPTIONS.map((option) => (
+                      <label
+                        key={option.key}
+                        className="flex cursor-pointer items-start gap-2 rounded border border-gray-800 bg-gray-950 p-2 text-xs"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={qaContext[option.key]}
+                          onChange={(event) => {
+                            setQaContext({ ...qaContext, [option.key]: event.target.checked });
+                            resetHydratedQa();
+                          }}
+                          className="mt-0.5"
+                        />
+                        <span>
+                          <span className="font-medium text-gray-200">{option.label}</span>
+                          <span className="block text-gray-500">{option.description}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <span className="mt-1 block text-xs text-gray-600">
+                    Descriptions, self-texts, and goods labels always feed Q&A.
+                  </span>
+                </div>
               </div>
               <p className="mt-2 text-xs text-gray-500">
                 Compare strategies here interactively; for batch strategy comparisons over the gold set use an e2e job (results land in Gold Eval - E2E).

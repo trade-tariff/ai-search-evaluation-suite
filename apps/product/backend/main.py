@@ -315,6 +315,26 @@ def _question_mode(payload: dict) -> str:
     return aliases.get(raw, "facet_rules")
 
 
+_QUESTION_MODEL_ALLOWLIST = ("gpt-5-nano", "gpt-5-mini", "gpt-5.5")
+
+# Question-builder context toggles the backend genuinely honours today.
+# facets/llm_facts gate fact-sheet signals (all question modes); footnotes/measures
+# gate regulatory_context labels fed to the llm_generated prompt. Descriptions,
+# self-texts, and goods labels always feed Q&A (core layer, not toggleable).
+_QUESTION_CONTEXT_KEYS = ("facets", "llm_facts", "footnotes", "measures")
+
+
+def _question_model(payload: dict) -> str:
+    config = payload.get("config") if isinstance(payload.get("config"), dict) else {}
+    raw = str(payload.get("question_model") or config.get("question_wording_model") or "").strip().lower()
+    return raw if raw in _QUESTION_MODEL_ALLOWLIST else "gpt-5-nano"
+
+
+def _question_context(payload: dict) -> dict[str, bool]:
+    raw = payload.get("sources") if isinstance(payload.get("sources"), dict) else {}
+    return {key: raw.get(key) is not False for key in _QUESTION_CONTEXT_KEYS}
+
+
 def _facet_priority(key: str) -> int:
     lowered = key.lower()
     if any(marker in lowered for marker in ("exclusion", "chapter_note", "section_note", "heading_rule", "legal_scope")):
@@ -1502,6 +1522,7 @@ def _pick_facet_question(active: list[dict], records_by_code: dict[str, dict], p
     key_priorities: dict[str, int] = {}
     key_sources: dict[str, set[str]] = defaultdict(set)
     hydrated_count = 0
+    context = _question_context(payload)
 
     for code in active_codes:
         record = records_by_code.get(code)
@@ -1512,6 +1533,10 @@ def _pick_facet_question(active: list[dict], records_by_code: dict[str, dict], p
         seen: set[tuple[str, str]] = set()
         for signal in _candidate_signals(record.get("candidate") or {}, hydration):
             key = str(signal.get("key") or "")
+            if key.startswith("facet:") and not context["facets"]:
+                continue
+            if key.startswith("llm_fact:") and not context["llm_facts"]:
+                continue
             value = str(signal.get("value") or "")
             label = str(signal.get("label") or value)
             if not key or not value:
@@ -1685,7 +1710,7 @@ def _rewrite_hydrated_question(question: str, options: list[str], payload: dict,
     api_key = cfg.api_keys.openai
     if not api_key:
         return question, "facet_rules", False, None
-    model = str((payload.get("config") or {}).get("question_wording_model") or "gpt-5-nano")
+    model = _question_model(payload)
     try:
         from openai import OpenAI
         resp = OpenAI(api_key=api_key, timeout=12).chat.completions.create(
@@ -1723,7 +1748,28 @@ def _llm_generated_question(active: list[dict], records_by_code: dict[str, dict]
     api_key = cfg.api_keys.openai
     if not api_key:
         return None
-    model = str((payload.get("config") or {}).get("question_wording_model") or "gpt-5-nano")
+    model = _question_model(payload)
+    context = _question_context(payload)
+
+    def _label_in_context(row: dict) -> bool:
+        kind = str(row.get("kind") or "")
+        key = str(row.get("key") or "")
+        if kind == "source_facet":
+            return context["facets"]
+        if kind == "llm_enriched_fact":
+            return context["llm_facts"]
+        if kind == "regulatory_context":
+            return context["footnotes"] if key == "direct_footnote" else context["measures"]
+        return True
+
+    def _signal_in_context(row: dict) -> bool:
+        key = str(row.get("key") or "")
+        if key.startswith("facet:"):
+            return context["facets"]
+        if key.startswith("llm_fact:"):
+            return context["llm_facts"]
+        return True
+
     rows = []
     for candidate in active[:10]:
         code = _candidate_code(candidate)
@@ -1735,11 +1781,11 @@ def _llm_generated_question(active: list[dict], records_by_code: dict[str, dict]
             "fact_sheet": {
                 "labels": [
                     {k: row.get(k) for k in ("kind", "key", "label", "source", "confidence")}
-                    for row in (fact_sheet.get("labels") or [])[:12]
+                    for row in [r for r in (fact_sheet.get("labels") or []) if isinstance(r, dict) and _label_in_context(r)][:12]
                 ],
                 "signals": [
                     {k: row.get(k) for k in ("key", "label", "source", "priority")}
-                    for row in (fact_sheet.get("signals") or [])[:12]
+                    for row in [r for r in (fact_sheet.get("signals") or []) if isinstance(r, dict) and _signal_in_context(r)][:12]
                 ],
             },
         })
@@ -1926,6 +1972,8 @@ async def api_hydration_candidates(payload: dict):
         "query": str(payload.get("query") or ""),
         "summarize": False,
         "question_mode": question_mode,
+        "question_model": _question_model(payload),
+        "question_context": _question_context(payload),
         "candidate_count": len(limited_candidates),
         "hydrate_limit": hydrate_limit,
         "cache_write": cache_write_count > 0,
