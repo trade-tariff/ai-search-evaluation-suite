@@ -993,9 +993,49 @@ export default function ExperimentsTab() {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 md:grid-cols-2">
-            <ScorePanel title="Lexical specificity" signal={trial.lexical_specificity} />
-            <ScorePanel title="Query difficulty" signal={trial.query_difficulty} />
+          <div className="mt-5 rounded border border-gray-800 bg-gray-950/50 p-3">
+            <div className="text-[10px] uppercase tracking-widest text-gray-500">
+              Query signals - before vs after retrieval
+            </div>
+            <div className="mt-0.5 text-xs text-gray-400">
+              We measured both and correlated them against real outcomes: how the
+              query <i>looks</i> barely predicts whether the right code is found -
+              what retrieval <i>returns</i> is the signal that tracks it.
+            </div>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <div>
+                <div className="mb-1.5 flex items-center gap-2">
+                  <span className="rounded bg-gray-800 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-300">
+                    Before retrieval
+                  </span>
+                  <span className="text-[11px] text-gray-500">query text only</span>
+                </div>
+                <ScorePanel title="Lexical specificity" signal={trial.lexical_specificity} />
+                <div className="mt-1.5 text-[11px] leading-4 text-amber-200/70">
+                  Honest negative result: this does NOT predict recall (r &asymp; 0.13
+                  vs gold-in-top-100). Branded terms look specific yet retrieve no
+                  better; terse queries score low yet retrieve fine. Built from the
+                  standard IR predictors (idf, ictf, clarity, embedding-neighbourhood
+                  density) plus an LLM rating - all correlate weakly.
+                </div>
+              </div>
+              <div>
+                <div className="mb-1.5 flex items-center gap-2">
+                  <span className="rounded bg-blue-900/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-200">
+                    After retrieval
+                  </span>
+                  <span className="text-[11px] text-gray-500">measured on the candidates</span>
+                </div>
+                <ScorePanel title="Query difficulty" signal={trial.query_difficulty} />
+                <div className="mt-1.5 text-[11px] leading-4 text-gray-400">
+                  Shannon entropy of the candidate distribution (how many bits of
+                  questioning to isolate one code), spread across tariff
+                  sections/chapters, unresolved code digits, and vagueness (few
+                  hits found weakly). These are the signals that track
+                  retrievability - and they power the Q&amp;A question choice.
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2">
