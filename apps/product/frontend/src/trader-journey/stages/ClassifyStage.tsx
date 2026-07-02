@@ -470,13 +470,16 @@ export default function ClassifyStage({ state, update, onNext }: Props) {
         t = await api.classifyStartStream(trimmedQuery, effectiveConfig, {
           onEvent: (name, payload) => onClassifyProgress(requestId, name, payload),
         });
-      } catch {
+      } catch (streamErr) {
         // Streaming unavailable (older backend, proxy buffering, parse
-        // failure) - fall back to the non-streaming endpoint once.
+        // failure) - fall back to the non-streaming endpoint once. Say so:
+        // a silent retry looks like a frozen screen for the whole re-run.
+        console.warn("classify start stream failed, falling back:", streamErr);
         t = null;
       }
       if (!t) {
         if (requestId !== classifyRequestSeq.current) return;
+        setLoadingMessage("Live progress unavailable - still searching (this can take a few minutes)...");
         t = await api.classifyStart(trimmedQuery, effectiveConfig);
       }
       if (requestId !== classifyRequestSeq.current) return;
@@ -563,12 +566,16 @@ export default function ClassifyStage({ state, update, onNext }: Props) {
         t = await api.classifyAnswerStream(query, newHistory, effectiveConfig, fixedCandidates, {
           onEvent: (name, payload) => onClassifyProgress(requestId, name, payload),
         });
-      } catch {
+      } catch (streamErr) {
         // Streaming unavailable - fall back to the non-streaming endpoint once.
+        // Say so: the fallback re-runs the whole turn, and a silent retry
+        // looks like a frozen screen for the duration.
+        console.warn("classify answer stream failed, falling back:", streamErr);
         t = null;
       }
       if (!t) {
         if (requestId !== classifyRequestSeq.current) return;
+        setLoadingMessage("Live progress unavailable - still ranking your answer (this can take a few minutes)...");
         t = await api.classifyAnswer(query, newHistory, effectiveConfig, fixedCandidates);
       }
       if (requestId !== classifyRequestSeq.current) return;

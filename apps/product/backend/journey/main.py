@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import queue
 import threading
+import traceback
 import uuid
 import json
 from concurrent.futures import ThreadPoolExecutor
@@ -123,12 +124,22 @@ def _classify_config(config: dict | None) -> dict:
 def _classify_turn(query: str, qa_history: list[dict], config: dict | None, fixed_candidates: list[dict] | None = None, on_progress=None) -> dict:
     cfg = _classify_config(config)
     if cfg.get("strategy") == "eliminate":
-        # The eliminate path does not emit progress milestones (item 17 covers
-        # the converge path only); the stream still ends with turn + done.
         fixed = fixed_candidates or []
         if not fixed:
             limit = int((cfg.get("retrieval") or {}).get("limit", 40))
             fixed, _ = initial_candidates_for_eliminate(query, cfg, candidate_limit=limit)
+            if on_progress is not None:
+                on_progress("retrieval_done", {"count": len(fixed)})
+                on_progress("candidates_ready", {"candidates": [
+                    {
+                        "commodity_code": c.get("commodity_code"),
+                        "description": c.get("description"),
+                        "score": c.get("score"),
+                    }
+                    for c in fixed[:10]
+                ]})
+        if on_progress is not None:
+            on_progress("llm_started", {"model": str(cfg.get("candidate_selection_model") or "")})
         turn = eliminate_step(query, qa_history, fixed, cfg)
         turn["fixed_candidates"] = fixed
         return turn
@@ -179,6 +190,9 @@ def _classify_turn_stream(
             turn = _classify_turn(query, qa_history, config, fixed_candidates, on_progress=on_progress)
             events.put(("turn", ClassifyTurn(**turn).model_dump(mode="json")))
         except Exception as exc:
+            # Log it - the SSE error event is the client's only copy otherwise,
+            # and the client may discard it when falling back.
+            traceback.print_exc()
             events.put(("error", {"detail": f"{type(exc).__name__}: {exc}"}))
         finally:
             events.put(("done",))
