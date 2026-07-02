@@ -6,6 +6,7 @@ import queue
 import threading
 import uuid
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -329,19 +330,37 @@ def hydrate_candidates(req: CandidateHydrationRequest):
         cfg["use_query_expansion"] = False
         candidates, _ = initial_candidates_for_eliminate(req.query, cfg, candidate_limit=candidate_limit)
     requested_hydrate_limit = int(req.hydrate_limit or 0)
-    hydrate_limit = len(candidates) if requested_hydrate_limit <= 0 else min(requested_hydrate_limit, len(candidates))
+    if requested_hydrate_limit <= 0:
+        # The UI sends 0 meaning "all". Hydration costs ~1s+ per candidate
+        # (DB reads, optional ATAR fetch/LLM summary), so an uncapped pool of
+        # 80+ candidates stalls the request for minutes. Cap the default.
+        default_cap = int(os.environ.get("JOURNEY_HYDRATE_DEFAULT_LIMIT", "24"))
+        hydrate_limit = min(default_cap, len(candidates))
+    else:
+        hydrate_limit = min(requested_hydrate_limit, len(candidates))
 
+    to_hydrate = [
+        c for c in candidates[:hydrate_limit]
+        if c.get("commodity_code") or c.get("code")
+    ]
     hydrated = []
     coverage_totals: dict[str, int] = {}
-    for candidate in candidates[:hydrate_limit]:
-        code = candidate.get("commodity_code") or candidate.get("code")
-        if not code:
-            continue
-        payload = hydrate_commodity(str(code), summarize=req.summarize, model=req.model, sources=req.sources)
-        counts = (payload.get("coverage") or {}).get("counts_by_kind") or {}
-        for kind, count in counts.items():
-            coverage_totals[kind] = coverage_totals.get(kind, 0) + int(count)
-        hydrated.append({"candidate": candidate, "hydration": payload})
+    if to_hydrate:
+        with ThreadPoolExecutor(max_workers=min(8, len(to_hydrate))) as pool:
+            payloads = list(pool.map(
+                lambda c: hydrate_commodity(
+                    str(c.get("commodity_code") or c.get("code")),
+                    summarize=req.summarize,
+                    model=req.model,
+                    sources=req.sources,
+                ),
+                to_hydrate,
+            ))
+        for candidate, payload in zip(to_hydrate, payloads):
+            counts = (payload.get("coverage") or {}).get("counts_by_kind") or {}
+            for kind, count in counts.items():
+                coverage_totals[kind] = coverage_totals.get(kind, 0) + int(count)
+            hydrated.append({"candidate": candidate, "hydration": payload})
 
     cfg = _classify_config(req.config)
     api_key = None

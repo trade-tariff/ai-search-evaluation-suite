@@ -2733,7 +2733,7 @@ def _enrich_candidates(candidates: list[dict]) -> list[dict]:
             "commodity_code": code,
             "code_dotted": _to_dotted(code),
             "description": display_description or description,
-            "score": c["score"],
+            "score": c.get("score", 0.0),
             "sources": c.get("sources", []),
             "in_slice": in_slice,
         }
