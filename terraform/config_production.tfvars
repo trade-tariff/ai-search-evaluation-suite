@@ -1,4 +1,3 @@
-region        = "eu-west-2"
 environment   = "production"
 cpu           = 256
 memory        = 512
