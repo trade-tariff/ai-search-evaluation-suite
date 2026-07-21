@@ -1,0 +1,25 @@
+name: Deploy to production
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ['Deploy to staging']
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    uses: trade-tariff/trade-tariff-tools/.github/workflows/deploy-ecs.yml@main
+    with:
+      app-name: tariff-ai-search-evaluation-suite
+      environment: production
+      test-flavour: none
+      migrate: false
+    secrets:
+      slack-webhook: ${{ secrets.SLACK_WEBHOOK }}
+      ssh-key: ${{ secrets.PRIVATE_SSH_KEY }}

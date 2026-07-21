@@ -148,6 +148,8 @@ Use placeholders such as `<database-dsn>`, `<provider-api-key>`, and
 
 ## Deployment Notes
 
+The platform deployment currently builds the repository-root `Dockerfile`. It intentionally runs only a small backend placeholder that responds `OKAY` at `/` and `/healthcheckz`; it does not package the existing frontend, connect to a database, or run evaluation features. Those capabilities will be integrated incrementally through backend APIs.
+
 The deployable app is in `apps/classification-evals/` and includes a Docker
 Compose setup for running the app with local Postgres/pgvector and local
 OpenSearch services:
