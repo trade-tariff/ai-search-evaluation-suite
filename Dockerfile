@@ -1,4 +1,7 @@
-FROM python:3.13-slim
+ARG PYTHON_VERSION=3.13
+ARG ALPINE_VERSION=3.22
+
+FROM python:${PYTHON_VERSION}-alpine${ALPINE_VERSION}
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -8,8 +11,8 @@ WORKDIR /app
 
 COPY apps/deployment /app/deployment
 
-RUN groupadd --system tariff \
-    && useradd --system --gid tariff --home-dir /app --no-create-home tariff \
+RUN addgroup -S tariff \
+    && adduser -S -D -H -h /app -G tariff tariff \
     && chown -R tariff:tariff /app
 
 EXPOSE 8443
