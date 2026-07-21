@@ -1,0 +1,22 @@
+name: Deploy to staging
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    uses: trade-tariff/trade-tariff-tools/.github/workflows/deploy-ecs.yml@main
+    with:
+      app-name: tariff-ai-search-evaluation-suite
+      environment: staging
+      test-flavour: none
+      migrate: false
+    secrets:
+      slack-webhook: ${{ secrets.SLACK_WEBHOOK }}
+      ssh-key: ${{ secrets.PRIVATE_SSH_KEY }}

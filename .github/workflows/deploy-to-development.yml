@@ -1,0 +1,32 @@
+name: Deploy to development
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'needs-deployment')
+    uses: trade-tariff/trade-tariff-tools/.github/workflows/deploy-ecs.yml@main
+    with:
+      app-name: tariff-ai-search-evaluation-suite
+      environment: development
+      test-flavour: none
+      migrate: false
+    secrets:
+      slack-webhook: ${{ secrets.SLACK_WEBHOOK }}
+      ssh-key: ${{ secrets.PRIVATE_SSH_KEY }}
+
+  start-services:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'needs-deployment')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: trade-tariff/trade-tariff-tools/.github/actions/start-services@main
+        with:
+          service-names: ai-eval
+          environment: development

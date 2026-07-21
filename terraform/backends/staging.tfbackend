@@ -1,0 +1,5 @@
+bucket       = "terraform-state-staging-451934005581"
+key          = "ai-search-evaluation-suite.tfstate"
+region       = "eu-west-2"
+encrypt      = true
+use_lockfile = true
