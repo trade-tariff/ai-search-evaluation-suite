@@ -15,7 +15,7 @@ data "aws_iam_policy_document" "task" {
 }
 
 resource "aws_iam_policy" "task" {
-  name   = "ai-eval-tasks-role-policy"
+  name   = "eval-tasks-role-policy"
   policy = data.aws_iam_policy_document.task.json
 }
 
@@ -47,6 +47,6 @@ data "aws_iam_policy_document" "execution" {
 }
 
 resource "aws_iam_policy" "execution" {
-  name   = "ai-eval-execution-role-policy"
+  name   = "eval-execution-role-policy"
   policy = data.aws_iam_policy_document.execution.json
 }

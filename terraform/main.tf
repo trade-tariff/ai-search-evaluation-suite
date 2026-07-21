@@ -3,7 +3,7 @@ module "service" {
 
   region = var.region
 
-  service_name  = "ai-eval"
+  service_name  = "eval"
   service_count = var.service_count
 
   cluster_name    = "trade-tariff-cluster-${var.environment}"
@@ -18,6 +18,8 @@ module "service" {
   docker_image = "382373577178.dkr.ecr.eu-west-2.amazonaws.com/tariff-ai-search-evaluation-suite-production"
   docker_tag   = var.docker_tag
   skip_destroy = true
+
+  private_dns_namespace = "tariff.internal"
 
   cpu    = var.cpu
   memory = var.memory
