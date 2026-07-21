@@ -4,8 +4,9 @@ variable "environment" {
 }
 
 variable "region" {
-  description = "AWS region to use."
+  description = "AWS region to use. Defaults to `eu-west-2`."
   type        = string
+  default     = "eu-west-2"
 }
 
 variable "docker_tag" {
