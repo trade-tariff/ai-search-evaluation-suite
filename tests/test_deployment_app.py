@@ -95,5 +95,18 @@ class DeploymentAppTest(unittest.TestCase):
                 thread.join()
 
 
+class DeploymentConfigurationTest(unittest.TestCase):
+    def test_ecs_service_registers_eval_private_dns_name(self):
+        repository_root = Path(__file__).resolve().parents[1]
+        terraform = (repository_root / "terraform/main.tf").read_text()
+        development_workflow = (
+            repository_root / ".github/workflows/deploy-to-development.yml"
+        ).read_text()
+
+        self.assertIn('service_name  = "eval"', terraform)
+        self.assertIn('private_dns_namespace = "tariff.internal"', terraform)
+        self.assertIn("service-names: eval", development_workflow)
+
+
 if __name__ == "__main__":
     unittest.main()
