@@ -245,6 +245,8 @@ export interface ModelSummary {
   gold_evaluated_count?: number;
   no_answer_count?: number | null;
   no_answer_rate?: number | null;
+  malformed_code_count?: number | null;
+  malformed_codes?: string[];
   gold_top1_rate?: number | null;
   gold_heading_rate?: number | null;
   gold_chapter_rate?: number | null;
@@ -268,6 +270,11 @@ export interface BenchmarkResults {
   model_ids: string[];
   fact_store?: Record<string, FactEntry[]>;
   prompt_sections?: Record<string, SectionInfo>;
+  // Per prompt: was the gold code actually in the retrieved candidates? Where
+  // it was not, no model could score a hit, so this sets the achievable
+  // ceiling for the run.
+  gold_retrievable?: Record<string, boolean>;
+  issues?: Array<Record<string, unknown>>;
 }
 
 export interface SectionInfo {

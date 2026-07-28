@@ -1036,6 +1036,21 @@ export default function AnalysisPanel() {
     );
   };
 
+  // A code that is not 10 digits is malformed output rather than a wrong
+  // classification. Silent otherwise - it scores as an ordinary miss.
+  const malformedCell = (s: { malformed_code_count?: number | null; malformed_codes?: string[] }) => {
+    const n = s.malformed_code_count ?? 0;
+    if (n === 0) return <span className="text-gray-600">0</span>;
+    return (
+      <span
+        className="text-red-300"
+        title={`Not 10-digit commodity codes: ${(s.malformed_codes || []).join(", ")}`}
+      >
+        {n}
+      </span>
+    );
+  };
+
   // Persist weight edits with light debounce via a save helper
   const updateWeight = async (key: keyof ScoringWeights, value: number) => {
     const next = { ...weights, [key]: Math.max(0, value) };
@@ -1248,6 +1263,36 @@ export default function AnalysisPanel() {
         );
       })()}
 
+      {/* Retrieval ceiling. The system prompt forbids answering outside the
+          retrieved candidates, so a prompt whose gold code is not among them
+          caps every model at zero there. Without this, stale retrieval reads
+          as poor model quality. */}
+      {(() => {
+        const reach = results.gold_retrievable ?? {};
+        const keys = Object.keys(reach);
+        if (keys.length === 0) return null;
+        const unreachable = keys.filter((k) => !reach[k]);
+        if (unreachable.length === 0) return null;
+        const ceiling = (keys.length - unreachable.length) / keys.length;
+        return (
+          <section className="rounded-lg border border-amber-800/60 bg-amber-950/30 p-4">
+            <h2 className="text-sm font-semibold text-amber-200 mb-1">
+              Achievable ceiling: {(ceiling * 100).toFixed(0)}%
+            </h2>
+            <p className="text-xs text-amber-100/80">
+              On {unreachable.length} of {keys.length} scored prompts the gold code is
+              not in the retrieved candidates, and the prompt instructs the model not to
+              answer outside them. No model can score a hit on those, so every accuracy
+              figure below is bounded by {(ceiling * 100).toFixed(0)}%, not 100%. A low
+              score here may be stale retrieval rather than a weak model.
+            </p>
+            <p className="text-[11px] text-amber-100/50 mt-1 font-mono">
+              unreachable: {unreachable.map((k) => `#${k}`).join(", ")}
+            </p>
+          </section>
+        );
+      })()}
+
       {/* Verdict */}
       {verdict && (
         <section className="bg-gradient-to-r from-emerald-950/40 to-gray-900 border border-emerald-800/50 rounded-lg p-5">
@@ -1262,6 +1307,28 @@ export default function AnalysisPanel() {
                 : "weights: reference agreement + efficiency + judge"}
             </span>
           </h2>
+          {/* The composite blends accuracy with cost and efficiency, so the
+              cheapest model can outrank a more accurate one. Say so out loud
+              rather than letting the badge imply "most accurate". */}
+          {(() => {
+            if (!verdict.useGold) return null;
+            const ranked = [...summaries].filter((s) => s.gold_top1_rate != null);
+            if (ranked.length < 2) return null;
+            const mostAccurate = ranked.reduce((a, b) =>
+              (b.gold_top1_rate ?? 0) > (a.gold_top1_rate ?? 0) ? b : a);
+            const best = verdict.best.summary;
+            if (mostAccurate.model_id === best.model_id) return null;
+            return (
+              <div className="mb-3 rounded border border-amber-900/60 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
+                <strong>{best.model_name}</strong> wins the composite, but{" "}
+                <strong>{mostAccurate.model_name}</strong> is more accurate against gold
+                ({((mostAccurate.gold_top1_rate ?? 0) * 100).toFixed(0)}% vs{" "}
+                {((best.gold_top1_rate ?? 0) * 100).toFixed(0)}% top-1). The composite also
+                rewards cost and efficiency, which can outweigh an accuracy gap. Pick on
+                gold top-1 if correctness is what matters.
+              </div>
+            );
+          })()}
           <div className="flex items-start gap-6">
             {/* Recommendation */}
             <div className="flex-1">
@@ -1419,6 +1486,7 @@ export default function AnalysisPanel() {
                 )}
                 {/* Deterministic quality */}
                 <HeaderTip label="No answer" />
+                <HeaderTip label="Bad code" />
                 <HeaderTip label="Schema" />
                 <HeaderTip label="R-eff" />
                 <HeaderTip label="Q-eff" />
@@ -1464,6 +1532,7 @@ export default function AnalysisPanel() {
                   )}
                   {/* Deterministic quality */}
                   <td className="py-3 pr-4 text-right text-amber-300">{noAnswerCell(consensusSummary)}</td>
+                  <td className="py-3 pr-4 text-right text-amber-300">{malformedCell(consensusSummary)}</td>
                   <td className="py-3 pr-4 text-right text-amber-300">{(consensusSummary.avg_schema_valid ?? 0).toFixed(2)}</td>
                   <td className="py-3 pr-4 text-right text-amber-300">{(consensusSummary.avg_rounds_efficiency ?? 0).toFixed(2)}</td>
                   <td className="py-3 pr-4 text-right text-amber-300">{(consensusSummary.avg_question_efficiency ?? 0).toFixed(2)}</td>
@@ -1541,6 +1610,7 @@ export default function AnalysisPanel() {
                     )}
                     {/* Deterministic quality */}
                     <td className="py-3 pr-4 text-right">{noAnswerCell(s)}</td>
+                    <td className="py-3 pr-4 text-right">{malformedCell(s)}</td>
                     <td className="py-3 pr-4 text-right">
                       {(s.avg_schema_valid ?? 0).toFixed(2)}
                       {comparing && <div>{deltaCell(s.avg_schema_valid ?? 0, cmp?.avg_schema_valid, v => v.toFixed(2))}</div>}
@@ -1634,6 +1704,7 @@ export default function AnalysisPanel() {
                     )}
                     {/* Deterministic quality */}
                     <td className="py-3 pr-4 text-right">{noAnswerCell(cs)}</td>
+                    <td className="py-3 pr-4 text-right">{malformedCell(cs)}</td>
                     <td className="py-3 pr-4 text-right">{(cs.avg_schema_valid ?? 0).toFixed(2)}</td>
                     <td className="py-3 pr-4 text-right">{(cs.avg_rounds_efficiency ?? 0).toFixed(2)}</td>
                     <td className="py-3 pr-4 text-right">{(cs.avg_question_efficiency ?? 0).toFixed(2)}</td>

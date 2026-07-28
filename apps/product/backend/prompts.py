@@ -140,6 +140,31 @@ def get_formatted_results(prompt_index: int, opensearch_limit: int = 80) -> list
     return []
 
 
+def gold_is_retrievable(prompt_index: int, opensearch_limit: int = 80) -> bool | None:
+    """Is the gold code actually present in this prompt's candidate set?
+
+    The system prompt tells the model not to go beyond the retrieved results
+    ("don't go beyond these search results ... even if you know the results
+    are incorrect"), so when gold is absent NO model can score a hit. Those
+    prompts cap the achievable accuracy, and reading a score without knowing
+    the cap makes a retrieval problem look like a model problem.
+
+    Returns None when the prompt has no gold code to check against.
+    """
+    data = _load_raw()
+    for q in data["queries"]:
+        if q["index"] == prompt_index:
+            gold = q.get("gold_code")
+            if not gold:
+                return None
+            codes = {
+                str(r.get("commodity_code"))
+                for r in (q.get("formatted_results") or [])[:opensearch_limit]
+            }
+            return str(gold) in codes
+    return None
+
+
 def get_raw_query(prompt_index: int) -> str:
     """Get just the raw query text for a prompt index."""
     data = _load_raw()

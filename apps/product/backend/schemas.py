@@ -348,6 +348,11 @@ class ModelSummary(BaseModel):
     # counted separately to keep the round cap's cost visible.
     no_answer_count: int = 0
     no_answer_rate: Optional[float] = None
+    # Top codes that are not 10 digits - malformed output rather than a wrong
+    # classification. Scored identically to a genuine miss everywhere else, so
+    # counted here to keep the two distinguishable.
+    malformed_code_count: int = 0
+    malformed_codes: list[str] = []
 
 
 class BenchmarkRun(BaseModel):
@@ -379,6 +384,11 @@ class BenchmarkRun(BaseModel):
     # {kind: "retry"|"error", source: str, model_id?: str, prompt_index?: int,
     #  message: str, attempt?: int, timestamp: str}
     issues: list[dict] = []
+    # Per-prompt: is the gold code present in that prompt's retrieved
+    # candidates? False means no model can score a hit there, because the
+    # prompt forbids answering outside the results. Shape:
+    # { "<prompt_index>": true|false }
+    gold_retrievable: dict[str, bool] = {}
     # Per-prompt OTT section tag, derived from the reference's top commodity
     # code after consensus is computed. Shape:
     # { "<prompt_index>": {"number": int, "roman": str, "title": str} }

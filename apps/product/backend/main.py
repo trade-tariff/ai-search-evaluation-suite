@@ -2576,6 +2576,22 @@ def api_atar_discard(ref: str):
 @app.post("/api/benchmark/start")
 async def api_start_benchmark(req: BenchmarkRequest):
     _require_workbench_spend(req)
+    from benchmark import is_run_active
+
+    # benchmark.py holds ONE module-level _current_run, which run_benchmark
+    # reassigns on entry. A second concurrent run silently overwrites the
+    # first one's accumulated results and both end up corrupt, with nothing
+    # to indicate it happened. Refuse rather than let two operators on a
+    # shared box quietly ruin each other's work.
+    if is_run_active():
+        current = get_current_run()
+        raise HTTPException(
+            409,
+            f"A benchmark is already running (id {current.id if current else 'unknown'}, "
+            f"{(current.progress * 100) if current else 0:.0f}% done). Only one run can be "
+            "in flight at a time - wait for it, or cancel it via POST /api/benchmark/cancel.",
+        )
+
     cfg = load_config()
 
     async def event_stream():
@@ -2613,12 +2629,21 @@ def api_benchmark_cancel():
 
 @app.get("/api/benchmark/status")
 def api_benchmark_status():
+    from benchmark import is_run_active
+
     run = get_current_run()
     if run is None:
-        return {"status": "idle"}
+        return {"status": "idle", "active": False}
+    active = is_run_active()
     return {
+        # `active` is the field to branch on. `status` describes the run being
+        # reported, which after a finished run is the newest SAVED one - so
+        # status alone never says "idle" and cannot be used to check whether
+        # it is safe to start work.
+        "active": active,
         "id": run.id,
-        "status": run.status,
+        "status": run.status if active else "idle",
+        "last_run_status": run.status,
         "progress": run.progress,
         "baseline_count": len(run.baseline_results),
         "model_count": len(run.model_results),
@@ -2662,6 +2687,8 @@ def _serialise_run(run) -> dict:
         "model_ids": run.model_ids,
         "fact_store": run.fact_store,
         "prompt_sections": run.prompt_sections,
+        "gold_retrievable": run.gold_retrievable,
+        "issues": run.issues,
     }
 
 
