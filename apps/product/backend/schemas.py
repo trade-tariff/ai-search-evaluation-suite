@@ -28,6 +28,13 @@ class ModelConfig(BaseModel):
     thinking_budget: Optional[int] = None  # for Anthropic extended thinking
     input_cost_per_million: float = 0.0
     output_cost_per_million: float = 0.0
+    # Providers bill re-sent prompt prefixes at a discount. This harness
+    # re-sends the same ~80-candidate context every round, so the cached
+    # share is large and billing it at full input rate overstates cost -
+    # which then feeds the cost term in the composite verdict. None = no
+    # discount (previous behaviour). VERIFY against current provider
+    # pricing before trusting the Costs tab.
+    cached_input_cost_per_million: Optional[float] = None
 
 
 class ApiKeys(BaseModel):
@@ -219,6 +226,8 @@ class QARound(BaseModel):
 class CompletionResult(BaseModel):
     model_id: str
     prompt_index: int
+    # Portion of input_tokens the provider served from its prompt cache.
+    cached_input_tokens: int = 0
     response_text: str  # final response text
     response_type: str = "unknown"  # final response type
     rounds: list[QARound] = []

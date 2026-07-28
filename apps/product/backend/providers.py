@@ -18,9 +18,30 @@ class BaseLLMProvider(ABC):
     ) -> CompletionResult:
         pass
 
-    def _calc_cost(self, input_tokens: int, output_tokens: int, mc: ModelConfig) -> float:
+    def _calc_cost(
+        self,
+        input_tokens: int,
+        output_tokens: int,
+        mc: ModelConfig,
+        cached_input_tokens: int = 0,
+    ) -> float:
+        """Bill cached input separately from fresh input.
+
+        input_tokens is the TOTAL prompt size and already includes whatever the
+        provider served from cache, so charging all of it at the full input
+        rate overstates cost. Falls back to the full rate when no cached rate
+        is configured, so nothing changes silently.
+        """
+        cached = max(0, min(cached_input_tokens, input_tokens))
+        fresh = input_tokens - cached
+        cached_rate = (
+            mc.cached_input_cost_per_million
+            if mc.cached_input_cost_per_million is not None
+            else mc.input_cost_per_million
+        )
         return (
-            input_tokens * mc.input_cost_per_million / 1_000_000
+            fresh * mc.input_cost_per_million / 1_000_000
+            + cached * cached_rate / 1_000_000
             + output_tokens * mc.output_cost_per_million / 1_000_000
         )
 
@@ -66,6 +87,9 @@ class OpenAIProvider(BaseLLMProvider):
         usage = resp.usage or type("U", (), {"prompt_tokens": 0, "completion_tokens": 0})()
         inp = getattr(usage, "prompt_tokens", 0) or 0
         out = getattr(usage, "completion_tokens", 0) or 0
+        # Prompt-cache hits are inside prompt_tokens, billed at a lower rate.
+        details = getattr(usage, "prompt_tokens_details", None)
+        cached = int(getattr(details, "cached_tokens", 0) or 0) if details else 0
         text = resp.choices[0].message.content or ""
 
         return CompletionResult(
@@ -74,8 +98,9 @@ class OpenAIProvider(BaseLLMProvider):
             response_text=text,
             input_tokens=inp,
             output_tokens=out,
+            cached_input_tokens=cached,
             latency_ms=latency,
-            cost=self._calc_cost(inp, out, model_config),
+            cost=self._calc_cost(inp, out, model_config, cached),
         )
 
 
@@ -126,6 +151,11 @@ class AnthropicProvider(BaseLLMProvider):
 
         inp = resp.usage.input_tokens
         out = resp.usage.output_tokens
+        # Anthropic reports cache reads separately and they are NOT included
+        # in input_tokens, so they are added in rather than split out.
+        cache_read = int(getattr(resp.usage, "cache_read_input_tokens", 0) or 0)
+        inp += cache_read
+        cached = cache_read
         text = ""
         for block in resp.content:
             if block.type == "text":
@@ -138,8 +168,9 @@ class AnthropicProvider(BaseLLMProvider):
             response_text=text,
             input_tokens=inp,
             output_tokens=out,
+            cached_input_tokens=cached,
             latency_ms=latency,
-            cost=self._calc_cost(inp, out, model_config),
+            cost=self._calc_cost(inp, out, model_config, cached),
         )
 
 
@@ -176,6 +207,8 @@ class GoogleProvider(BaseLLMProvider):
             )
         latency = (time.perf_counter() - start) * 1000
 
+        # This SDK path reports no cache breakdown, so nothing is discounted.
+        cached = 0
         meta = getattr(resp, "usage_metadata", None)
         inp = getattr(meta, "prompt_token_count", 0) or 0
         out = getattr(meta, "candidates_token_count", 0) or 0
@@ -187,8 +220,9 @@ class GoogleProvider(BaseLLMProvider):
             response_text=text,
             input_tokens=inp,
             output_tokens=out,
+            cached_input_tokens=cached,
             latency_ms=latency,
-            cost=self._calc_cost(inp, out, model_config),
+            cost=self._calc_cost(inp, out, model_config, cached),
         )
 
 
@@ -227,6 +261,9 @@ class OpenAICompatibleProvider(BaseLLMProvider):
         usage = resp.usage or type("U", (), {"prompt_tokens": 0, "completion_tokens": 0})()
         inp = getattr(usage, "prompt_tokens", 0) or 0
         out = getattr(usage, "completion_tokens", 0) or 0
+        # Prompt-cache hits are inside prompt_tokens, billed at a lower rate.
+        details = getattr(usage, "prompt_tokens_details", None)
+        cached = int(getattr(details, "cached_tokens", 0) or 0) if details else 0
         text = resp.choices[0].message.content or ""
 
         return CompletionResult(
@@ -235,8 +272,9 @@ class OpenAICompatibleProvider(BaseLLMProvider):
             response_text=text,
             input_tokens=inp,
             output_tokens=out,
+            cached_input_tokens=cached,
             latency_ms=latency,
-            cost=self._calc_cost(inp, out, model_config),
+            cost=self._calc_cost(inp, out, model_config, cached),
         )
 
 

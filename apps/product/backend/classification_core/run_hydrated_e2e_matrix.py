@@ -43,17 +43,10 @@ DEFAULT_PERSONAS = [
 QUESTION_MODES = ["facet_rules", "facet_rules_llm_wording", "llm_generated"]
 
 
-def _flat(code: str | None) -> str:
-    digits = re.sub(r"\D", "", code or "")
-    return digits.ljust(10, "0")[:10] if digits else ""
-
-
-def _rank_of(codes: list[str], expected: str) -> int | None:
-    exp = _flat(expected)
-    for idx, code in enumerate(codes, start=1):
-        if _flat(code) == exp:
-            return idx
-    return None
+# Canonical implementations live in commodity_codes so every scoring surface
+# agrees on what "the same code" means. Aliased rather than renamed to keep
+# this module's call sites unchanged.
+from commodity_codes import flat_code as _flat, rank_of as _rank_of
 
 
 def _candidate_code(row: dict) -> str:

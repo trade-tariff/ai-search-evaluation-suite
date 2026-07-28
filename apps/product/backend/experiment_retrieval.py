@@ -62,9 +62,7 @@ def _kg_use_scope_filter(alias: str, table: str, scope: str) -> str:
     return f"AND '{scope}' = ANY({alias}.use_scopes)"
 
 
-def _flat_code(code: str) -> str:
-    digits = re.sub(r"\D", "", code or "")
-    return digits.ljust(10, "0")[:10] if digits else ""
+from commodity_codes import flat_code as _flat_code  # canonical, shared
 
 
 def _pct(value: str) -> float:

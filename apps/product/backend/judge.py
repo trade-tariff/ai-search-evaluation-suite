@@ -8,6 +8,7 @@ import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity as sklearn_cosine
 
+from commodity_codes import common_prefix_len, flat_code, rank_of
 from schemas import CompletionResult, EvaluationResult
 
 
@@ -208,22 +209,23 @@ def compute_gold_metrics(
             "gold_hierarchical_score": None,
         }
 
+    # Normalised comparison, shared with the E2E matrix via commodity_codes.
+    # Model Comparison used to compare raw strings, so "6912 00 23 10" was a
+    # miss here and a match there - the two harnesses disagreed about whether
+    # the same answer was correct.
     codes = [str(c) for c in candidate_codes]
-    cand_top = codes[0]
-    gold = str(gold_code)
+    cand_top = flat_code(codes[0])
+    gold = flat_code(gold_code)
 
-    prefix = 0
-    for a, b in zip(cand_top, gold):
-        if a != b:
-            break
-        prefix += 1
-
-    rank = codes.index(gold) + 1 if gold in codes else None
+    prefix = common_prefix_len(cand_top, gold)
+    rank = rank_of(codes, gold)
+    top3 = rank is not None and rank <= 3
+    top5 = rank is not None and rank <= 5
 
     return {
         "gold_top1_match": cand_top == gold,
-        "gold_top3_hit": gold in codes[:3],
-        "gold_top5_hit": gold in codes[:5],
+        "gold_top3_hit": top3,
+        "gold_top5_hit": top5,
         "gold_reciprocal_rank": round(1.0 / rank, 4) if rank else 0.0,
         "gold_heading_match": prefix >= 4,
         "gold_chapter_match": prefix >= 2,
