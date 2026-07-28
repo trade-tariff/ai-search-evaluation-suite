@@ -21,12 +21,17 @@ import ExperimentsTab from "./components/ExperimentsTab";
 // rulings, intercepts, complexity, knowledge graph). Results = read the
 // measurements: the gold-set eval, where prompts have known correct
 // answers, so we score retrieval + Q&A directly against gold (plus cost,
-// time and rank). Configure = set up the pipeline (rendered as a dropdown
-// so the bar does not overflow). Legacy = the reference-model benchmark
-// loop - still the right tool for prompts WITHOUT gold answers and for
-// judge diagnostics. Tab ids are stable internal keys (panel switching
-// below); labels are what the user sees. Domain terms the team already
-// uses (ATaR, Intercepts) stay recognisable in the label.
+// time and rank). Model Comparison lives here too - the Gold Eval jobs take
+// a SINGLE model and sweep pipeline config (persona, question mode,
+// retrieval base), so the fan-out is the only thing that puts models
+// head-to-head, and its shared fact store is what keeps that comparison
+// honest. Configure = set up the pipeline (rendered as a dropdown so the
+// bar does not overflow). Legacy = the reference-model scoring path
+// (reference panel, consensus, LLM judge) - superseded by gold mode, but
+// still the right tool for prompts WITHOUT gold answers and for judge
+// diagnostics. Tab ids are stable internal keys (panel switching below);
+// labels are what the user sees. Domain terms the team already uses
+// (ATaR, Intercepts) stay recognisable in the label.
 const NAV_GROUPS = [
   {
     label: "Experiment",
@@ -43,6 +48,7 @@ const NAV_GROUPS = [
     tabs: [
       { id: "E2E Matrix", label: "Gold Eval - E2E" },
       { id: "Q&A Matrix", label: "Gold Eval - Q&A" },
+      { id: "Benchmark", label: "Model Comparison" },
       { id: "Matrix", label: "Retrieval Matrix" },
       { id: "Financial", label: "Costs" },
     ],
@@ -61,7 +67,6 @@ const NAV_GROUPS = [
   {
     label: "Legacy",
     tabs: [
-      { id: "Benchmark", label: "Run Benchmark" },
       { id: "Analysis", label: "Benchmark Results" },
     ],
   },

@@ -304,20 +304,31 @@ function SlotTag({ slot }: { slot: string }) {
   );
 }
 
+// Accents let several models sit side by side and stay distinguishable.
+const TRACE_ACCENTS = {
+  amber: { hover: "hover:border-amber-600", chosen: "bg-amber-950/40 border-amber-700" },
+  blue: { hover: "hover:border-blue-600", chosen: "bg-blue-950/40 border-blue-700" },
+  violet: { hover: "hover:border-violet-600", chosen: "bg-violet-950/40 border-violet-700" },
+  teal: { hover: "hover:border-teal-600", chosen: "bg-teal-950/40 border-teal-700" },
+  rose: { hover: "hover:border-rose-600", chosen: "bg-rose-950/40 border-rose-700" },
+} as const;
+type TraceAccent = keyof typeof TRACE_ACCENTS;
+const ACCENT_ORDER: TraceAccent[] = ["blue", "violet", "teal", "rose", "amber"];
+
 function SimulatorTraceBlock({
   round,
   accent,
 }: {
   round: QARound;
-  accent: "amber" | "blue";
+  accent: TraceAccent;
 }) {
   const questions = round.questions_asked ?? [];
   const trace: SimulatorTraceEntry[] = round.simulator_trace ?? [];
   const answers = round.answers_given ?? [];
   if (questions.length === 0) return null;
 
-  const borderHover = accent === "amber" ? "hover:border-amber-600" : "hover:border-blue-600";
-  const chosenBg = accent === "amber" ? "bg-amber-950/40 border-amber-700" : "bg-blue-950/40 border-blue-700";
+  const borderHover = TRACE_ACCENTS[accent].hover;
+  const chosenBg = TRACE_ACCENTS[accent].chosen;
 
   const simCost = round.simulator_cost ?? 0;
   const simLatency = round.simulator_latency_ms ?? 0;
@@ -410,6 +421,160 @@ function SimulatorTraceBlock({
         })}
       </div>
     </div>
+  );
+}
+
+function topCodeOf(result: CompletionResult | undefined): string | null {
+  if (!result) return null;
+  try {
+    return JSON.parse(result.response_text || "{}")?.answers?.[0]?.commodity_code ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * One product, every model side by side, showing the actual dialogue.
+ *
+ * The fact-store matrix says WHICH slots got set; this says what was asked
+ * and what the trader answered. That is the difference between "nano used
+ * 5 rounds" and "nano asked the wrong five questions".
+ */
+function QATranscriptPanel({
+  results,
+  rawQueryByPrompt,
+}: {
+  results: BenchmarkResults;
+  rawQueryByPrompt: Record<number, string>;
+}) {
+  const promptIndices = results.prompt_indices ?? [];
+  const [promptIndex, setPromptIndex] = useState<number | null>(promptIndices[0] ?? null);
+  if (promptIndices.length === 0) return null;
+  const pi = promptIndex ?? promptIndices[0];
+
+  const allResults = [
+    ...(results.baseline_results ?? []),
+    ...(results.model_results ?? []),
+  ].filter((r) => r.prompt_index === pi);
+
+  // Dedupe by model, reference first, so multi-pass runs show one column.
+  const seen = new Set<string>();
+  const columns = allResults.filter((r) => {
+    if (seen.has(r.model_id)) return false;
+    seen.add(r.model_id);
+    return true;
+  });
+
+  const goldCode =
+    (results.evaluations ?? []).find((e) => e.prompt_index === pi)?.gold_code ?? null;
+  const rawQuery = rawQueryByPrompt[pi] ?? "";
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-2 gap-4">
+        <div>
+          <h2 className="text-lg font-semibold">Q&amp;A Transcripts</h2>
+          <p className="text-xs text-gray-500 mt-0.5">
+            One product, every model side by side - what each asked, what the
+            shared trader answered, and where it landed.
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <label className="text-sm text-gray-400">Product:</label>
+          <select
+            value={pi}
+            onChange={(e) => setPromptIndex(Number(e.target.value))}
+            className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm"
+          >
+            {promptIndices.map((p) => (
+              <option key={p} value={p}>Prompt #{p}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="mb-3 rounded border border-gray-800 bg-gray-900/60 p-2">
+        <div className="text-xs text-gray-300">{rawQuery || `Prompt #${pi}`}</div>
+        {goldCode && (
+          <div className="mt-1 text-[10px] font-mono text-yellow-300">gold {goldCode}</div>
+        )}
+      </div>
+
+      <div
+        className="grid gap-3"
+        style={{ gridTemplateColumns: `repeat(${Math.max(1, columns.length)}, minmax(320px, 1fr))` }}
+      >
+        {columns.map((res, ci) => {
+          const accent = ACCENT_ORDER[ci % ACCENT_ORDER.length];
+          const top = topCodeOf(res);
+          // No code at all is a distinct outcome from a wrong code - a model
+          // that burned every round and never committed. Say so.
+          const noAnswer = !res.error && !top;
+          const correct = goldCode != null && top === goldCode;
+
+          return (
+            <div key={res.model_id} className="rounded border border-gray-800 bg-gray-950/40">
+              <div className="px-3 py-2 border-b border-gray-800">
+                <div className="text-sm font-medium text-gray-200">{res.model_id}</div>
+                <div className="mt-1 flex items-center gap-2 flex-wrap text-[10px] font-mono">
+                  {res.error ? (
+                    <span className="px-1.5 py-0.5 rounded bg-red-900/60 text-red-200">error</span>
+                  ) : noAnswer ? (
+                    <span
+                      className="px-1.5 py-0.5 rounded bg-orange-900/60 text-orange-200"
+                      title={`Used all ${res.total_rounds} rounds without committing to a code`}
+                    >
+                      no answer
+                    </span>
+                  ) : (
+                    <span className={correct ? "text-emerald-300" : goldCode ? "text-red-300" : "text-amber-300"}>
+                      {top}{goldCode ? (correct ? " ✓" : " ✗") : ""}
+                    </span>
+                  )}
+                  <span className="text-gray-500">
+                    {res.total_rounds}r · {res.total_latency_ms.toFixed(0)}ms · ${res.total_cost.toFixed(4)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-3 space-y-3">
+                {(res.rounds ?? []).map((r) => (
+                  <div key={r.round_number} className="border-l-2 border-gray-800 pl-2">
+                    <div className="text-[11px] text-gray-400 mb-1">
+                      Round {r.round_number}
+                      <span
+                        className={`ml-2 px-1.5 py-0.5 rounded text-[10px] ${
+                          r.response_type === "answers"
+                            ? "bg-green-900 text-green-300"
+                            : r.response_type === "questions"
+                              ? "bg-blue-900 text-blue-300"
+                              : "bg-gray-700 text-gray-300"
+                        }`}
+                      >
+                        {r.response_type}
+                      </span>
+                      <span className="ml-2 text-gray-600">{r.latency_ms.toFixed(0)}ms</span>
+                    </div>
+                    {(r.questions_asked ?? []).length > 0 ? (
+                      <SimulatorTraceBlock round={r} accent={accent} />
+                    ) : (
+                      <div className="text-[11px] text-gray-600 italic">
+                        {r.response_type === "answers"
+                          ? "answered directly, no questions asked"
+                          : "no questions in this round"}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {(res.rounds ?? []).length === 0 && (
+                  <div className="text-[11px] text-gray-600 italic">No round detail recorded.</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -710,7 +875,7 @@ export default function AnalysisPanel() {
             setResults(saved);
             setSelectedRunId(mostRecent.id);
           } else {
-            setErr("No benchmark results yet. Start one on Legacy > Run Benchmark.");
+            setErr("No benchmark results yet. Start one on Results > Model Comparison.");
           }
         }
       } catch (e) {
@@ -854,6 +1019,37 @@ export default function AnalysisPanel() {
     ) : (
       <td className={"py-3 pr-4 text-right " + className}>{v.toFixed(2)}</td>
     );
+
+  // "No answer" reads as a count, not a rate - one silent failure out of 20
+  // matters, and 0.05 hides that. Zero is good news, so it stays muted.
+  const noAnswerCell = (s: { no_answer_count?: number | null; no_answer_rate?: number | null }) => {
+    const n = s.no_answer_count ?? 0;
+    if (s.no_answer_rate == null) return <span className="text-gray-600">-</span>;
+    if (n === 0) return <span className="text-gray-600">0</span>;
+    return (
+      <span
+        className="text-orange-300"
+        title="Completions that used every round without committing to a commodity code. Scored as a miss everywhere else."
+      >
+        {n} ({(s.no_answer_rate * 100).toFixed(0)}%)
+      </span>
+    );
+  };
+
+  // A code that is not 10 digits is malformed output rather than a wrong
+  // classification. Silent otherwise - it scores as an ordinary miss.
+  const malformedCell = (s: { malformed_code_count?: number | null; malformed_codes?: string[] }) => {
+    const n = s.malformed_code_count ?? 0;
+    if (n === 0) return <span className="text-gray-600">0</span>;
+    return (
+      <span
+        className="text-red-300"
+        title={`Not 10-digit commodity codes: ${(s.malformed_codes || []).join(", ")}`}
+      >
+        {n}
+      </span>
+    );
+  };
 
   // Persist weight edits with light debounce via a save helper
   const updateWeight = async (key: keyof ScoringWeights, value: number) => {
@@ -1067,6 +1263,36 @@ export default function AnalysisPanel() {
         );
       })()}
 
+      {/* Retrieval ceiling. The system prompt forbids answering outside the
+          retrieved candidates, so a prompt whose gold code is not among them
+          caps every model at zero there. Without this, stale retrieval reads
+          as poor model quality. */}
+      {(() => {
+        const reach = results.gold_retrievable ?? {};
+        const keys = Object.keys(reach);
+        if (keys.length === 0) return null;
+        const unreachable = keys.filter((k) => !reach[k]);
+        if (unreachable.length === 0) return null;
+        const ceiling = (keys.length - unreachable.length) / keys.length;
+        return (
+          <section className="rounded-lg border border-amber-800/60 bg-amber-950/30 p-4">
+            <h2 className="text-sm font-semibold text-amber-200 mb-1">
+              Achievable ceiling: {(ceiling * 100).toFixed(0)}%
+            </h2>
+            <p className="text-xs text-amber-100/80">
+              On {unreachable.length} of {keys.length} scored prompts the gold code is
+              not in the retrieved candidates, and the prompt instructs the model not to
+              answer outside them. No model can score a hit on those, so every accuracy
+              figure below is bounded by {(ceiling * 100).toFixed(0)}%, not 100%. A low
+              score here may be stale retrieval rather than a weak model.
+            </p>
+            <p className="text-[11px] text-amber-100/50 mt-1 font-mono">
+              unreachable: {unreachable.map((k) => `#${k}`).join(", ")}
+            </p>
+          </section>
+        );
+      })()}
+
       {/* Verdict */}
       {verdict && (
         <section className="bg-gradient-to-r from-emerald-950/40 to-gray-900 border border-emerald-800/50 rounded-lg p-5">
@@ -1081,6 +1307,28 @@ export default function AnalysisPanel() {
                 : "weights: reference agreement + efficiency + judge"}
             </span>
           </h2>
+          {/* The composite blends accuracy with cost and efficiency, so the
+              cheapest model can outrank a more accurate one. Say so out loud
+              rather than letting the badge imply "most accurate". */}
+          {(() => {
+            if (!verdict.useGold) return null;
+            const ranked = [...summaries].filter((s) => s.gold_top1_rate != null);
+            if (ranked.length < 2) return null;
+            const mostAccurate = ranked.reduce((a, b) =>
+              (b.gold_top1_rate ?? 0) > (a.gold_top1_rate ?? 0) ? b : a);
+            const best = verdict.best.summary;
+            if (mostAccurate.model_id === best.model_id) return null;
+            return (
+              <div className="mb-3 rounded border border-amber-900/60 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
+                <strong>{best.model_name}</strong> wins the composite, but{" "}
+                <strong>{mostAccurate.model_name}</strong> is more accurate against gold
+                ({((mostAccurate.gold_top1_rate ?? 0) * 100).toFixed(0)}% vs{" "}
+                {((best.gold_top1_rate ?? 0) * 100).toFixed(0)}% top-1). The composite also
+                rewards cost and efficiency, which can outweigh an accuracy gap. Pick on
+                gold top-1 if correctness is what matters.
+              </div>
+            );
+          })()}
           <div className="flex items-start gap-6">
             {/* Recommendation */}
             <div className="flex-1">
@@ -1231,12 +1479,16 @@ export default function AnalysisPanel() {
                 {hasGoldEvals && (
                   <>
                     <HeaderTip label="Gold T1" />
+                    <HeaderTip label="Gold T3" />
+                    <HeaderTip label="Gold T5" />
                     <HeaderTip label="Gold H" />
                     <HeaderTip label="Gold C" />
                     <HeaderTip label="Gold N" />
                   </>
                 )}
                 {/* Deterministic quality */}
+                <HeaderTip label="No answer" />
+                <HeaderTip label="Bad code" />
                 <HeaderTip label="Schema" />
                 <HeaderTip label="R-eff" />
                 <HeaderTip label="Q-eff" />
@@ -1273,6 +1525,8 @@ export default function AnalysisPanel() {
                   {hasGoldEvals && (
                     <>
                       {goldCell(consensusSummary.gold_top1_rate, "text-amber-300")}
+                      {goldCell(consensusSummary.gold_top3_rate, "text-amber-300")}
+                      {goldCell(consensusSummary.gold_top5_rate, "text-amber-300")}
                       {goldCell(consensusSummary.gold_heading_rate, "text-amber-300")}
                       {goldCell(consensusSummary.gold_chapter_rate, "text-amber-300")}
                       <td className="py-3 pr-4 text-right text-amber-300 text-xs">
@@ -1281,6 +1535,8 @@ export default function AnalysisPanel() {
                     </>
                   )}
                   {/* Deterministic quality */}
+                  <td className="py-3 pr-4 text-right text-amber-300">{noAnswerCell(consensusSummary)}</td>
+                  <td className="py-3 pr-4 text-right text-amber-300">{malformedCell(consensusSummary)}</td>
                   <td className="py-3 pr-4 text-right text-amber-300">{(consensusSummary.avg_schema_valid ?? 0).toFixed(2)}</td>
                   <td className="py-3 pr-4 text-right text-amber-300">{(consensusSummary.avg_rounds_efficiency ?? 0).toFixed(2)}</td>
                   <td className="py-3 pr-4 text-right text-amber-300">{(consensusSummary.avg_question_efficiency ?? 0).toFixed(2)}</td>
@@ -1349,6 +1605,8 @@ export default function AnalysisPanel() {
                     {hasGoldEvals && (
                       <>
                         {goldCell(s.gold_top1_rate, goldMode ? "text-emerald-300 font-medium" : "")}
+                        {goldCell(s.gold_top3_rate, goldMode ? "text-emerald-300" : "")}
+                        {goldCell(s.gold_top5_rate, goldMode ? "text-emerald-300" : "")}
                         {goldCell(s.gold_heading_rate, goldMode ? "text-emerald-300" : "")}
                         {goldCell(s.gold_chapter_rate, goldMode ? "text-emerald-300" : "")}
                         <td className="py-3 pr-4 text-right text-xs text-gray-500">
@@ -1357,6 +1615,8 @@ export default function AnalysisPanel() {
                       </>
                     )}
                     {/* Deterministic quality */}
+                    <td className="py-3 pr-4 text-right">{noAnswerCell(s)}</td>
+                    <td className="py-3 pr-4 text-right">{malformedCell(s)}</td>
                     <td className="py-3 pr-4 text-right">
                       {(s.avg_schema_valid ?? 0).toFixed(2)}
                       {comparing && <div>{deltaCell(s.avg_schema_valid ?? 0, cmp?.avg_schema_valid, v => v.toFixed(2))}</div>}
@@ -1441,6 +1701,8 @@ export default function AnalysisPanel() {
                     {hasGoldEvals && (
                       <>
                         {goldCell(cs.gold_top1_rate)}
+                        {goldCell(cs.gold_top3_rate)}
+                        {goldCell(cs.gold_top5_rate)}
                         {goldCell(cs.gold_heading_rate)}
                         {goldCell(cs.gold_chapter_rate)}
                         <td className="py-3 pr-4 text-right text-xs text-gray-500">
@@ -1449,6 +1711,8 @@ export default function AnalysisPanel() {
                       </>
                     )}
                     {/* Deterministic quality */}
+                    <td className="py-3 pr-4 text-right">{noAnswerCell(cs)}</td>
+                    <td className="py-3 pr-4 text-right">{malformedCell(cs)}</td>
                     <td className="py-3 pr-4 text-right">{(cs.avg_schema_valid ?? 0).toFixed(2)}</td>
                     <td className="py-3 pr-4 text-right">{(cs.avg_rounds_efficiency ?? 0).toFixed(2)}</td>
                     <td className="py-3 pr-4 text-right">{(cs.avg_question_efficiency ?? 0).toFixed(2)}</td>
@@ -1773,6 +2037,9 @@ export default function AnalysisPanel() {
 
       {/* Fact store: how the per-prompt schema was built */}
       <FactStorePanel results={results} rawQueryByPrompt={rawQueryByPrompt} />
+
+      {/* One product, every model - the actual dialogue */}
+      <QATranscriptPanel results={results} rawQueryByPrompt={rawQueryByPrompt} />
 
       {/* Detailed per-prompt results */}
       <section>

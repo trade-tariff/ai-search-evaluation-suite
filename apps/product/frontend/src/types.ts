@@ -184,6 +184,9 @@ export interface EvaluationResult {
   // Ground-truth fields - only set when the prompt had a gold_code
   gold_code?: string | null;
   gold_top1_match?: boolean | null;
+  gold_top3_hit?: boolean | null;
+  gold_top5_hit?: boolean | null;
+  gold_reciprocal_rank?: number | null;
   gold_heading_match?: boolean | null;
   gold_chapter_match?: boolean | null;
   gold_hierarchical_score?: number | null;
@@ -243,7 +246,14 @@ export interface ModelSummary {
   avg_rounds_efficiency?: number;
   // Gold-truth aggregates. None when no prompts in the run had a gold_code.
   gold_evaluated_count?: number;
+  no_answer_count?: number | null;
+  no_answer_rate?: number | null;
+  malformed_code_count?: number | null;
+  malformed_codes?: string[];
   gold_top1_rate?: number | null;
+  gold_top3_rate?: number | null;
+  gold_top5_rate?: number | null;
+  avg_gold_reciprocal_rank?: number | null;
   gold_heading_rate?: number | null;
   gold_chapter_rate?: number | null;
   avg_gold_hierarchical_score?: number | null;
@@ -266,6 +276,11 @@ export interface BenchmarkResults {
   model_ids: string[];
   fact_store?: Record<string, FactEntry[]>;
   prompt_sections?: Record<string, SectionInfo>;
+  // Per prompt: was the gold code actually in the retrieved candidates? Where
+  // it was not, no model could score a hit, so this sets the achievable
+  // ceiling for the run.
+  gold_retrievable?: Record<string, boolean>;
+  issues?: Array<Record<string, unknown>>;
 }
 
 export interface SectionInfo {

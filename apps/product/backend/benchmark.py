@@ -19,6 +19,7 @@ from judge import (
 from llm_judge import judge_response
 from prompts import (
     build_prompt_messages,
+    gold_is_retrievable,
     get_gold_code,
     get_gold_facts,
     get_oracle_text,
@@ -40,19 +41,76 @@ from schemas import (
 from sections import section_for_code
 from simulator import simulate_answer
 
-MAX_ROUNDS = 5
+# Matches production's interactive_search_max_questions default (7) rather
+# than the 5 this harness used to impose, so the benchmark measures the same
+# budget the live journey gives a trader.
+MAX_ROUNDS = 7
+
+# Verbatim from trade-tariff-backend
+# app/services/interactive_search_service.rb (FINAL_ANSWER_INSTRUCTION).
+# Production appends this and re-prompts once the question budget is spent;
+# without it the model asks a question into the void and the harness records
+# no answer at all, which then scores identically to a wrong answer.
+FINAL_ANSWER_INSTRUCTION = (
+    "\n\nIMPORTANT: You have asked the maximum number of questions allowed. "
+    "Based on the search input, OpenSearch results, and the answers provided "
+    "so far, you MUST now provide your best answer. Do not ask any more "
+    "questions. Rank the opensearch results by confidence using the "
+    "information you have.\n"
+)
+
+
+def _best_available_answers(prompt_index: int, opensearch_limit: int) -> str:
+    """Deterministic last resort, ported from interactive_search_service.rb
+    (best_available_answers): rank the retrieved candidates by their existing
+    order, top two "Good" and the rest "Possible".
+
+    Production can never return nothing, and neither should this. Reached only
+    when the forced-answer re-prompt ALSO fails to produce answers.
+    """
+    from prompts import get_formatted_results
+
+    results = get_formatted_results(prompt_index, opensearch_limit)[:5]
+    answers = [
+        {
+            "commodity_code": r.get("commodity_code"),
+            "confidence": "Good" if i < 2 else "Possible",
+        }
+        for i, r in enumerate(results)
+        if r.get("commodity_code")
+    ]
+    return json.dumps({"answers": answers})
+
+
+# No fan-out task should ever go this long without emitting an event. One
+# that does is hung, and waiting on it forever stalls the whole run.
+FANOUT_STALL_TIMEOUT_S = 420
 JUDGE_TIMEOUT_S = 60
 JUDGE_DRAIN_TIMEOUT_S = 300
 RESULTS_DIR = Path(__file__).parent.parent / "results"
 RESULTS_DIR.mkdir(exist_ok=True)
 
 _current_run: BenchmarkRun | None = None
+# Kept beside _current_run so a checkpoint can recompute summaries without the
+# run_benchmark closure. Summaries need model display names, nothing more.
+_current_model_map: dict = {}
 # Set when the user hits Stop; benchmark loop checks at drain boundaries and
 # cancels in-flight asyncio tasks so no more provider/judge calls are made.
 _cancel_event: asyncio.Event | None = None
 
 
 _loaded_run_cache: tuple[str, "BenchmarkRun"] | None = None
+
+
+def is_run_active() -> bool:
+    """True only while a benchmark is genuinely in flight.
+
+    Distinct from get_current_run(), which falls back to the newest saved run
+    so the results endpoints survive a restart. That fallback made /status
+    report a finished run as if it were live, so callers could never tell
+    "nothing is running" from "the last run ended badly".
+    """
+    return _current_run is not None and _current_run.status == "running"
 
 
 def get_current_run() -> BenchmarkRun | None:
@@ -104,6 +162,12 @@ def list_saved_runs() -> list[dict]:
                 "prompt_count": len(data.get("prompt_indices", [])),
                 "model_count": len(data.get("model_ids", [])),
                 "summary_count": len(data.get("summaries", [])),
+                # Without this an interrupted run reads as empty in the list,
+                # so an operator cannot tell "died immediately" from "died at
+                # 90% with most of the results intact".
+                "progress": data.get("progress", 0.0),
+                "completion_count": len(data.get("model_results", []))
+                + len(data.get("panel_results", [])),
                 "filename": f.name,
             })
         except (json.JSONDecodeError, KeyError):
@@ -120,9 +184,45 @@ def load_saved_run(run_id: str) -> BenchmarkRun | None:
 
 
 def _save_run(run: BenchmarkRun) -> None:
-    """Save a completed run to disk."""
+    """Write a run to disk atomically.
+
+    Called on every completion, not just at the end, so a dropped client or a
+    killed process leaves the work that was already paid for on disk. Writes
+    to a temp file and renames, so a crash mid-write cannot leave a truncated
+    JSON file where a valid earlier checkpoint used to be.
+    """
     path = RESULTS_DIR / f"benchmark_{run.id}.json"
-    path.write_text(run.model_dump_json(indent=2))
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(run.model_dump_json(indent=2))
+    tmp.replace(path)
+
+
+def checkpoint_current_run(status: str | None = None) -> str | None:
+    """Persist whatever the in-flight run has so far. Returns its id, or None
+    if no run is in flight.
+
+    The SSE generator that drives a benchmark is closed the moment the client
+    disconnects, so anything after the last `yield` never executes. Without a
+    checkpoint the entire run - every provider call already billed - is lost.
+    """
+    if _current_run is None:
+        return None
+    if status is not None:
+        _current_run.status = status
+    try:
+        # Recompute summaries over whatever has completed. Without this an
+        # interrupted run persists raw results but summary_count=0, so the
+        # runs list makes it look empty and the operator bins work that was
+        # already paid for.
+        _current_run.summaries = compute_summaries(_current_run, _current_model_map)
+    except Exception:
+        pass
+    try:
+        _save_run(_current_run)
+    except Exception:
+        # Never let a checkpoint failure take down the run itself.
+        return _current_run.id
+    return _current_run.id
 
 
 def _parse_questions(response_text: str) -> list[dict]:
@@ -356,12 +456,17 @@ async def _run_qa_loop(
         and fact_store is not None
     )
 
-    for round_num in range(1, MAX_ROUNDS + 1):
+    # One extra turn beyond the question budget, mirroring production: the
+    # final turn is not another chance to ask, it is a forced answer.
+    for round_num in range(1, MAX_ROUNDS + 2):
+        forced = round_num > MAX_ROUNDS
         messages = build_prompt_messages(
             prompt_index,
             qa_history if qa_history else None,
             opensearch_limit=opensearch_limit,
         )
+        if forced:
+            messages[0]["content"] += FINAL_ANSWER_INSTRUCTION
         result = await provider.complete(messages, model_config, prompt_index)
 
         if result.error:
@@ -379,6 +484,16 @@ async def _run_qa_loop(
 
         resp_type = detect_response_type(result)
         questions_asked = _parse_questions(result.response_text)
+
+        if forced:
+            # The budget is spent. Anything that is not an answer becomes the
+            # deterministic ranked fallback, so this path always yields a code.
+            if resp_type != "answers":
+                result.response_text = _best_available_answers(
+                    prompt_index, opensearch_limit
+                )
+                resp_type = "answers"
+            questions_asked = []
 
         # Push the questions live BEFORE the simulator answers them, so the
         # UI sees the model thinking out loud while the slow path runs.
@@ -501,6 +616,176 @@ async def _run_qa_loop(
     )
 
 
+def compute_summaries(run: BenchmarkRun, model_map: dict) -> list[ModelSummary]:
+    """Aggregate per-model summaries from whatever the run has so far.
+
+    Extracted from the end of run_benchmark so a checkpoint can call it too.
+    An interrupted run used to persist its raw results with no summaries at
+    all, so the runs list showed summary_count=0 and an operator would bin a
+    run that actually held perfectly good, already-paid-for results.
+
+    Safe to call mid-run: it aggregates over the evaluations recorded so far,
+    so the numbers describe the completed subset, not the intended one.
+    """
+    out: list[ModelSummary] = []
+    # ── Phase 4: Summaries ──
+    evals_by_model: dict[str, list[EvaluationResult]] = defaultdict(list)
+    for ev in run.evaluations:
+        evals_by_model[ev.model_id].append(ev)
+
+    # Index completion results by model_id so we can attribute simulator stats.
+    # Consensus rows aggregate across all panel members.
+    completions_by_model: dict[str, list[CompletionResult]] = defaultdict(list)
+    for r in run.model_results:
+        completions_by_model[r.model_id].append(r)
+    for r in run.panel_results:
+        completions_by_model[r.model_id].append(r)
+        completions_by_model["consensus"].append(r)
+
+    for mid, evals in evals_by_model.items():
+        mc = model_map.get(mid)
+        if mid == "consensus":
+            bl_id = run.baseline_model_id or "panel"
+            name = f"Consensus ({bl_id})"
+        else:
+            name = mc.name if mc else mid
+        n = len(evals)
+        if n == 0:
+            continue
+
+        # Judge now scores fact_consistency + question_quality only. Any
+        # eval with a non-None fact_consistency had a successful judge call.
+        judged_fc = [e for e in evals if e.judge_fact_consistency is not None]
+        judged_qq = [e for e in evals if e.judge_question_quality is not None]
+        jn = len(judged_fc)
+        err_count = sum(1 for e in evals if e.judge_error)
+
+        sim_completions = completions_by_model.get(mid, [])
+        sim_total_cost = sum(c.total_simulator_cost for c in sim_completions)
+        total_questions = sum(
+            sum(len(r.questions_asked) for r in c.rounds) for c in sim_completions
+        )
+        total_store_hits = sum(c.simulator_store_hits for c in sim_completions)
+        store_hit_rate = (
+            round(total_store_hits / total_questions, 4) if total_questions else 0.0
+        )
+
+        # Gold-truth aggregates: only average over evals that had a gold_code.
+        # A model with 0 gold-evaluated prompts gets gold_evaluated_count=0 and
+        # None for all rates, which the UI renders as "-".
+        gold_evals = [e for e in evals if e.gold_code is not None]
+        gold_n = len(gold_evals)
+        if gold_n > 0:
+            gold_top1_rate = round(
+                sum(1 for e in gold_evals if e.gold_top1_match) / gold_n, 4
+            )
+            gold_top3_rate = round(
+                sum(1 for e in gold_evals if e.gold_top3_hit) / gold_n, 4
+            )
+            gold_top5_rate = round(
+                sum(1 for e in gold_evals if e.gold_top5_hit) / gold_n, 4
+            )
+            avg_gold_rr = round(
+                sum(e.gold_reciprocal_rank or 0.0 for e in gold_evals) / gold_n, 4
+            )
+            gold_heading_rate = round(
+                sum(1 for e in gold_evals if e.gold_heading_match) / gold_n, 4
+            )
+            gold_chapter_rate = round(
+                sum(1 for e in gold_evals if e.gold_chapter_match) / gold_n, 4
+            )
+            avg_gold_hier = round(
+                sum(
+                    e.gold_hierarchical_score or 0.0 for e in gold_evals
+                ) / gold_n,
+                4,
+            )
+        else:
+            gold_top1_rate = None
+            gold_top3_rate = None
+            gold_top5_rate = None
+            avg_gold_rr = None
+            gold_heading_rate = None
+            gold_chapter_rate = None
+            avg_gold_hier = None
+
+        scorable = [c for c in sim_completions if not c.error]
+
+        # A code that is not 10 digits is malformed output, not a wrong
+        # answer - gpt-5-mini once returned "691200". Both score as a miss
+        # everywhere else, so count malformed separately or it hides.
+        malformed_codes = []
+        for c in scorable:
+            for code in _extract_codes(c.response_text)[:1]:
+                if not (code.isdigit() and len(code) == 10):
+                    malformed_codes.append(code)
+
+        # "No answer" = the completion carries no commodity code at all. That
+        # is a different failure from a confidently wrong code (usually the
+        # round cap ran out mid-questioning), but every accuracy metric above
+        # scores the two identically, so count it on its own.
+        no_answer_count = sum(
+            1 for c in scorable if not _extract_codes(c.response_text)
+        )
+        no_answer_rate = (
+            round(no_answer_count / len(scorable), 4) if scorable else None
+        )
+
+        # Reference-comparison boolean rates are only meaningful when at
+        # least one eval was scored against a reference. In gold mode every
+        # reference field (top1_match etc.) is None, so the rates are None
+        # ("not evaluated"), not 0.0.
+        has_reference = any(e.top1_match is not None for e in evals)
+
+        summary = ModelSummary(
+            model_id=mid,
+            model_name=name,
+            avg_cosine_similarity=_none_safe_mean([e.cosine_similarity for e in evals], 4),
+            avg_code_match_score=_none_safe_mean([e.code_match_score for e in evals], 4),
+            avg_delta_score=_none_safe_mean([e.delta_score for e in evals], 4),
+            avg_total_latency_ms=round(sum(e.total_latency_ms for e in evals) / n, 1),
+            avg_speed_factor=_none_safe_mean([e.speed_factor for e in evals], 3),
+            total_cost=round(sum(e.total_cost for e in evals), 6),
+            avg_cost_per_classification=round(sum(e.total_cost for e in evals) / n, 6),
+            top1_accuracy=round(sum(1 for e in evals if e.top1_match) / n, 4) if has_reference else None,
+            avg_top5_overlap=_none_safe_mean([e.top5_overlap for e in evals], 4),
+            avg_rounds=round(sum(e.total_rounds for e in evals) / n, 2),
+            heading_match_rate=round(sum(1 for e in evals if e.heading_match) / n, 4) if has_reference else None,
+            chapter_match_rate=round(sum(1 for e in evals if e.chapter_match) / n, 4) if has_reference else None,
+            top3_hit_rate=round(sum(1 for e in evals if e.top3_hit) / n, 4) if has_reference else None,
+            avg_mean_reciprocal_rank=_none_safe_mean([e.mean_reciprocal_rank for e in evals], 4),
+            avg_hierarchical_score=_none_safe_mean([e.hierarchical_score for e in evals], 4),
+            avg_schema_valid=round(sum(e.schema_valid for e in evals) / n, 4),
+            avg_question_efficiency=round(sum(e.question_efficiency for e in evals) / n, 4),
+            avg_rounds_efficiency=round(sum(e.rounds_efficiency for e in evals) / n, 4),
+            # Legacy judge dimensions are None (replaced by deterministic metrics)
+            avg_judge_score=None,
+            avg_judge_classification_accuracy=None,
+            avg_judge_structured_output=None,
+            avg_judge_fact_consistency=round(sum(e.judge_fact_consistency for e in judged_fc) / len(judged_fc), 2) if judged_fc else None,
+            avg_judge_question_quality=round(sum(e.judge_question_quality for e in judged_qq) / len(judged_qq), 2) if judged_qq else None,
+            judge_scored_count=jn,
+            judge_error_count=err_count,
+            total_judge_cost=round(sum(e.judge_cost for e in evals), 6),
+            total_simulator_cost=round(sim_total_cost, 6),
+            avg_simulator_store_hit_rate=store_hit_rate,
+            gold_evaluated_count=gold_n,
+            no_answer_count=no_answer_count,
+            no_answer_rate=no_answer_rate,
+            malformed_code_count=len(malformed_codes),
+            malformed_codes=malformed_codes[:5],
+            gold_top1_rate=gold_top1_rate,
+            gold_top3_rate=gold_top3_rate,
+            gold_top5_rate=gold_top5_rate,
+            avg_gold_reciprocal_rank=avg_gold_rr,
+            gold_heading_rate=gold_heading_rate,
+            gold_chapter_rate=gold_chapter_rate,
+            avg_gold_hierarchical_score=avg_gold_hier,
+        )
+        out.append(summary)
+    return out
+
+
 async def run_benchmark(
     prompt_indices: list[int],
     model_ids: list[str],
@@ -508,7 +793,7 @@ async def run_benchmark(
     opensearch_limit: int = 80,
     gold_mode: bool | None = None,
 ) -> AsyncIterator[SSEEvent]:
-    global _current_run, _cancel_event
+    global _current_run, _cancel_event, _current_model_map
     clear_provider_cache()
     _cancel_event = asyncio.Event()
     all_tasks: list[asyncio.Task] = []
@@ -539,6 +824,14 @@ async def run_benchmark(
     oracle_by_prompt: dict[int, str | None] = {
         pi: get_oracle_text(pi) for pi in prompt_indices
     }
+    # Which prompts CAN be answered correctly at all. The prompt forbids
+    # answering outside the retrieved candidates, so a prompt whose gold code
+    # is missing from them caps every model at zero for that prompt.
+    gold_retrievable = {
+        str(pi): r
+        for pi in prompt_indices
+        if (r := gold_is_retrievable(pi, opensearch_limit)) is not None
+    }
     # Gold mode: when every prompt carries a gold code, the reference panel,
     # consensus and LLM judge add no correctness signal - candidates are
     # scored against gold directly, which saves the panel + judge spend.
@@ -557,10 +850,13 @@ async def run_benchmark(
         gold_mode=gold_mode_effective,
         prompt_indices=prompt_indices,
         model_ids=model_ids,
+        gold_retrievable=gold_retrievable,
     )
 
     api_keys = config.api_keys.model_dump()
     model_map: dict[str, ModelConfig] = {m.id: m for m in config.models}
+    # Checkpoints recompute summaries outside this closure; they need names.
+    _current_model_map = model_map
 
     # Reference is pinned via ReferenceConfig. Three modes:
     #   single     -> [ref_model]               (1 task per prompt)
@@ -608,19 +904,29 @@ async def run_benchmark(
         yield SSEEvent(event="error", data={"message": ref_err})
         return
 
+    if gold_mode_effective:
+        # No reference phase in gold mode - the panel is never launched. This
+        # has to happen BEFORE the candidate dedup below: otherwise a model that
+        # is also the reference is dropped from the candidates, and then the
+        # panel it was dropped into is emptied, so it runs nowhere at all.
+        panel_mcs = []
+
     # Candidates = user-selected minus any that are already in the reference set
     # (de-dupes the case where a user explicitly picks the reference model).
     panel_ids = {mc.id for mc in panel_mcs}
     candidate_mcs: list[ModelConfig] = []
+    deduped_into_panel: list[str] = []
     for mid in model_ids:
         mc = model_map.get(mid)
-        if mc is None or mc.id in panel_ids:
+        if mc is None:
+            continue
+        if mc.id in panel_ids:
+            # Still runs, but as the reference - not as a scored candidate.
+            # Surfaced to the UI below so its absence from the results table
+            # is explained rather than silent.
+            deduped_into_panel.append(mc.id)
             continue
         candidate_mcs.append(mc)
-
-    if gold_mode_effective:
-        # No reference phase in gold mode - the panel is never launched.
-        panel_mcs = []
 
     if not panel_mcs and not candidate_mcs:
         _current_run.status = "error"
@@ -656,6 +962,17 @@ async def run_benchmark(
             "candidate_models": [mc.id for mc in candidate_mcs],
             "seeded_facts": seeded_facts,  # {prompt_index: count}
             "oracle_prompts": [pi for pi, t in oracle_by_prompt.items() if t],
+            # {prompt_index: gold_code} for every prompt that has one, so the
+            # live UI can mark answers against gold instead of the reference.
+            "gold_codes": {
+                str(pi): code
+                for pi in prompt_indices
+                if (code := get_gold_code(pi))
+            },
+            # The achievable ceiling. Where gold is not in the candidate set,
+            # no model can be right, so accuracy read without this is
+            # measuring retrieval staleness and calling it model quality.
+            "gold_retrievable": _current_run.gold_retrievable,
             "max_rounds": MAX_ROUNDS,
             "simulator_enabled": simulator_client is not None,
             "simulator_model": sim_cfg.model if simulator_client else None,
@@ -671,6 +988,42 @@ async def run_benchmark(
                 "reason": (
                     "explicitly requested" if gold_mode
                     else "all prompts have gold codes"
+                ),
+            },
+        )
+
+    if gold_mode_effective:
+        # Gold mode runs no reference phase, so a prompt without a gold code
+        # has nothing to be scored against. It still runs (the Q&A transcript
+        # is often what you wanted) but contributes to no accuracy figure -
+        # say which ones rather than quietly averaging over fewer prompts.
+        unscored = [pi for pi in prompt_indices if not get_gold_code(pi)]
+        if unscored:
+            yield SSEEvent(
+                event="benchmark:unscored_prompts",
+                data={
+                    "prompt_indices": unscored,
+                    "message": (
+                        f"{len(unscored)} selected prompt(s) have no gold code "
+                        f"({', '.join('#' + str(pi) for pi in unscored)}). They will run "
+                        "but are not scored. Deselect them, or switch scoring to the "
+                        "reference model to score everything against a model-built baseline."
+                    ),
+                },
+            )
+
+    if deduped_into_panel:
+        # A selected model that is also the reference runs as the reference and
+        # never appears as a scored candidate. Say so, rather than letting it
+        # vanish from the results table with no explanation.
+        yield SSEEvent(
+            event="benchmark:model_deduped",
+            data={
+                "model_ids": deduped_into_panel,
+                "message": (
+                    f"{', '.join(deduped_into_panel)} is the configured reference model, "
+                    "so it runs as the reference and is not scored as a candidate. "
+                    "Change Configure > Reference Model to score it head-to-head."
                 ),
             },
         )
@@ -725,6 +1078,11 @@ async def run_benchmark(
             all_tasks.append(asyncio.create_task(run_panel_prompt(mc, pi)))
 
     panel_done = 0
+    # Same idle-connection problem as the fan-out phase: a quiet stretch with
+    # no events lets a proxy drop the stream. Behind an ALB (60s default idle
+    # timeout) this phase would be the first to die.
+    panel_last_event = asyncio.get_running_loop().time()
+    panel_last_heartbeat = 0.0
     while panel_done < panel_task_count:
         if check_cancelled():
             _current_run.status = "cancelled"
@@ -733,7 +1091,36 @@ async def run_benchmark(
             return
         try:
             item = await asyncio.wait_for(event_bus.get(), timeout=1.0)
+            panel_last_event = asyncio.get_running_loop().time()
         except asyncio.TimeoutError:
+            now = asyncio.get_running_loop().time()
+            stalled_for = now - panel_last_event
+            if stalled_for >= FANOUT_STALL_TIMEOUT_S:
+                for task in all_tasks:
+                    if not task.done():
+                        task.cancel()
+                _current_run.issues.append({
+                    "kind": "error",
+                    "source": "panel_stall",
+                    "message": (
+                        f"{panel_task_count - panel_done} reference task(s) cancelled "
+                        f"after {round(stalled_for)}s with no activity"
+                    ),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                })
+                yield SSEEvent(event="benchmark:panel_stalled", data={
+                    "outstanding": panel_task_count - panel_done,
+                    "stalled_seconds": round(stalled_for),
+                })
+                break
+            if now - panel_last_heartbeat >= 15.0:
+                panel_last_heartbeat = now
+                yield SSEEvent(event="benchmark:waiting", data={
+                    "phase": "panel",
+                    "done": panel_done,
+                    "total": panel_task_count,
+                    "stalled_seconds": round(stalled_for),
+                })
             continue
         kind = item[0]
         if kind == "live":
@@ -759,6 +1146,7 @@ async def run_benchmark(
         _current_run.panel_results.append(result)
         completed += 1
         _current_run.progress = completed / total_tasks
+        checkpoint_current_run()
 
         # Surface any task-level errors (reached after retries were exhausted
         # in the provider layer) into the run's issues log + SSE so the UI
@@ -974,14 +1362,40 @@ async def run_benchmark(
         except Exception as exc:
             await event_bus.put(("candidate_done", mc.id, pi, exc))
 
-    for mc in candidate_mcs:
-        for pi in prompt_indices:
-            all_tasks.append(asyncio.create_task(run_model_prompt(mc, pi)))
-            fan_out_count += 1
+    # Models run SEQUENTIALLY within a prompt, prompts run concurrently.
+    #
+    # The fact store is first-writer-wins: the first model to ask about a
+    # concept fixes the answer for every model after it. Firing all
+    # (model, prompt) pairs concurrently meant the winner of that race was
+    # decided by asyncio scheduling, so two identical runs could commit
+    # different facts and hand every model a different product. Measured on
+    # two back-to-back runs: 10 of 20 prompts ended with a different set of
+    # slots, and 4 shared slots got different answers - every one of them
+    # first-written by a different model. On prompt 43 the committed carbon
+    # content differed, which is the classification for that heading.
+    #
+    # Fixing the order makes the same model always write first, so a repeat
+    # run sees the same product. Prompts stay parallel, so the wall-clock cost
+    # is bounded by models-per-prompt, not by the full fan-out.
+    async def run_prompt_all_models(pi: int) -> None:
+        for mc in candidate_mcs:
+            await run_model_prompt(mc, pi)
+
+    for pi in prompt_indices:
+        all_tasks.append(asyncio.create_task(run_prompt_all_models(pi)))
+    fan_out_count = len(prompt_indices) * len(candidate_mcs)
 
     yield SSEEvent(event="fanout:start", data={"total_tasks": fan_out_count})
 
     candidate_done_count = 0
+    # A single hung task used to stall the entire run: the loop below waits on
+    # the event bus forever, emitting nothing, so the run never finalises and
+    # the idle connection is eventually dropped by an intermediary. Three
+    # 20x3 runs died at 59/60 that way, each on a different task. Bound the
+    # wait, and emit a heartbeat while waiting so the stream stays alive and
+    # the UI can say what is outstanding.
+    fanout_last_event = asyncio.get_running_loop().time()
+    fanout_last_heartbeat = 0.0
     while candidate_done_count < fan_out_count:
         if check_cancelled():
             _current_run.status = "cancelled"
@@ -990,7 +1404,42 @@ async def run_benchmark(
             return
         try:
             item = await asyncio.wait_for(event_bus.get(), timeout=1.0)
+            fanout_last_event = asyncio.get_running_loop().time()
         except asyncio.TimeoutError:
+            now = asyncio.get_running_loop().time()
+            stalled_for = now - fanout_last_event
+            if stalled_for >= FANOUT_STALL_TIMEOUT_S:
+                outstanding = fan_out_count - candidate_done_count
+                for task in all_tasks:
+                    if not task.done():
+                        task.cancel()
+                yield SSEEvent(event="benchmark:fanout_stalled", data={
+                    "outstanding": outstanding,
+                    "stalled_seconds": round(stalled_for),
+                    "message": (
+                        f"{outstanding} task(s) produced no events for "
+                        f"{round(stalled_for)}s and were cancelled. The run is "
+                        "finalised with the completions it already has."
+                    ),
+                })
+                _current_run.issues.append({
+                    "kind": "error",
+                    "source": "fanout_stall",
+                    "message": (
+                        f"{outstanding} task(s) cancelled after {round(stalled_for)}s "
+                        "with no activity; run finalised with the completions it had"
+                    ),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                })
+                break
+            if now - fanout_last_heartbeat >= 15.0:
+                fanout_last_heartbeat = now
+                yield SSEEvent(event="benchmark:waiting", data={
+                    "phase": "fanout",
+                    "done": candidate_done_count,
+                    "total": fan_out_count,
+                    "stalled_seconds": round(stalled_for),
+                })
             continue
         kind = item[0]
         if kind == "live":
@@ -1015,6 +1464,7 @@ async def run_benchmark(
         _current_run.model_results.append(result)
         completed += 1
         _current_run.progress = completed / total_tasks
+        checkpoint_current_run()
 
         # Evaluate against consensus and fire judge immediately. Pass the
         # prompt's gold_code (if any) so candidates get scored against the
@@ -1148,119 +1598,7 @@ async def run_benchmark(
             })
 
     # ── Phase 4: Summaries ──
-    evals_by_model: dict[str, list[EvaluationResult]] = defaultdict(list)
-    for ev in _current_run.evaluations:
-        evals_by_model[ev.model_id].append(ev)
-
-    # Index completion results by model_id so we can attribute simulator stats.
-    # Consensus rows aggregate across all panel members.
-    completions_by_model: dict[str, list[CompletionResult]] = defaultdict(list)
-    for r in _current_run.model_results:
-        completions_by_model[r.model_id].append(r)
-    for r in _current_run.panel_results:
-        completions_by_model[r.model_id].append(r)
-        completions_by_model["consensus"].append(r)
-
-    for mid, evals in evals_by_model.items():
-        mc = model_map.get(mid)
-        if mid == "consensus":
-            bl_id = _current_run.baseline_model_id or "panel"
-            name = f"Consensus ({bl_id})"
-        else:
-            name = mc.name if mc else mid
-        n = len(evals)
-        if n == 0:
-            continue
-
-        # Judge now scores fact_consistency + question_quality only. Any
-        # eval with a non-None fact_consistency had a successful judge call.
-        judged_fc = [e for e in evals if e.judge_fact_consistency is not None]
-        judged_qq = [e for e in evals if e.judge_question_quality is not None]
-        jn = len(judged_fc)
-        err_count = sum(1 for e in evals if e.judge_error)
-
-        sim_completions = completions_by_model.get(mid, [])
-        sim_total_cost = sum(c.total_simulator_cost for c in sim_completions)
-        total_questions = sum(
-            sum(len(r.questions_asked) for r in c.rounds) for c in sim_completions
-        )
-        total_store_hits = sum(c.simulator_store_hits for c in sim_completions)
-        store_hit_rate = (
-            round(total_store_hits / total_questions, 4) if total_questions else 0.0
-        )
-
-        # Gold-truth aggregates: only average over evals that had a gold_code.
-        # A model with 0 gold-evaluated prompts gets gold_evaluated_count=0 and
-        # None for all rates, which the UI renders as "-".
-        gold_evals = [e for e in evals if e.gold_code is not None]
-        gold_n = len(gold_evals)
-        if gold_n > 0:
-            gold_top1_rate = round(
-                sum(1 for e in gold_evals if e.gold_top1_match) / gold_n, 4
-            )
-            gold_heading_rate = round(
-                sum(1 for e in gold_evals if e.gold_heading_match) / gold_n, 4
-            )
-            gold_chapter_rate = round(
-                sum(1 for e in gold_evals if e.gold_chapter_match) / gold_n, 4
-            )
-            avg_gold_hier = round(
-                sum(
-                    e.gold_hierarchical_score or 0.0 for e in gold_evals
-                ) / gold_n,
-                4,
-            )
-        else:
-            gold_top1_rate = None
-            gold_heading_rate = None
-            gold_chapter_rate = None
-            avg_gold_hier = None
-
-        # Reference-comparison boolean rates are only meaningful when at
-        # least one eval was scored against a reference. In gold mode every
-        # reference field (top1_match etc.) is None, so the rates are None
-        # ("not evaluated"), not 0.0.
-        has_reference = any(e.top1_match is not None for e in evals)
-
-        summary = ModelSummary(
-            model_id=mid,
-            model_name=name,
-            avg_cosine_similarity=_none_safe_mean([e.cosine_similarity for e in evals], 4),
-            avg_code_match_score=_none_safe_mean([e.code_match_score for e in evals], 4),
-            avg_delta_score=_none_safe_mean([e.delta_score for e in evals], 4),
-            avg_total_latency_ms=round(sum(e.total_latency_ms for e in evals) / n, 1),
-            avg_speed_factor=_none_safe_mean([e.speed_factor for e in evals], 3),
-            total_cost=round(sum(e.total_cost for e in evals), 6),
-            avg_cost_per_classification=round(sum(e.total_cost for e in evals) / n, 6),
-            top1_accuracy=round(sum(1 for e in evals if e.top1_match) / n, 4) if has_reference else None,
-            avg_top5_overlap=_none_safe_mean([e.top5_overlap for e in evals], 4),
-            avg_rounds=round(sum(e.total_rounds for e in evals) / n, 2),
-            heading_match_rate=round(sum(1 for e in evals if e.heading_match) / n, 4) if has_reference else None,
-            chapter_match_rate=round(sum(1 for e in evals if e.chapter_match) / n, 4) if has_reference else None,
-            top3_hit_rate=round(sum(1 for e in evals if e.top3_hit) / n, 4) if has_reference else None,
-            avg_mean_reciprocal_rank=_none_safe_mean([e.mean_reciprocal_rank for e in evals], 4),
-            avg_hierarchical_score=_none_safe_mean([e.hierarchical_score for e in evals], 4),
-            avg_schema_valid=round(sum(e.schema_valid for e in evals) / n, 4),
-            avg_question_efficiency=round(sum(e.question_efficiency for e in evals) / n, 4),
-            avg_rounds_efficiency=round(sum(e.rounds_efficiency for e in evals) / n, 4),
-            # Legacy judge dimensions are None (replaced by deterministic metrics)
-            avg_judge_score=None,
-            avg_judge_classification_accuracy=None,
-            avg_judge_structured_output=None,
-            avg_judge_fact_consistency=round(sum(e.judge_fact_consistency for e in judged_fc) / len(judged_fc), 2) if judged_fc else None,
-            avg_judge_question_quality=round(sum(e.judge_question_quality for e in judged_qq) / len(judged_qq), 2) if judged_qq else None,
-            judge_scored_count=jn,
-            judge_error_count=err_count,
-            total_judge_cost=round(sum(e.judge_cost for e in evals), 6),
-            total_simulator_cost=round(sim_total_cost, 6),
-            avg_simulator_store_hit_rate=store_hit_rate,
-            gold_evaluated_count=gold_n,
-            gold_top1_rate=gold_top1_rate,
-            gold_heading_rate=gold_heading_rate,
-            gold_chapter_rate=gold_chapter_rate,
-            avg_gold_hierarchical_score=avg_gold_hier,
-        )
-        _current_run.summaries.append(summary)
+    _current_run.summaries = compute_summaries(_current_run, model_map)
 
     # Persist the per-prompt fact store snapshot so the UI can render it.
     _current_run.fact_store = {

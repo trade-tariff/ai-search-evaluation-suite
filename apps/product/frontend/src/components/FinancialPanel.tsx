@@ -84,7 +84,7 @@ export default function FinancialPanel() {
             setSelectedRunId(mostRecent.id);
           } else if (!cancelled) {
             setErr(
-              "No legacy benchmark runs yet - project spend (fact extraction, embeddings, E2E Q&A, classification matrix) is shown below. To populate the benchmark cost tables, use Legacy > Run Benchmark.",
+              "No legacy benchmark runs yet - project spend (fact extraction, embeddings, E2E Q&A, classification matrix) is shown below. To populate the benchmark cost tables, use Results > Model Comparison.",
             );
           }
         }

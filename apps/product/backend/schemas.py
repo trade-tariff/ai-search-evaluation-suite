@@ -28,6 +28,13 @@ class ModelConfig(BaseModel):
     thinking_budget: Optional[int] = None  # for Anthropic extended thinking
     input_cost_per_million: float = 0.0
     output_cost_per_million: float = 0.0
+    # Providers bill re-sent prompt prefixes at a discount. This harness
+    # re-sends the same ~80-candidate context every round, so the cached
+    # share is large and billing it at full input rate overstates cost -
+    # which then feeds the cost term in the composite verdict. None = no
+    # discount (previous behaviour). VERIFY against current provider
+    # pricing before trusting the Costs tab.
+    cached_input_cost_per_million: Optional[float] = None
 
 
 class ApiKeys(BaseModel):
@@ -219,6 +226,8 @@ class QARound(BaseModel):
 class CompletionResult(BaseModel):
     model_id: str
     prompt_index: int
+    # Portion of input_tokens the provider served from its prompt cache.
+    cached_input_tokens: int = 0
     response_text: str  # final response text
     response_type: str = "unknown"  # final response type
     rounds: list[QARound] = []
@@ -269,6 +278,9 @@ class EvaluationResult(BaseModel):
     # single most valuable signal when a gold set is available.
     gold_code: Optional[str] = None
     gold_top1_match: Optional[bool] = None
+    gold_top3_hit: Optional[bool] = None
+    gold_top5_hit: Optional[bool] = None
+    gold_reciprocal_rank: Optional[float] = None
     gold_heading_match: Optional[bool] = None
     gold_chapter_match: Optional[bool] = None
     gold_hierarchical_score: Optional[float] = None
@@ -339,9 +351,26 @@ class ModelSummary(BaseModel):
     # that had a gold code. Rate = matches / gold_evaluated_count.
     gold_evaluated_count: int = 0
     gold_top1_rate: Optional[float] = None
+    # Rank-aware: production shows the trader a ranked list of five, so gold at
+    # rank 2 is a usable answer. These are also markedly more stable run to run
+    # than top-1, which swings up to 10pp on identical configs.
+    gold_top3_rate: Optional[float] = None
+    gold_top5_rate: Optional[float] = None
+    avg_gold_reciprocal_rank: Optional[float] = None
     gold_heading_rate: Optional[float] = None
     gold_chapter_rate: Optional[float] = None
     avg_gold_hierarchical_score: Optional[float] = None
+    # Completions that finished without committing to any commodity code -
+    # typically the model used every round asking questions and never
+    # answered. Scored the same as a wrong answer everywhere else, so it is
+    # counted separately to keep the round cap's cost visible.
+    no_answer_count: int = 0
+    no_answer_rate: Optional[float] = None
+    # Top codes that are not 10 digits - malformed output rather than a wrong
+    # classification. Scored identically to a genuine miss everywhere else, so
+    # counted here to keep the two distinguishable.
+    malformed_code_count: int = 0
+    malformed_codes: list[str] = []
 
 
 class BenchmarkRun(BaseModel):
@@ -373,6 +402,11 @@ class BenchmarkRun(BaseModel):
     # {kind: "retry"|"error", source: str, model_id?: str, prompt_index?: int,
     #  message: str, attempt?: int, timestamp: str}
     issues: list[dict] = []
+    # Per-prompt: is the gold code present in that prompt's retrieved
+    # candidates? False means no model can score a hit there, because the
+    # prompt forbids answering outside the results. Shape:
+    # { "<prompt_index>": true|false }
+    gold_retrievable: dict[str, bool] = {}
     # Per-prompt OTT section tag, derived from the reference's top commodity
     # code after consensus is computed. Shape:
     # { "<prompt_index>": {"number": int, "roman": str, "title": str} }

@@ -26,6 +26,7 @@ COPY apps/product/backend/_retry.py \
      apps/product/backend/atar.py \
      apps/product/backend/auth.py \
      apps/product/backend/benchmark.py \
+     apps/product/backend/commodity_codes.py \
      apps/product/backend/complexity_charts.py \
      apps/product/backend/config.py \
      apps/product/backend/experiment_retrieval.py \

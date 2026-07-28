@@ -8,12 +8,25 @@ from schemas import PromptInfo
 DATA_PATH = Path(__file__).parent.parent / "data" / "search_contexts.json"
 
 _cached_data: dict | None = None
+_cached_mtime: float | None = None
 
 
 def _load_raw() -> dict:
-    global _cached_data
-    if _cached_data is None:
+    """Load search_contexts.json, reloading whenever the file changes on disk.
+
+    This file is MUTABLE state, not config - approve_draft() appends to it. The
+    cache used to be invalidated only by the process that did the writing, so
+    any other worker served stale prompts indefinitely. Keying on mtime makes
+    every process pick up writes, whoever made them.
+    """
+    global _cached_data, _cached_mtime
+    try:
+        mtime = DATA_PATH.stat().st_mtime
+    except OSError:
+        mtime = None
+    if _cached_data is None or mtime != _cached_mtime:
         _cached_data = json.loads(DATA_PATH.read_text())
+        _cached_mtime = mtime
     return _cached_data
 
 
@@ -128,6 +141,41 @@ def build_prompt_messages(
         {"role": "system", "content": filled},
         {"role": "user", "content": f"Classify: {query['raw_query']}"},
     ]
+
+
+def get_formatted_results(prompt_index: int, opensearch_limit: int = 80) -> list[dict]:
+    """Retrieved candidates for a prompt, in retrieval order. Used by the
+    forced-answer fallback when the model will not commit to a code."""
+    data = _load_raw()
+    for q in data["queries"]:
+        if q["index"] == prompt_index:
+            return (q.get("formatted_results") or [])[:opensearch_limit]
+    return []
+
+
+def gold_is_retrievable(prompt_index: int, opensearch_limit: int = 80) -> bool | None:
+    """Is the gold code actually present in this prompt's candidate set?
+
+    The system prompt tells the model not to go beyond the retrieved results
+    ("don't go beyond these search results ... even if you know the results
+    are incorrect"), so when gold is absent NO model can score a hit. Those
+    prompts cap the achievable accuracy, and reading a score without knowing
+    the cap makes a retrieval problem look like a model problem.
+
+    Returns None when the prompt has no gold code to check against.
+    """
+    data = _load_raw()
+    for q in data["queries"]:
+        if q["index"] == prompt_index:
+            gold = q.get("gold_code")
+            if not gold:
+                return None
+            codes = {
+                str(r.get("commodity_code"))
+                for r in (q.get("formatted_results") or [])[:opensearch_limit]
+            }
+            return str(gold) in codes
+    return None
 
 
 def get_raw_query(prompt_index: int) -> str:
