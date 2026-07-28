@@ -608,19 +608,29 @@ async def run_benchmark(
         yield SSEEvent(event="error", data={"message": ref_err})
         return
 
+    if gold_mode_effective:
+        # No reference phase in gold mode - the panel is never launched. This
+        # has to happen BEFORE the candidate dedup below: otherwise a model that
+        # is also the reference is dropped from the candidates, and then the
+        # panel it was dropped into is emptied, so it runs nowhere at all.
+        panel_mcs = []
+
     # Candidates = user-selected minus any that are already in the reference set
     # (de-dupes the case where a user explicitly picks the reference model).
     panel_ids = {mc.id for mc in panel_mcs}
     candidate_mcs: list[ModelConfig] = []
+    deduped_into_panel: list[str] = []
     for mid in model_ids:
         mc = model_map.get(mid)
-        if mc is None or mc.id in panel_ids:
+        if mc is None:
+            continue
+        if mc.id in panel_ids:
+            # Still runs, but as the reference - not as a scored candidate.
+            # Surfaced to the UI below so its absence from the results table
+            # is explained rather than silent.
+            deduped_into_panel.append(mc.id)
             continue
         candidate_mcs.append(mc)
-
-    if gold_mode_effective:
-        # No reference phase in gold mode - the panel is never launched.
-        panel_mcs = []
 
     if not panel_mcs and not candidate_mcs:
         _current_run.status = "error"
@@ -656,6 +666,13 @@ async def run_benchmark(
             "candidate_models": [mc.id for mc in candidate_mcs],
             "seeded_facts": seeded_facts,  # {prompt_index: count}
             "oracle_prompts": [pi for pi, t in oracle_by_prompt.items() if t],
+            # {prompt_index: gold_code} for every prompt that has one, so the
+            # live UI can mark answers against gold instead of the reference.
+            "gold_codes": {
+                str(pi): code
+                for pi in prompt_indices
+                if (code := get_gold_code(pi))
+            },
             "max_rounds": MAX_ROUNDS,
             "simulator_enabled": simulator_client is not None,
             "simulator_model": sim_cfg.model if simulator_client else None,
@@ -671,6 +688,42 @@ async def run_benchmark(
                 "reason": (
                     "explicitly requested" if gold_mode
                     else "all prompts have gold codes"
+                ),
+            },
+        )
+
+    if gold_mode_effective:
+        # Gold mode runs no reference phase, so a prompt without a gold code
+        # has nothing to be scored against. It still runs (the Q&A transcript
+        # is often what you wanted) but contributes to no accuracy figure -
+        # say which ones rather than quietly averaging over fewer prompts.
+        unscored = [pi for pi in prompt_indices if not get_gold_code(pi)]
+        if unscored:
+            yield SSEEvent(
+                event="benchmark:unscored_prompts",
+                data={
+                    "prompt_indices": unscored,
+                    "message": (
+                        f"{len(unscored)} selected prompt(s) have no gold code "
+                        f"({', '.join('#' + str(pi) for pi in unscored)}). They will run "
+                        "but are not scored. Deselect them, or switch scoring to the "
+                        "reference model to score everything against a model-built baseline."
+                    ),
+                },
+            )
+
+    if deduped_into_panel:
+        # A selected model that is also the reference runs as the reference and
+        # never appears as a scored candidate. Say so, rather than letting it
+        # vanish from the results table with no explanation.
+        yield SSEEvent(
+            event="benchmark:model_deduped",
+            data={
+                "model_ids": deduped_into_panel,
+                "message": (
+                    f"{', '.join(deduped_into_panel)} is the configured reference model, "
+                    "so it runs as the reference and is not scored as a candidate. "
+                    "Change Configure > Reference Model to score it head-to-head."
                 ),
             },
         )

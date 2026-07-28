@@ -88,6 +88,17 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
   const [factStoreView, setFactStoreView] = useState<"timeline" | "matrix">("matrix");
   // Live per-prompt reference top code for on-the-fly accuracy calc
   const [referenceCodeByPrompt, setReferenceCodeByPrompt] = useState<Record<number, string>>({});
+  // Gold code per prompt (from benchmark:start). When a prompt has one it is
+  // the truth to mark against; the reference is only a fallback.
+  const [goldCodeByPrompt, setGoldCodeByPrompt] = useState<Record<number, string>>({});
+  // Models dropped from the candidate set because they are the reference.
+  const [dedupedNote, setDedupedNote] = useState<string | null>(null);
+  // Prompts that will run but cannot be scored under the chosen mode.
+  const [unscoredNote, setUnscoredNote] = useState<string | null>(null);
+  // Scoring mode. "gold" is the default and is pinned, not auto-detected:
+  // dropping one non-gold prompt into the selection used to flip the whole
+  // run back to reference scoring silently, which inverted the numbers.
+  const [scoring, setScoring] = useState<"gold" | "reference">("gold");
   const ctrlRef = useRef<AbortController | null>(null);
 
   const addLog = (event: string, data: Record<string, unknown>) => {
@@ -114,6 +125,9 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
     setReferenceTotalTasks(0);
     setCandidateCompletions([]);
     setReferenceCodeByPrompt({});
+    setGoldCodeByPrompt({});
+    setDedupedNote(null);
+    setUnscoredNote(null);
 
     ctrlRef.current = startBenchmarkSSE(
       promptIndices,
@@ -122,10 +136,24 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
 
         addLog(event, data);
 
+        if (event === "benchmark:start") {
+          // Gold codes arrive up-front so live marking never has to wait on a
+          // reference phase that may not run at all.
+          const golds = (data.gold_codes ?? {}) as Record<string, string>;
+          const parsed: Record<number, string> = {};
+          for (const [pi, code] of Object.entries(golds)) parsed[Number(pi)] = code;
+          setGoldCodeByPrompt(parsed);
+        }
         if (event === "benchmark:gold_mode") {
           // Gold mode: the reference/consensus/judge phases are skipped, so
           // no panel:* events will arrive for this run.
           setGoldMode(Boolean(data.enabled));
+        }
+        if (event === "benchmark:model_deduped") {
+          setDedupedNote(String(data.message || ""));
+        }
+        if (event === "benchmark:unscored_prompts") {
+          setUnscoredNote(String(data.message || ""));
         }
         if (event === "fanout:start") {
           setFanoutTotal(Number(data.total_tasks) || 0);
@@ -219,6 +247,7 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
         setRunning(false);
       },
       opensearchLimit,
+      scoring === "gold",
     );
   };
 
@@ -303,13 +332,21 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
 
   return (
     <div className="space-y-6">
-      {/* Legacy notice */}
-      <div className="border border-amber-900/50 bg-amber-950/20 text-amber-200/80 text-xs rounded p-2">
-        Legacy exploratory eval - compares models against a model-built
-        reference. For measuring the system against known-correct answers use
-        Gold Eval - E2E (it is cheaper and anchored to gold). When every
-        selected prompt has a gold answer this run automatically skips the
-        reference, consensus and judge phases.
+      {/* What this tab is for, and when to use the gold-eval jobs instead */}
+      <div className="border border-gray-800 bg-gray-900/60 text-gray-300 text-xs rounded p-2 space-y-1">
+        <div>
+          Runs several models head-to-head over the same prompts. Every model
+          shares one simulated trader: the first model to ask about a concept
+          sets the answer, and every later model asking the same concept gets
+          that answer back - so the comparison measures the models, not
+          variation in what the trader happened to say.
+        </div>
+        <div className="text-gray-500">
+          Scoring is set below and stays where you put it - it is not inferred
+          from which prompts you picked. To compare <em>pipeline</em>
+          configuration - retrieval base, persona, question mode - at a fixed
+          model, use Gold Eval - E2E instead.
+        </div>
       </div>
       {/* Controls */}
       <div className="flex items-center gap-4">
@@ -344,6 +381,48 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
         )}
       </div>
 
+      {/* Scoring mode. Pinned, not inferred from the selection. */}
+      <div className="flex items-start gap-3 text-xs">
+        <span className="text-gray-500 pt-1 shrink-0">Score against</span>
+        <div className="flex rounded overflow-hidden border border-gray-700 shrink-0">
+          <button
+            onClick={() => setScoring("gold")}
+            disabled={running}
+            className={`px-3 py-1 ${scoring === "gold" ? "bg-yellow-900/60 text-yellow-200" : "bg-gray-900 text-gray-400 hover:text-gray-200"} disabled:opacity-50`}
+          >
+            Gold answers
+          </button>
+          <button
+            onClick={() => setScoring("reference")}
+            disabled={running}
+            className={`px-3 py-1 border-l border-gray-700 ${scoring === "reference" ? "bg-amber-900/60 text-amber-200" : "bg-gray-900 text-gray-400 hover:text-gray-200"} disabled:opacity-50`}
+          >
+            Reference model (legacy)
+          </button>
+        </div>
+        <span className="text-gray-500 pt-1">
+          {scoring === "gold"
+            ? "Answers are marked against the ATaR gold code. No reference, consensus or judge phases. Prompts without a gold code still run but are not scored."
+            : "Answers are marked against the configured reference model, with consensus and the LLM judge. Use for prompts that have no gold answer."}
+        </span>
+      </div>
+
+      {/* A selected model that is also the reference is not scored as a
+          candidate. Say so - it used to disappear from the results with no
+          explanation. */}
+      {dedupedNote && (
+        <div className="rounded border border-amber-900/60 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
+          {dedupedNote}
+        </div>
+      )}
+
+      {/* Selected prompts with no gold code under gold scoring. */}
+      {unscoredNote && (
+        <div className="rounded border border-amber-900/60 bg-amber-950/30 px-3 py-2 text-xs text-amber-200">
+          {unscoredNote}
+        </div>
+      )}
+
       {/* Progress bar */}
       {(running || done) && (
         <div className="bg-gray-800 rounded-full h-3 overflow-hidden">
@@ -375,7 +454,7 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
             <div>
               <h3 className="text-sm font-medium">Live Ranking</h3>
               <p className="text-xs text-gray-500 mt-0.5">
-                Running top-1 accuracy per candidate vs the reference, updated as each candidate-prompt completes. Approximate mid-run; final composite is on the Benchmark Results tab.
+                Running top-1 accuracy per candidate, marked against the gold code where the prompt has one and against the reference otherwise. Updated as each candidate-prompt completes. Approximate mid-run; final composite is on the Benchmark Results tab.
               </p>
             </div>
           </div>
@@ -384,24 +463,30 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
             const byModel = new Map<string, {
               completed: number;
               correct: number;
+              scored: number;
               totalLatency: number;
               totalCost: number;
               totalRounds: number;
               errored: number;
             }>();
+            // Mark against gold where the prompt has one; fall back to the
+            // reference only for prompts with no gold code. `scored` counts the
+            // completions we could actually mark, so the percentage is over
+            // markable prompts rather than being diluted by unmarkable ones.
             for (const c of candidateCompletions) {
               if (!byModel.has(c.model_id)) {
                 byModel.set(c.model_id, {
-                  completed: 0, correct: 0, totalLatency: 0,
+                  completed: 0, correct: 0, scored: 0, totalLatency: 0,
                   totalCost: 0, totalRounds: 0, errored: 0,
                 });
               }
               const s = byModel.get(c.model_id)!;
               s.completed += 1;
               if (c.error) s.errored += 1;
-              if (c.top_code && referenceCodeByPrompt[c.prompt_index] &&
-                  c.top_code === referenceCodeByPrompt[c.prompt_index]) {
-                s.correct += 1;
+              const truth = goldCodeByPrompt[c.prompt_index] ?? referenceCodeByPrompt[c.prompt_index];
+              if (c.top_code && truth) {
+                s.scored += 1;
+                if (c.top_code === truth) s.correct += 1;
               }
               // We don't have latency/cost in the SSE payload for this code path,
               // but we can approximate from what's in candidateCompletions
@@ -410,16 +495,19 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
               .map(([model_id, s]) => ({
                 model_id,
                 completed: s.completed,
-                top1: s.completed > 0 ? s.correct / s.completed : 0,
+                scored: s.scored,
+                top1: s.scored > 0 ? s.correct / s.scored : null,
                 errored: s.errored,
               }))
-              .sort((a, b) => b.top1 - a.top1);
+              .sort((a, b) => (b.top1 ?? -1) - (a.top1 ?? -1));
             const referenceCodesKnown = Object.keys(referenceCodeByPrompt).length;
+            const goldCodesKnown = Object.keys(goldCodeByPrompt).length;
             return (
               <div>
                 <div className="text-[10px] text-gray-500 mb-2">
-                  {goldMode
-                    ? "Gold mode - no reference phase, so live top-1 vs reference is unavailable; final scoring vs gold is on the Benchmark Results tab"
+                  {goldCodesKnown > 0
+                    ? `Marked against gold for ${goldCodesKnown} / ${promptIndices.length || "?"} prompts` +
+                      (goldMode ? "" : `; reference top-codes known for ${referenceCodesKnown}`)
                     : `Reference top-codes known for ${referenceCodesKnown} / ${promptIndices.length || "?"} prompts`}
                 </div>
                 <table className="w-full text-xs">
@@ -441,13 +529,19 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
                           {r.completed} / {promptIndices.length || "?"}
                         </td>
                         <td className="py-1 pr-3 text-right font-mono">
-                          <span className={
-                            r.top1 >= 0.8 ? "text-emerald-300"
-                            : r.top1 >= 0.5 ? "text-amber-300"
-                            : "text-red-300"
-                          }>
-                            {(r.top1 * 100).toFixed(0)}%
-                          </span>
+                          {r.top1 == null ? (
+                            <span className="text-gray-600" title="Nothing markable yet - no gold code and no reference top-code for these prompts">
+                              n/a
+                            </span>
+                          ) : (
+                            <span className={
+                              r.top1 >= 0.8 ? "text-emerald-300"
+                              : r.top1 >= 0.5 ? "text-amber-300"
+                              : "text-red-300"
+                            }>
+                              {(r.top1 * 100).toFixed(0)}%
+                            </span>
+                          )}
                         </td>
                         <td className="py-1 pr-3 text-right font-mono text-gray-500">
                           {r.errored > 0 ? <span className="text-red-400">{r.errored}</span> : "—"}
@@ -707,8 +801,13 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
                     cellCommits.get(k)!.push(c);
                   }
 
-                  // Top codes per prompt - determine which codes agree with reference
+                  // What to mark against: the gold code when this prompt has
+                  // one, otherwise agreement with the reference. Without this,
+                  // a gold-mode run has no reference and every model is stamped
+                  // wrong regardless of whether it got the answer right.
+                  const goldCode = goldCodeByPrompt[pi] ?? null;
                   const refTopCode = models.find((m) => m.isRef)?.topCode ?? null;
+                  const truthCode = goldCode ?? refTopCode;
 
                   return (
                     <div key={pi} className="rounded border border-gray-800 bg-gray-950/40 overflow-x-auto">
@@ -718,6 +817,11 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
                           <span className="text-gray-400">
                             {promptCommits.length} slot{promptCommits.length === 1 ? "" : "s"} set across {models.length} model{models.length === 1 ? "" : "s"}
                           </span>
+                          {goldCode && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-950/40 border border-yellow-900/60 text-yellow-300 font-mono">
+                              gold {goldCode}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <table className="w-full text-xs">
@@ -776,7 +880,12 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
                           <tr className="bg-gray-900/60">
                             <td className="px-3 py-1.5 font-mono text-gray-500">final</td>
                             {models.map((m) => {
-                              const match = refTopCode && m.topCode === refTopCode;
+                              const match = truthCode != null && m.topCode === truthCode;
+                              // The reference is the yardstick, so it is never
+                              // marked against itself - but it IS marked when a
+                              // gold code exists, because then it is just
+                              // another answer that can be wrong.
+                              const marked = truthCode != null && (goldCode != null || !m.isRef);
                               return (
                                 <td key={m.id} className="px-3 py-1.5">
                                   {m.error ? (
@@ -784,11 +893,13 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
                                   ) : m.topCode ? (
                                     <span
                                       className={`font-mono ${
-                                        match ? "text-emerald-300" : "text-amber-300"
+                                        marked
+                                          ? match ? "text-emerald-300" : "text-red-300"
+                                          : "text-amber-300"
                                       }`}
                                     >
                                       {m.topCode}
-                                      {m.isRef ? null : match ? " ✓" : " ✗"}
+                                      {marked ? (match ? " ✓" : " ✗") : null}
                                     </span>
                                   ) : (
                                     <span className="text-gray-600 text-[10px]">—</span>

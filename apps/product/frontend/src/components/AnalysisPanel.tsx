@@ -710,7 +710,7 @@ export default function AnalysisPanel() {
             setResults(saved);
             setSelectedRunId(mostRecent.id);
           } else {
-            setErr("No benchmark results yet. Start one on Legacy > Run Benchmark.");
+            setErr("No benchmark results yet. Start one on Results > Model Comparison.");
           }
         }
       } catch (e) {

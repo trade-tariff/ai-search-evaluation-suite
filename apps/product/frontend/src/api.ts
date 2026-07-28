@@ -52,6 +52,10 @@ export function startBenchmarkSSE(
   onDone: () => void,
   onError: (err: string) => void,
   opensearchLimit: number = 80,
+  // null = let the backend auto-detect (gold only when every prompt has a
+  // gold code). true/false pin it, so a selection that mixes gold and
+  // non-gold prompts cannot silently fall back to reference scoring.
+  goldMode: boolean | null = null,
 ): AbortController {
   const ctrl = new AbortController();
 
@@ -63,6 +67,7 @@ export function startBenchmarkSSE(
       model_ids: modelIds,
       opensearch_limit: opensearchLimit,
       allow_spend: true,
+      gold_mode: goldMode,
     }),
     signal: ctrl.signal,
   })
