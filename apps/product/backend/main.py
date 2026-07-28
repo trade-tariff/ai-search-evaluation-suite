@@ -2579,12 +2579,25 @@ async def api_start_benchmark(req: BenchmarkRequest):
     cfg = load_config()
 
     async def event_stream():
-        async for event in run_benchmark(
-            req.prompt_indices, req.model_ids, cfg, req.opensearch_limit,
-            gold_mode=req.gold_mode,
-        ):
-            data = json.dumps(event.data)
-            yield f"event: {event.event}\ndata: {data}\n\n"
+        from benchmark import checkpoint_current_run
+
+        finished = False
+        try:
+            async for event in run_benchmark(
+                req.prompt_indices, req.model_ids, cfg, req.opensearch_limit,
+                gold_mode=req.gold_mode,
+            ):
+                if event.event in ("benchmark:complete", "benchmark:cancelled", "error"):
+                    finished = True
+                data = json.dumps(event.data)
+                yield f"event: {event.event}\ndata: {data}\n\n"
+        finally:
+            # A disconnected client closes this generator, so run_benchmark
+            # never reaches its own save and the whole run - already billed -
+            # would vanish. Persist what completed, flagged honestly so the
+            # partial numbers are not mistaken for a finished run.
+            if not finished:
+                checkpoint_current_run(status="interrupted")
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
@@ -2632,6 +2645,9 @@ def _serialise_run(run) -> dict:
         "id": run.id,
         "timestamp": run.timestamp,
         "status": run.status,
+        # Matters for interrupted runs: says how far the run got before the
+        # client dropped, which the status alone does not.
+        "progress": run.progress,
         "opensearch_limit": run.opensearch_limit,
         "gold_mode": run.gold_mode,
         "baseline_model_id": run.baseline_model_id,

@@ -158,9 +158,37 @@ def load_saved_run(run_id: str) -> BenchmarkRun | None:
 
 
 def _save_run(run: BenchmarkRun) -> None:
-    """Save a completed run to disk."""
+    """Write a run to disk atomically.
+
+    Called on every completion, not just at the end, so a dropped client or a
+    killed process leaves the work that was already paid for on disk. Writes
+    to a temp file and renames, so a crash mid-write cannot leave a truncated
+    JSON file where a valid earlier checkpoint used to be.
+    """
     path = RESULTS_DIR / f"benchmark_{run.id}.json"
-    path.write_text(run.model_dump_json(indent=2))
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(run.model_dump_json(indent=2))
+    tmp.replace(path)
+
+
+def checkpoint_current_run(status: str | None = None) -> str | None:
+    """Persist whatever the in-flight run has so far. Returns its id, or None
+    if no run is in flight.
+
+    The SSE generator that drives a benchmark is closed the moment the client
+    disconnects, so anything after the last `yield` never executes. Without a
+    checkpoint the entire run - every provider call already billed - is lost.
+    """
+    if _current_run is None:
+        return None
+    if status is not None:
+        _current_run.status = status
+    try:
+        _save_run(_current_run)
+    except Exception:
+        # Never let a checkpoint failure take down the run itself.
+        return _current_run.id
+    return _current_run.id
 
 
 def _parse_questions(response_text: str) -> list[dict]:
@@ -865,6 +893,7 @@ async def run_benchmark(
         _current_run.panel_results.append(result)
         completed += 1
         _current_run.progress = completed / total_tasks
+        checkpoint_current_run()
 
         # Surface any task-level errors (reached after retries were exhausted
         # in the provider layer) into the run's issues log + SSE so the UI
@@ -1121,6 +1150,7 @@ async def run_benchmark(
         _current_run.model_results.append(result)
         completed += 1
         _current_run.progress = completed / total_tasks
+        checkpoint_current_run()
 
         # Evaluate against consensus and fire judge immediately. Pass the
         # prompt's gold_code (if any) so candidates get scored against the
