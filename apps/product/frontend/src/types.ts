@@ -184,6 +184,9 @@ export interface EvaluationResult {
   // Ground-truth fields - only set when the prompt had a gold_code
   gold_code?: string | null;
   gold_top1_match?: boolean | null;
+  gold_top3_hit?: boolean | null;
+  gold_top5_hit?: boolean | null;
+  gold_reciprocal_rank?: number | null;
   gold_heading_match?: boolean | null;
   gold_chapter_match?: boolean | null;
   gold_hierarchical_score?: number | null;
@@ -248,6 +251,9 @@ export interface ModelSummary {
   malformed_code_count?: number | null;
   malformed_codes?: string[];
   gold_top1_rate?: number | null;
+  gold_top3_rate?: number | null;
+  gold_top5_rate?: number | null;
+  avg_gold_reciprocal_rank?: number | null;
   gold_heading_rate?: number | null;
   gold_chapter_rate?: number | null;
   avg_gold_hierarchical_score?: number | null;

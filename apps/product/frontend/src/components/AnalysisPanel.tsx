@@ -1479,6 +1479,8 @@ export default function AnalysisPanel() {
                 {hasGoldEvals && (
                   <>
                     <HeaderTip label="Gold T1" />
+                    <HeaderTip label="Gold T3" />
+                    <HeaderTip label="Gold T5" />
                     <HeaderTip label="Gold H" />
                     <HeaderTip label="Gold C" />
                     <HeaderTip label="Gold N" />
@@ -1523,6 +1525,8 @@ export default function AnalysisPanel() {
                   {hasGoldEvals && (
                     <>
                       {goldCell(consensusSummary.gold_top1_rate, "text-amber-300")}
+                      {goldCell(consensusSummary.gold_top3_rate, "text-amber-300")}
+                      {goldCell(consensusSummary.gold_top5_rate, "text-amber-300")}
                       {goldCell(consensusSummary.gold_heading_rate, "text-amber-300")}
                       {goldCell(consensusSummary.gold_chapter_rate, "text-amber-300")}
                       <td className="py-3 pr-4 text-right text-amber-300 text-xs">
@@ -1601,6 +1605,8 @@ export default function AnalysisPanel() {
                     {hasGoldEvals && (
                       <>
                         {goldCell(s.gold_top1_rate, goldMode ? "text-emerald-300 font-medium" : "")}
+                        {goldCell(s.gold_top3_rate, goldMode ? "text-emerald-300" : "")}
+                        {goldCell(s.gold_top5_rate, goldMode ? "text-emerald-300" : "")}
                         {goldCell(s.gold_heading_rate, goldMode ? "text-emerald-300" : "")}
                         {goldCell(s.gold_chapter_rate, goldMode ? "text-emerald-300" : "")}
                         <td className="py-3 pr-4 text-right text-xs text-gray-500">
@@ -1695,6 +1701,8 @@ export default function AnalysisPanel() {
                     {hasGoldEvals && (
                       <>
                         {goldCell(cs.gold_top1_rate)}
+                        {goldCell(cs.gold_top3_rate)}
+                        {goldCell(cs.gold_top5_rate)}
                         {goldCell(cs.gold_heading_rate)}
                         {goldCell(cs.gold_chapter_rate)}
                         <td className="py-3 pr-4 text-right text-xs text-gray-500">

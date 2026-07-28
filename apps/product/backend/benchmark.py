@@ -679,6 +679,15 @@ def compute_summaries(run: BenchmarkRun, model_map: dict) -> list[ModelSummary]:
             gold_top1_rate = round(
                 sum(1 for e in gold_evals if e.gold_top1_match) / gold_n, 4
             )
+            gold_top3_rate = round(
+                sum(1 for e in gold_evals if e.gold_top3_hit) / gold_n, 4
+            )
+            gold_top5_rate = round(
+                sum(1 for e in gold_evals if e.gold_top5_hit) / gold_n, 4
+            )
+            avg_gold_rr = round(
+                sum(e.gold_reciprocal_rank or 0.0 for e in gold_evals) / gold_n, 4
+            )
             gold_heading_rate = round(
                 sum(1 for e in gold_evals if e.gold_heading_match) / gold_n, 4
             )
@@ -693,6 +702,9 @@ def compute_summaries(run: BenchmarkRun, model_map: dict) -> list[ModelSummary]:
             )
         else:
             gold_top1_rate = None
+            gold_top3_rate = None
+            gold_top5_rate = None
+            avg_gold_rr = None
             gold_heading_rate = None
             gold_chapter_rate = None
             avg_gold_hier = None
@@ -763,6 +775,9 @@ def compute_summaries(run: BenchmarkRun, model_map: dict) -> list[ModelSummary]:
             malformed_code_count=len(malformed_codes),
             malformed_codes=malformed_codes[:5],
             gold_top1_rate=gold_top1_rate,
+            gold_top3_rate=gold_top3_rate,
+            gold_top5_rate=gold_top5_rate,
+            avg_gold_reciprocal_rank=avg_gold_rr,
             gold_heading_rate=gold_heading_rate,
             gold_chapter_rate=gold_chapter_rate,
             avg_gold_hierarchical_score=avg_gold_hier,
@@ -1063,6 +1078,11 @@ async def run_benchmark(
             all_tasks.append(asyncio.create_task(run_panel_prompt(mc, pi)))
 
     panel_done = 0
+    # Same idle-connection problem as the fan-out phase: a quiet stretch with
+    # no events lets a proxy drop the stream. Behind an ALB (60s default idle
+    # timeout) this phase would be the first to die.
+    panel_last_event = asyncio.get_running_loop().time()
+    panel_last_heartbeat = 0.0
     while panel_done < panel_task_count:
         if check_cancelled():
             _current_run.status = "cancelled"
@@ -1071,7 +1091,36 @@ async def run_benchmark(
             return
         try:
             item = await asyncio.wait_for(event_bus.get(), timeout=1.0)
+            panel_last_event = asyncio.get_running_loop().time()
         except asyncio.TimeoutError:
+            now = asyncio.get_running_loop().time()
+            stalled_for = now - panel_last_event
+            if stalled_for >= FANOUT_STALL_TIMEOUT_S:
+                for task in all_tasks:
+                    if not task.done():
+                        task.cancel()
+                _current_run.issues.append({
+                    "kind": "error",
+                    "source": "panel_stall",
+                    "message": (
+                        f"{panel_task_count - panel_done} reference task(s) cancelled "
+                        f"after {round(stalled_for)}s with no activity"
+                    ),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                })
+                yield SSEEvent(event="benchmark:panel_stalled", data={
+                    "outstanding": panel_task_count - panel_done,
+                    "stalled_seconds": round(stalled_for),
+                })
+                break
+            if now - panel_last_heartbeat >= 15.0:
+                panel_last_heartbeat = now
+                yield SSEEvent(event="benchmark:waiting", data={
+                    "phase": "panel",
+                    "done": panel_done,
+                    "total": panel_task_count,
+                    "stalled_seconds": round(stalled_for),
+                })
             continue
         kind = item[0]
         if kind == "live":
@@ -1313,10 +1362,28 @@ async def run_benchmark(
         except Exception as exc:
             await event_bus.put(("candidate_done", mc.id, pi, exc))
 
-    for mc in candidate_mcs:
-        for pi in prompt_indices:
-            all_tasks.append(asyncio.create_task(run_model_prompt(mc, pi)))
-            fan_out_count += 1
+    # Models run SEQUENTIALLY within a prompt, prompts run concurrently.
+    #
+    # The fact store is first-writer-wins: the first model to ask about a
+    # concept fixes the answer for every model after it. Firing all
+    # (model, prompt) pairs concurrently meant the winner of that race was
+    # decided by asyncio scheduling, so two identical runs could commit
+    # different facts and hand every model a different product. Measured on
+    # two back-to-back runs: 10 of 20 prompts ended with a different set of
+    # slots, and 4 shared slots got different answers - every one of them
+    # first-written by a different model. On prompt 43 the committed carbon
+    # content differed, which is the classification for that heading.
+    #
+    # Fixing the order makes the same model always write first, so a repeat
+    # run sees the same product. Prompts stay parallel, so the wall-clock cost
+    # is bounded by models-per-prompt, not by the full fan-out.
+    async def run_prompt_all_models(pi: int) -> None:
+        for mc in candidate_mcs:
+            await run_model_prompt(mc, pi)
+
+    for pi in prompt_indices:
+        all_tasks.append(asyncio.create_task(run_prompt_all_models(pi)))
+    fan_out_count = len(prompt_indices) * len(candidate_mcs)
 
     yield SSEEvent(event="fanout:start", data={"total_tasks": fan_out_count})
 

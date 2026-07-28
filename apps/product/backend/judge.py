@@ -11,15 +11,35 @@ from sklearn.metrics.pairwise import cosine_similarity as sklearn_cosine
 from schemas import CompletionResult, EvaluationResult
 
 
+# The prompt asks the model to rank answers by confidence, but nothing forces
+# it to EMIT them in that order. Measured on real runs: ~1% of answer lists are
+# out of order, one of them burying a "Good" behind three "Possible"s - which
+# made top-1 score a code the model itself ranked lower.
+_CONFIDENCE_RANK = {"strong": 0, "good": 1, "possible": 2, "weak": 3, "low": 4}
+
+
 def _extract_codes(text: str) -> list[str]:
-    """Extract commodity codes from a response (JSON or freeform)."""
+    """Extract commodity codes from a response (JSON or freeform), ordered by
+    the model's own stated confidence.
+
+    Order matters: it defines top-1, top-3 and reciprocal rank. Stable sort, so
+    equal-confidence answers keep their emitted order and anything with an
+    unrecognised label sorts last rather than jumping the queue.
+    """
     codes: list[str] = []
     try:
         parsed = json.loads(text)
         if isinstance(parsed, dict):
-            for answer in parsed.get("answers", []):
-                if "commodity_code" in answer:
-                    codes.append(str(answer["commodity_code"]))
+            answers = [
+                a for a in parsed.get("answers", [])
+                if isinstance(a, dict) and "commodity_code" in a
+            ]
+            answers.sort(
+                key=lambda a: _CONFIDENCE_RANK.get(
+                    str(a.get("confidence", "")).strip().lower(), 9
+                )
+            )
+            codes = [str(a["commodity_code"]) for a in answers]
     except (json.JSONDecodeError, TypeError):
         pass
 
@@ -162,21 +182,34 @@ def compute_gold_metrics(
     the known-correct code". Returned dict has None values when gold_code is
     missing so callers can distinguish "didn't match" from "not evaluated".
 
+    Rank-aware on purpose. Production returns a RANKED LIST of five codes with
+    confidence labels and the trader picks from it, so gold at rank 2 is a
+    useful answer, not a miss. Scoring top-1 only threw away 10-35 percentage
+    points of real capability on measured runs - and top-1 is also the noisiest
+    signal, swinging up to 10pp between identical runs where top-3 held steady.
+
     Returns:
       gold_top1_match          - candidate top-1 exactly matches gold
-      gold_heading_match       - first 4 digits agree
-      gold_chapter_match       - first 2 digits agree
-      gold_hierarchical_score  - deepest common prefix / 10 (0-1)
+      gold_top3_hit            - gold appears in the candidate's top 3
+      gold_top5_hit            - gold appears in the candidate's top 5
+      gold_reciprocal_rank     - 1/rank of gold in the list, 0 if absent
+      gold_heading_match       - first 4 digits agree (top-1)
+      gold_chapter_match       - first 2 digits agree (top-1)
+      gold_hierarchical_score  - deepest common prefix / 10 (0-1, top-1)
     """
     if not gold_code or not candidate_codes:
         return {
             "gold_top1_match": None,
+            "gold_top3_hit": None,
+            "gold_top5_hit": None,
+            "gold_reciprocal_rank": None,
             "gold_heading_match": None,
             "gold_chapter_match": None,
             "gold_hierarchical_score": None,
         }
 
-    cand_top = str(candidate_codes[0])
+    codes = [str(c) for c in candidate_codes]
+    cand_top = codes[0]
     gold = str(gold_code)
 
     prefix = 0
@@ -185,8 +218,13 @@ def compute_gold_metrics(
             break
         prefix += 1
 
+    rank = codes.index(gold) + 1 if gold in codes else None
+
     return {
         "gold_top1_match": cand_top == gold,
+        "gold_top3_hit": gold in codes[:3],
+        "gold_top5_hit": gold in codes[:5],
+        "gold_reciprocal_rank": round(1.0 / rank, 4) if rank else 0.0,
         "gold_heading_match": prefix >= 4,
         "gold_chapter_match": prefix >= 2,
         "gold_hierarchical_score": round(min(prefix, 10) / 10.0, 4),

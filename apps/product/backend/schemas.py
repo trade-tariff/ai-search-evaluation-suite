@@ -269,6 +269,9 @@ class EvaluationResult(BaseModel):
     # single most valuable signal when a gold set is available.
     gold_code: Optional[str] = None
     gold_top1_match: Optional[bool] = None
+    gold_top3_hit: Optional[bool] = None
+    gold_top5_hit: Optional[bool] = None
+    gold_reciprocal_rank: Optional[float] = None
     gold_heading_match: Optional[bool] = None
     gold_chapter_match: Optional[bool] = None
     gold_hierarchical_score: Optional[float] = None
@@ -339,6 +342,12 @@ class ModelSummary(BaseModel):
     # that had a gold code. Rate = matches / gold_evaluated_count.
     gold_evaluated_count: int = 0
     gold_top1_rate: Optional[float] = None
+    # Rank-aware: production shows the trader a ranked list of five, so gold at
+    # rank 2 is a usable answer. These are also markedly more stable run to run
+    # than top-1, which swings up to 10pp on identical configs.
+    gold_top3_rate: Optional[float] = None
+    gold_top5_rate: Optional[float] = None
+    avg_gold_reciprocal_rank: Optional[float] = None
     gold_heading_rate: Optional[float] = None
     gold_chapter_rate: Optional[float] = None
     avg_gold_hierarchical_score: Optional[float] = None

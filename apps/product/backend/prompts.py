@@ -8,12 +8,25 @@ from schemas import PromptInfo
 DATA_PATH = Path(__file__).parent.parent / "data" / "search_contexts.json"
 
 _cached_data: dict | None = None
+_cached_mtime: float | None = None
 
 
 def _load_raw() -> dict:
-    global _cached_data
-    if _cached_data is None:
+    """Load search_contexts.json, reloading whenever the file changes on disk.
+
+    This file is MUTABLE state, not config - approve_draft() appends to it. The
+    cache used to be invalidated only by the process that did the writing, so
+    any other worker served stale prompts indefinitely. Keying on mtime makes
+    every process pick up writes, whoever made them.
+    """
+    global _cached_data, _cached_mtime
+    try:
+        mtime = DATA_PATH.stat().st_mtime
+    except OSError:
+        mtime = None
+    if _cached_data is None or mtime != _cached_mtime:
         _cached_data = json.loads(DATA_PATH.read_text())
+        _cached_mtime = mtime
     return _cached_data
 
 
