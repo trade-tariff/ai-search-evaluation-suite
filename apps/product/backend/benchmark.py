@@ -40,7 +40,45 @@ from schemas import (
 from sections import section_for_code
 from simulator import simulate_answer
 
-MAX_ROUNDS = 5
+# Matches production's interactive_search_max_questions default (7) rather
+# than the 5 this harness used to impose, so the benchmark measures the same
+# budget the live journey gives a trader.
+MAX_ROUNDS = 7
+
+# Verbatim from trade-tariff-backend
+# app/services/interactive_search_service.rb (FINAL_ANSWER_INSTRUCTION).
+# Production appends this and re-prompts once the question budget is spent;
+# without it the model asks a question into the void and the harness records
+# no answer at all, which then scores identically to a wrong answer.
+FINAL_ANSWER_INSTRUCTION = (
+    "\n\nIMPORTANT: You have asked the maximum number of questions allowed. "
+    "Based on the search input, OpenSearch results, and the answers provided "
+    "so far, you MUST now provide your best answer. Do not ask any more "
+    "questions. Rank the opensearch results by confidence using the "
+    "information you have.\n"
+)
+
+
+def _best_available_answers(prompt_index: int, opensearch_limit: int) -> str:
+    """Deterministic last resort, ported from interactive_search_service.rb
+    (best_available_answers): rank the retrieved candidates by their existing
+    order, top two "Good" and the rest "Possible".
+
+    Production can never return nothing, and neither should this. Reached only
+    when the forced-answer re-prompt ALSO fails to produce answers.
+    """
+    from prompts import get_formatted_results
+
+    results = get_formatted_results(prompt_index, opensearch_limit)[:5]
+    answers = [
+        {
+            "commodity_code": r.get("commodity_code"),
+            "confidence": "Good" if i < 2 else "Possible",
+        }
+        for i, r in enumerate(results)
+        if r.get("commodity_code")
+    ]
+    return json.dumps({"answers": answers})
 JUDGE_TIMEOUT_S = 60
 JUDGE_DRAIN_TIMEOUT_S = 300
 RESULTS_DIR = Path(__file__).parent.parent / "results"
@@ -356,12 +394,17 @@ async def _run_qa_loop(
         and fact_store is not None
     )
 
-    for round_num in range(1, MAX_ROUNDS + 1):
+    # One extra turn beyond the question budget, mirroring production: the
+    # final turn is not another chance to ask, it is a forced answer.
+    for round_num in range(1, MAX_ROUNDS + 2):
+        forced = round_num > MAX_ROUNDS
         messages = build_prompt_messages(
             prompt_index,
             qa_history if qa_history else None,
             opensearch_limit=opensearch_limit,
         )
+        if forced:
+            messages[0]["content"] += FINAL_ANSWER_INSTRUCTION
         result = await provider.complete(messages, model_config, prompt_index)
 
         if result.error:
@@ -379,6 +422,16 @@ async def _run_qa_loop(
 
         resp_type = detect_response_type(result)
         questions_asked = _parse_questions(result.response_text)
+
+        if forced:
+            # The budget is spent. Anything that is not an answer becomes the
+            # deterministic ranked fallback, so this path always yields a code.
+            if resp_type != "answers":
+                result.response_text = _best_available_answers(
+                    prompt_index, opensearch_limit
+                )
+                resp_type = "answers"
+            questions_asked = []
 
         # Push the questions live BEFORE the simulator answers them, so the
         # UI sees the model thinking out loud while the slow path runs.

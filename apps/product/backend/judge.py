@@ -271,8 +271,9 @@ def evaluate_pair(
     )
 
     # Rounds efficiency: fewer rounds = more decisive.
-    # MAX_ROUNDS is 5 in benchmark.py; 1 round = 1.0, 5 rounds = 0.0.
-    MAX_ROUNDS_FLOOR = 5
+    # Mirrors MAX_ROUNDS in benchmark.py (7, matching production's
+    # interactive_search_max_questions); 1 round = 1.0, 7 rounds = 0.0.
+    MAX_ROUNDS_FLOOR = 7
     rounds_efficiency = 1.0 - max(0, min(target.total_rounds, MAX_ROUNDS_FLOOR) - 1) / max(1, MAX_ROUNDS_FLOOR - 1)
 
     return EvaluationResult(

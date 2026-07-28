@@ -130,6 +130,16 @@ def build_prompt_messages(
     ]
 
 
+def get_formatted_results(prompt_index: int, opensearch_limit: int = 80) -> list[dict]:
+    """Retrieved candidates for a prompt, in retrieval order. Used by the
+    forced-answer fallback when the model will not commit to a code."""
+    data = _load_raw()
+    for q in data["queries"]:
+        if q["index"] == prompt_index:
+            return (q.get("formatted_results") or [])[:opensearch_limit]
+    return []
+
+
 def get_raw_query(prompt_index: int) -> str:
     """Get just the raw query text for a prompt index."""
     data = _load_raw()
