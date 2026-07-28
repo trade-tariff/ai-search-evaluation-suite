@@ -243,6 +243,8 @@ export interface ModelSummary {
   avg_rounds_efficiency?: number;
   // Gold-truth aggregates. None when no prompts in the run had a gold_code.
   gold_evaluated_count?: number;
+  no_answer_count?: number | null;
+  no_answer_rate?: number | null;
   gold_top1_rate?: number | null;
   gold_heading_rate?: number | null;
   gold_chapter_rate?: number | null;

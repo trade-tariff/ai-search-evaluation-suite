@@ -1269,6 +1269,18 @@ async def run_benchmark(
             gold_chapter_rate = None
             avg_gold_hier = None
 
+        # "No answer" = the completion carries no commodity code at all. That
+        # is a different failure from a confidently wrong code (usually the
+        # round cap ran out mid-questioning), but every accuracy metric above
+        # scores the two identically, so count it on its own.
+        scorable = [c for c in sim_completions if not c.error]
+        no_answer_count = sum(
+            1 for c in scorable if not _extract_codes(c.response_text)
+        )
+        no_answer_rate = (
+            round(no_answer_count / len(scorable), 4) if scorable else None
+        )
+
         # Reference-comparison boolean rates are only meaningful when at
         # least one eval was scored against a reference. In gold mode every
         # reference field (top1_match etc.) is None, so the rates are None
@@ -1308,6 +1320,8 @@ async def run_benchmark(
             total_simulator_cost=round(sim_total_cost, 6),
             avg_simulator_store_hit_rate=store_hit_rate,
             gold_evaluated_count=gold_n,
+            no_answer_count=no_answer_count,
+            no_answer_rate=no_answer_rate,
             gold_top1_rate=gold_top1_rate,
             gold_heading_rate=gold_heading_rate,
             gold_chapter_rate=gold_chapter_rate,

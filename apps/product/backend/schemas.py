@@ -342,6 +342,12 @@ class ModelSummary(BaseModel):
     gold_heading_rate: Optional[float] = None
     gold_chapter_rate: Optional[float] = None
     avg_gold_hierarchical_score: Optional[float] = None
+    # Completions that finished without committing to any commodity code -
+    # typically the model used every round asking questions and never
+    # answered. Scored the same as a wrong answer everywhere else, so it is
+    # counted separately to keep the round cap's cost visible.
+    no_answer_count: int = 0
+    no_answer_rate: Optional[float] = None
 
 
 class BenchmarkRun(BaseModel):
