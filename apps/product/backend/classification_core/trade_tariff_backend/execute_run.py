@@ -10,9 +10,18 @@ from datetime import datetime, timezone
 
 from openai import AsyncOpenAI
 
-from classification_core.provider_guard import openai_allowed
+from classification_core.provider_guard import TRUE_VALUES, openai_allowed
 
 from .qa_loop import run_qa_session_via_trade_tariff_backend
+
+
+def _progress_logging_enabled() -> bool:
+    # Same convention as CLASSIFICATION_ALLOW_PROVIDER_CALLS (provider_guard.py):
+    # unset/empty = off. Off by default everywhere (including deployed ECS,
+    # which already ships container stdout to CloudWatch for free -- no need to
+    # pay ingestion cost/add log noise for every run when nothing's wrong);
+    # local dev turns it on via apps/classification-evals/.env (gitignored).
+    return os.environ.get("EVAL_PROGRESS_LOGGING", "").strip().lower() in TRUE_VALUES
 
 
 def _matches_gold(candidate_code, expected_code, expected_code_digits) -> bool:
@@ -65,6 +74,9 @@ async def execute_run(run_id: str, client) -> dict:
         await client.update_run(run_id, status="running")
 
         gold_queries = await client.get_gold_queries()
+        total_gold_queries = len(gold_queries)
+        if _progress_logging_enabled():
+            print(f"[eval progress] run {run_id}: {total_gold_queries} gold queries to process", flush=True)
 
         # Built once for the whole run, the same way classification_core.qa_loop's
         # existing run_qa_session builds it. openai_allowed() is this repo's spend
@@ -75,7 +87,7 @@ async def execute_run(run_id: str, client) -> dict:
         api_key = os.environ.get("OPENAI_API_KEY")
         sim_client = AsyncOpenAI(api_key=api_key) if (openai_allowed() and api_key) else None
 
-        for gold in gold_queries:
+        for index, gold in enumerate(gold_queries, start=1):
             # Read the identity fields ONCE, before the try, via .get(). The except
             # handler below builds a failure result from these same fields — if it
             # read them off the gold dict itself, a malformed row would make the
@@ -86,6 +98,13 @@ async def execute_run(run_id: str, client) -> dict:
             persona = gold.get("persona")
             expected_code = gold.get("expected_code")
             expected_code_digits = gold.get("expected_code_digits")
+
+            if _progress_logging_enabled():
+                print(
+                    f"[eval progress] {index}/{total_gold_queries} {source_id} ({persona}) "
+                    f"expected={expected_code}: {gold.get('query')!r}",
+                    flush=True,
+                )
 
             try:
                 ruling = await client.get_atar_ruling(source_id)
@@ -139,7 +158,17 @@ async def execute_run(run_id: str, client) -> dict:
                     "provider_calls": session_result.get("provider_calls", 0),
                 })
                 succeeded += 1
+                if _progress_logging_enabled():
+                    print(
+                        f"[eval progress] {index}/{total_gold_queries} {source_id} ({persona}): "
+                        f"final={final_code} top1={_matches_gold(final_code, expected_code, expected_code_digits)} "
+                        f"top5={any(_matches_gold(c, expected_code, expected_code_digits) for c in top5_codes)} "
+                        f"questions_answered={session_result.get('questions_answered', 0)}",
+                        flush=True,
+                    )
             except Exception as exc:  # noqa: BLE001 - one bad gold query must not abort the run
+                if _progress_logging_enabled():
+                    print(f"[eval progress] {index}/{total_gold_queries} {source_id} ({persona}): FAILED error={exc}", flush=True)
                 try:
                     await client.post_result({
                         "run_id": run_id, "source_type": source_type, "source_id": source_id,
@@ -169,6 +198,9 @@ async def execute_run(run_id: str, client) -> dict:
     if outer_exc is not None:
         prefix = f"{error_summary}; " if error_summary else ""
         error_summary = f"{prefix}run aborted early: {outer_exc}"
+
+    if _progress_logging_enabled():
+        print(f"[eval progress] run {run_id} finished: status={final_status} succeeded={succeeded} failed={failed}", flush=True)
 
     # Deliberately NOT wrapped in a swallowing try/except: if this call itself
     # fails (e.g. the backend is genuinely down for the whole run), there is

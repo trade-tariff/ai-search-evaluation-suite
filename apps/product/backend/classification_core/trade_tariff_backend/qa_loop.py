@@ -54,6 +54,10 @@ async def run_qa_session_via_trade_tariff_backend(
             "cost_usd": total_cost_usd,
             "latency_seconds": total_duration_ms / 1000,
             "provider_calls": total_provider_calls,
+            # len(answers_so_far), not round_num -- round_num counts every
+            # /searches call including the one that finally converges (which
+            # answers nothing), so it overcounts by one on convergence.
+            "questions_answered": len(answers_so_far),
         }
 
     for round_num in range(1, max_rounds + 1):

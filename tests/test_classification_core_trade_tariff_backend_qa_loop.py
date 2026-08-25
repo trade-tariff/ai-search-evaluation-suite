@@ -72,6 +72,36 @@ class RunQaSessionViaBackendTest(unittest.IsolatedAsyncioTestCase):
         self.assertAlmostEqual(result["latency_seconds"], (540 + 610) / 1000)
         self.assertEqual(result["provider_calls"], 2)
 
+    async def test_questions_answered_counts_the_simulators_committed_answers(self):
+        # AI-1223 console progress logging needs this to print "N questions
+        # answered" per gold query -- answers_so_far already tracks this
+        # locally but was never surfaced on the return value.
+        client = FakeClient([SEARCH_RESPONSE_PENDING_QUESTION, SEARCH_RESPONSE_CONVERGED])
+
+        with patch(
+            "classification_core.trade_tariff_backend.qa_loop.simulate_trader_answer",
+            new=AsyncMock(return_value={
+                "chosen": "Textile", "choice_index": 1, "slot": "material", "reasoning": "",
+                "simulator_failed": False, "attempts": 1, "last_error": None,
+            }),
+        ):
+            result = await run_qa_session_via_trade_tariff_backend(
+                client=client, sim_client="fake-openai-client", query="women's trainers",
+                oracle_text="ruling text", run_time_overrides={}, max_rounds=4,
+            )
+
+        self.assertEqual(result["questions_answered"], 1)
+
+    async def test_questions_answered_is_zero_when_the_first_round_already_converges(self):
+        client = FakeClient([SEARCH_RESPONSE_CONVERGED])
+
+        result = await run_qa_session_via_trade_tariff_backend(
+            client=client, sim_client=None, query="women's trainers",
+            oracle_text="ruling text", run_time_overrides={}, max_rounds=4,
+        )
+
+        self.assertEqual(result["questions_answered"], 0)
+
     async def test_a_round_with_no_usage_key_contributes_nothing_rather_than_raising(self):
         # meta.usage is absent entirely on a short-circuit round (no LLM call
         # made) -- must not raise or be treated as an error.

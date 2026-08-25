@@ -1,5 +1,8 @@
+import io
+import os
 import sys
 import unittest
+from contextlib import redirect_stdout
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -400,6 +403,95 @@ class NoOracleTextDisablesSimulatorTest(unittest.IsolatedAsyncioTestCase):
 
         mocked_qa_session.assert_awaited_once()
         self.assertIsNotNone(mocked_qa_session.await_args.kwargs["sim_client"])
+
+
+class ProgressLoggingTest(unittest.IsolatedAsyncioTestCase):
+    async def test_prints_nothing_when_eval_progress_logging_is_unset(self):
+        # Off by default everywhere unless explicitly set -- matches
+        # CLASSIFICATION_ALLOW_PROVIDER_CALLS's convention.
+        client = FakeClient()
+
+        with (
+            patch.dict(os.environ, {}, clear=False),
+            patch(
+                "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+                new=AsyncMock(return_value={
+                    "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
+                    "converged": True, "simulator_failed": False, "questions_answered": 0,
+                }),
+            ),
+        ):
+            os.environ.pop("EVAL_PROGRESS_LOGGING", None)
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                await execute_run("107", client)
+
+        self.assertEqual(buffer.getvalue(), "")
+
+    async def test_prints_the_full_progress_sequence_when_enabled(self):
+        client = FakeClient()
+
+        with (
+            patch.dict(os.environ, {"EVAL_PROGRESS_LOGGING": "1"}),
+            patch(
+                "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+                new=AsyncMock(return_value={
+                    "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
+                    "converged": True, "simulator_failed": False, "questions_answered": 2,
+                }),
+            ),
+        ):
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                await execute_run("107", client)
+
+        output = buffer.getvalue()
+        self.assertIn("1 gold quer", output)  # total count line
+        self.assertIn("1/1", output)  # position
+        self.assertIn("600004365", output)  # source_id
+        self.assertIn("emu_generic", output)  # persona
+        self.assertIn("women's trainers", output)  # query text
+        self.assertIn("6404199000", output)  # final_code on the end line
+        self.assertIn("questions_answered=2", output)
+        self.assertIn("succeeded=1", output)
+        self.assertIn("status=completed", output)
+
+    async def test_accepts_the_other_true_values_not_just_1(self):
+        for value in ("true", "YES", "On"):
+            client = FakeClient()
+            with (
+                patch.dict(os.environ, {"EVAL_PROGRESS_LOGGING": value}),
+                patch(
+                    "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+                    new=AsyncMock(return_value={
+                        "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
+                        "converged": True, "simulator_failed": False, "questions_answered": 0,
+                    }),
+                ),
+            ):
+                buffer = io.StringIO()
+                with redirect_stdout(buffer):
+                    await execute_run("107", client)
+
+            self.assertNotEqual(buffer.getvalue(), "", f"expected output with EVAL_PROGRESS_LOGGING={value!r}")
+
+    async def test_a_failed_gold_query_prints_the_error_on_its_end_line(self):
+        client = FakeClient()
+
+        with (
+            patch.dict(os.environ, {"EVAL_PROGRESS_LOGGING": "1"}),
+            patch(
+                "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+                new=AsyncMock(side_effect=RuntimeError("search errored")),
+            ),
+        ):
+            buffer = io.StringIO()
+            with redirect_stdout(buffer):
+                await execute_run("107", client)
+
+        output = buffer.getvalue()
+        self.assertIn("search errored", output)
+        self.assertIn("status=failed", output)
 
 
 if __name__ == "__main__":

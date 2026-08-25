@@ -332,6 +332,34 @@ When a job passes these gates, the runner sets
 The suite remains no-spend by default unless
 `AI_FAN_OUT_WORKBENCH_SPEND_ENABLED=1` is explicitly enabled.
 
+## Console Progress Logging (evaluation runs)
+
+A `trade-tariff-backend`-driven evaluation run (`execute_run.py`) can take
+several minutes and, by default, prints nothing to the console while it's
+running. Set `EVAL_PROGRESS_LOGGING` to see per-gold-query progress as it
+happens: the total gold query count at the start, a line when each gold
+query begins (position, ATaR reference, expected code, persona, query text),
+a line when it ends (final code, gold_in_top1/gold_in_top5, questions
+answered, or the error on failure), and a one-line summary when the whole
+run finishes.
+
+Same convention as `CLASSIFICATION_ALLOW_PROVIDER_CALLS` above: unset/empty
+is off, one of `1`/`true`/`yes`/`on` is on. **Off by default everywhere.**
+
+- **Local dev:** set `EVAL_PROGRESS_LOGGING=1` in `apps/classification-evals/.env`
+  (gitignored).
+- **Deployed (ECS):** stays off by default — the service already ships
+  container stdout to CloudWatch for free (`cloudwatch_log_group_name` in
+  `terraform/main.tf`), so there's no need to pay extra ingestion cost or add
+  log noise for every run when nothing's wrong. To turn it on for a specific
+  deploy (e.g. to debug a remote run), add an entry to `terraform/locals.tf`'s
+  `service_environment` list — `{ name = "EVAL_PROGRESS_LOGGING", value = "1" }` —
+  and redeploy. Once it's printing, CloudWatch picks it up automatically like
+  any other console output; nothing further to configure there.
+
+This is console output only — it never changes what gets persisted via
+`post_result`/`update_run`.
+
 ## API
 
 | Route | Purpose |
