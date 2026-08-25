@@ -83,6 +83,16 @@ async def run_qa_session_via_trade_tariff_backend(
             client=sim_client, session=session, raw_query=query,
             question=pending["question"], options=options, round_number=round_num, oracle_text=oracle_text,
         )
+        # Folded into the SAME totals as retrieval, not a separate figure -- one
+        # combined cost_usd/latency_seconds/provider_calls per gold query. .get()
+        # with defaults, not direct indexing: every real simulate_trader_answer call
+        # includes these keys, but plenty of tests in this file mock it with a bare
+        # dict that doesn't. Applied BEFORE the simulator_failed early return below --
+        # a failed simulator attempt still burned real, costly API calls.
+        total_cost_usd += sim_result.get("cost_usd", 0.0)
+        total_duration_ms += sim_result.get("duration_seconds", 0.0) * 1000
+        total_provider_calls += sim_result.get("attempts", 0)
+
         if sim_result.get("simulator_failed"):
             return {"final_candidates": response.get("data") or [], "converged": False, "simulator_failed": True, **usage_totals()}
 

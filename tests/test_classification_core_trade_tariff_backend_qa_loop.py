@@ -70,7 +70,57 @@ class RunQaSessionViaBackendTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertAlmostEqual(result["cost_usd"], 0.0021 + 0.0035)
         self.assertAlmostEqual(result["latency_seconds"], (540 + 610) / 1000)
-        self.assertEqual(result["provider_calls"], 2)
+        # 1 retrieval call (round 1) + 1 simulator call (answering round 1's
+        # question, per the mocked "attempts": 1) + 1 retrieval call (round 2).
+        self.assertEqual(result["provider_calls"], 3)
+
+    async def test_the_simulators_own_cost_and_duration_fold_into_the_same_totals_as_retrieval(self):
+        # Retrieval side (round 1): cost 0.0021, 540ms, 1 call (SEARCH_RESPONSE_PENDING_QUESTION).
+        # Simulator side (answering round 1's question): cost 0.004, 2.5s, 2 calls (a retry).
+        # Retrieval side (round 2): cost 0.0035, 610ms, 1 call (SEARCH_RESPONSE_CONVERGED).
+        client = FakeClient([SEARCH_RESPONSE_PENDING_QUESTION, SEARCH_RESPONSE_CONVERGED])
+
+        with patch(
+            "classification_core.trade_tariff_backend.qa_loop.simulate_trader_answer",
+            new=AsyncMock(return_value={
+                "chosen": "Textile", "choice_index": 1, "slot": "material", "reasoning": "",
+                "simulator_failed": False, "attempts": 2, "last_error": None,
+                "cost_usd": 0.004, "duration_seconds": 2.5, "pricing_known": True,
+            }),
+        ):
+            result = await run_qa_session_via_trade_tariff_backend(
+                client=client, sim_client="fake-openai-client", query="women's trainers",
+                oracle_text="ruling text", run_time_overrides={}, max_rounds=4,
+            )
+
+        self.assertAlmostEqual(result["cost_usd"], 0.0021 + 0.004 + 0.0035)
+        self.assertAlmostEqual(result["latency_seconds"], 0.54 + 2.5 + 0.61)
+        # 1 retrieval call (round 1) + 2 simulator calls (a retry) + 1 retrieval call (round 2).
+        self.assertEqual(result["provider_calls"], 4)
+
+    async def test_a_failed_simulator_attempt_still_counts_its_real_cost_before_the_early_return(self):
+        # The simulator exhausted its retries (simulator_failed=True) -- the loop stops
+        # immediately per the existing behaviour, but the failed attempts still burned
+        # real, costly API calls that must not be reported as free.
+        client = FakeClient([SEARCH_RESPONSE_PENDING_QUESTION])
+
+        with patch(
+            "classification_core.trade_tariff_backend.qa_loop.simulate_trader_answer",
+            new=AsyncMock(return_value={
+                "chosen": None, "choice_index": None, "slot": "failed_round_1", "reasoning": "",
+                "simulator_failed": True, "attempts": 3, "last_error": "could not parse response",
+                "cost_usd": 0.006, "duration_seconds": 4.1, "pricing_known": True,
+            }),
+        ):
+            result = await run_qa_session_via_trade_tariff_backend(
+                client=client, sim_client="fake-openai-client", query="women's trainers",
+                oracle_text="ruling text", run_time_overrides={}, max_rounds=4,
+            )
+
+        self.assertTrue(result["simulator_failed"])
+        self.assertAlmostEqual(result["cost_usd"], 0.0021 + 0.006)
+        self.assertAlmostEqual(result["latency_seconds"], 0.54 + 4.1)
+        self.assertEqual(result["provider_calls"], 1 + 3)
 
     async def test_a_round_with_no_usage_key_contributes_nothing_rather_than_raising(self):
         # meta.usage is absent entirely on a short-circuit round (no LLM call

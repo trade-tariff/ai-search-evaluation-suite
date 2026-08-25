@@ -27,12 +27,14 @@ import asyncio
 import json
 import os
 import re
+import time
 from dataclasses import dataclass, field
 from typing import Optional
 
 from openai import AsyncOpenAI
 
 from . import classification, local_db
+from .pricing import calculate_cost
 from .provider_guard import openai_allowed
 
 MAX_ROUNDS_DEFAULT = 5  # User-confirmed acceptable budget (was 3 in original Exp 6)
@@ -398,6 +400,15 @@ async def simulate_trader_answer(
         simulator_failed: bool
         attempts: int
         last_error: str | None
+        cost_usd: float       - summed across every attempt that got a response back
+                                 (including ones that failed to parse) -- a wasted
+                                 attempt still cost real money. Attempts that raised
+                                 before a response arrived (the except branch below)
+                                 contribute 0, since there is no usage data for them.
+        duration_seconds: float - summed wall-clock time across every attempt
+        pricing_known: bool   - False if SIMULATOR_MODEL isn't in pricing.MODEL_PRICING;
+                                 cost_usd is still 0.0 (not None) so callers can sum it
+                                 without a None-check, same as an unpriced Rails call.
     }
     """
     if not options:
@@ -405,6 +416,7 @@ async def simulate_trader_answer(
             "chosen": None, "choice_index": None, "slot": "no_options",
             "reasoning": "no options provided", "simulator_failed": True,
             "attempts": 0, "last_error": "no options",
+            "cost_usd": 0.0, "duration_seconds": 0.0, "pricing_known": True,
         }
 
     n = len(options)
@@ -413,6 +425,9 @@ async def simulate_trader_answer(
     last_error: Optional[str] = None
     last_slot: Optional[str] = None
     last_reasoning: Optional[str] = None
+    total_cost_usd = 0.0
+    total_duration_seconds = 0.0
+    pricing_known = True
 
     for attempt in range(SIMULATOR_MAX_RETRIES + 1):
         user_prompt = _build_simulator_prompt(raw_query, question, options, facts, oracle_text)
@@ -427,12 +442,18 @@ async def simulate_trader_answer(
             "response_format": {"type": "json_object"},
         }
 
+        call_started_at = time.monotonic()
         try:
             resp = await client.chat.completions.create(**kwargs)
             content = (resp.choices[0].message.content or "").strip()
         except Exception as exc:
             last_error = f"API call failed: {exc!r}"
             continue
+        total_duration_seconds += time.monotonic() - call_started_at
+
+        cost, known = calculate_cost(SIMULATOR_MODEL, getattr(resp, "usage", None))
+        total_cost_usd += cost or 0.0
+        pricing_known = pricing_known and known
 
         idx, slot, reasoning, err = _parse_indexed_choice(content, n)
         if err is None and idx is not None:
@@ -445,6 +466,8 @@ async def simulate_trader_answer(
                 "chosen": chosen, "choice_index": idx, "slot": slot,
                 "reasoning": reasoning or "",
                 "simulator_failed": False, "attempts": attempt + 1, "last_error": None,
+                "cost_usd": total_cost_usd, "duration_seconds": total_duration_seconds,
+                "pricing_known": pricing_known,
             }
         last_error = err
         last_slot = slot or last_slot
@@ -460,6 +483,8 @@ async def simulate_trader_answer(
         "simulator_failed": True,
         "attempts": SIMULATOR_MAX_RETRIES + 1,
         "last_error": last_error,
+        "cost_usd": total_cost_usd, "duration_seconds": total_duration_seconds,
+        "pricing_known": pricing_known,
     }
 
 

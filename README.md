@@ -215,7 +215,7 @@ cd apps/product/backend
 python -m classification_core.trade_tariff_backend.cli "my-local-test-experiment"
 ```
 
-### Run-level cost and latency (retrieval side only)
+### Run-level cost and latency
 
 Each `/searches` round from `trade-tariff-backend` includes a `meta.usage`
 object (`total_cost_usd`, `duration_ms`, `provider_calls`) whenever that
@@ -228,14 +228,21 @@ sums this across every round of a gold query's Q&A session and
 `trade-tariff-backend` now reflect real spend and timing (AI-1225 on the
 Rails side, this repo's half of the same design).
 
-This covers the **retrieval and question-asking** cost only — the Rails-side
-LLM calls behind `/searches`. The simulator/trader side of this app (the
-`simulate_trader_answer` calls in `qa_loop.py`, imported unchanged from
-`classification_core.qa_loop`) has no cost or latency tracking of its own
-yet — tracked separately as AI-1226, since it needs its own small $/token
-pricing table in Python (`AiUsage::PricingCalculator` isn't callable from
-this repo). Until AI-1226 lands, a run's totals understate a gold query's
-true cost by whatever the simulator's own calls cost.
+The simulator/trader side (the `simulate_trader_answer` calls in `qa_loop.py`,
+shared with `classification_core`'s other consumers) is folded into the same
+totals, not reported separately (AI-1226): `simulate_trader_answer` sums cost
+and duration across every attempt in its own retry loop — including attempts
+that failed to parse, since those still burned real tokens — using
+`classification_core/pricing.py`'s `MODEL_PRICING` table. That table is a
+**manually maintained mirror** of `config/openai_model_pricing.yml` on the
+Rails side (no shared source between the two repos/languages); a model
+missing from it reports `pricing_known=False` and contributes `$0`, the same
+graceful-degradation behaviour the Rails YAML documents, rather than raising.
+One known gap: `QA_SIMULATOR_MODEL`'s real default (`"gpt-5-mini"`, unset) is
+not an exact match for any key in that table — Rails prices the equivalent
+model under a dated alias, `"gpt-5-mini-2025-08-07"` — so out of the box the
+simulator's own cost reports as `pricing_known=False` until
+`QA_SIMULATOR_MODEL` is set to one of the table's exact keys.
 
 ### Running the tests
 
