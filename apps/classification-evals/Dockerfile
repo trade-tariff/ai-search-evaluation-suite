@@ -61,6 +61,12 @@ COPY apps/product/backend/classification_core/__init__.py \
      apps/product/backend/classification_core/session_facts.py \
      apps/product/backend/classification_core/triage.py \
      apps/product/backend/classification_core/
+COPY apps/product/backend/classification_core/trade_tariff_backend/__init__.py \
+     apps/product/backend/classification_core/trade_tariff_backend/cli.py \
+     apps/product/backend/classification_core/trade_tariff_backend/client.py \
+     apps/product/backend/classification_core/trade_tariff_backend/execute_run.py \
+     apps/product/backend/classification_core/trade_tariff_backend/qa_loop.py \
+     apps/product/backend/classification_core/trade_tariff_backend/
 COPY apps/product/backend/classification_core/data/commodities.json \
      apps/product/backend/classification_core/data/countries.json \
      apps/product/backend/classification_core/data/facets.json \
