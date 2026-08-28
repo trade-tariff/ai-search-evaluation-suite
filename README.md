@@ -115,6 +115,144 @@ search, KG, classification eval, ATaR extraction, embeddings, judge, benchmark,
 and intercept-generation flows require the relevant database and provider
 configuration.
 
+## Trade Tariff Backend Integration (classification_core/trade_tariff_backend/)
+
+`apps/product/backend/classification_core/trade_tariff_backend/` is a separate path from
+the rest of `classification_core/` — it talks to `trade-tariff-backend` over
+HTTP instead of the local Postgres database the rest of this app's
+classification tooling uses. This is the code that runs a classification-
+matrix experiment for the deployed Admin-integrated workflow; the local-DB
+code elsewhere in `classification_core/` remains for offline research and is
+untouched by this.
+
+### Running an experiment end-to-end
+
+This is the manual, step-by-step path: you create the experiment and the run
+yourself from a `trade-tariff-backend` Rails console — exactly the same way
+the not-yet-built AI-1067 Admin Portal integration will, once it exists — then
+trigger execution. This is the workflow to use to prove the whole integration
+works after this plan has been implemented.
+
+**1. Create an experiment** (`trade-tariff-backend` Rails console —
+`bin/rails console`):
+
+```ruby
+experiment = EvaluationExperiment.create(
+  name: "my-manual-test-#{Time.now.to_i}",  # must be unique — validates_unique :name
+  description: "Manual end-to-end test",
+  enabled: true,
+  configuration_overrides: {},              # optional — merged over the admin-config baseline; see EvaluationConfiguration::ALLOWED_OVERRIDE_KEYS for what's allowed here
+)
+experiment.id  # => note this, it's needed for step 2
+```
+
+**2. Create a run for that experiment** (same Rails console):
+
+```ruby
+run = EvaluationRun.start!(
+  experiment:,
+  triggered_by: "console",
+  idempotency_key: SecureRandom.uuid,       # required — see AI-1184; a fresh UUID per attempt, not reused
+  run_time_overrides: {},                   # optional — merged over experiment.configuration_overrides
+)
+run.id      # => note this, it's needed for step 3
+run.status  # => "queued" — nothing has executed yet
+```
+
+**3. Execute the run.** Nothing in `trade-tariff-backend` runs a queued run by
+itself — something has to call the eval app and tell it to start. Two ways to
+do that, both landing on the same `execute_run` code:
+
+- **Once AI-1067 exists:** trigger it from `trade-tariff-backend` itself
+  (Admin Portal button, or its own Rails-side call) — out of scope for this
+  repo, tracked separately.
+- **Today, without AI-1067:** call this app's own ingress endpoint directly.
+  Start this app the normal way (`cd apps/classification-evals && ./start.sh`
+  — this is the deployable app, `apps/classification-evals/backend/app.py`,
+  not `apps/product/backend/main.py` directly; see Task 7 for why it has to
+  be that one), with `TRADE_TARIFF_BACKEND_BASE_URL` pointing at the same
+  `trade-tariff-backend` you just used for steps 1-2, then:
+
+  ```bash
+  curl -X POST http://127.0.0.1:8100/api/evaluation/runs/<run.id>/start
+  # => 202 {"started": true, "run_id": "<run.id>"}
+  ```
+
+  This returns immediately — execution happens in the background
+  (`asyncio.create_task`, Task 7). There is no separate status-polling
+  endpoint on this app to watch; progress lives in `trade-tariff-backend`
+  itself (next step), because that's the one persistent record of the run
+  regardless of which of the two trigger paths above started it.
+
+  If this app is deployed with `AI_FAN_OUT_BEARER_TOKEN` or
+  `AI_FAN_OUT_BASIC_AUTH_USER`/`_PASSWORD` set (see `## Configuration`
+  below), that same optional auth applies to this route too — AI-1067's
+  Rails-side caller will need to send the matching `Authorization` header,
+  the same as any other route on this app.
+
+**4. Confirm the results landed in `trade-tariff-backend`** (same Rails
+console as steps 1-2 — re-fetch, don't reuse the in-memory `run` object,
+since the eval app updated it out-of-process):
+
+```ruby
+run = EvaluationRun[run.id]
+run.status              # => "completed" (or "partially_failed"/"failed") once the background task finishes
+run.result_count        # => set by reconcile_aggregates! when the run finishes
+run.evaluation_results_dataset.count
+run.evaluation_results_dataset.first.values
+```
+
+**Alternative for local/manual testing only:** `classification_core.trade_tariff_backend.cli`
+does steps 1-3 itself in one process (it calls `create_experiment`/`create_run`/`execute_run`
+over HTTP rather than via Rails console, then runs synchronously instead of
+in the background) — convenient for a quick local check, but it bypasses the
+Rails-console/ingress-endpoint split above, so use the walkthrough above when
+you specifically want to verify that split works.
+
+```bash
+export TRADE_TARIFF_BACKEND_BASE_URL=http://127.0.0.1:3000  # defaults to this already
+cd apps/product/backend
+python -m classification_core.trade_tariff_backend.cli "my-local-test-experiment"
+```
+
+### Run-level cost and latency (retrieval side only)
+
+Each `/searches` round from `trade-tariff-backend` includes a `meta.usage`
+object (`total_cost_usd`, `duration_ms`, `provider_calls`) whenever that
+round made at least one LLM or embedding call — absent, not zeroed, on a
+short-circuit round with no call. `qa_loop.run_qa_session_via_trade_tariff_backend`
+sums this across every round of a gold query's Q&A session and
+`execute_run.py` sends the totals (`cost_usd`, `latency_seconds`,
+`provider_calls`) on the successful `post_result` call, so a finished run's
+`total_cost_usd`/`total_latency_seconds`/`total_provider_calls` in
+`trade-tariff-backend` now reflect real spend and timing (AI-1225 on the
+Rails side, this repo's half of the same design).
+
+This covers the **retrieval and question-asking** cost only — the Rails-side
+LLM calls behind `/searches`. The simulator/trader side of this app (the
+`simulate_trader_answer` calls in `qa_loop.py`, imported unchanged from
+`classification_core.qa_loop`) has no cost or latency tracking of its own
+yet — tracked separately as AI-1226, since it needs its own small $/token
+pricing table in Python (`AiUsage::PricingCalculator` isn't callable from
+this repo). Until AI-1226 lands, a run's totals understate a gold query's
+true cost by whatever the simulator's own calls cost.
+
+### Running the tests
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+This also runs automatically in CI on every PR (`.github/workflows/ci.yml`).
+The `classification_core.trade_tariff_backend` tests are fixture-based — they mock the
+HTTP layer with `httpx.MockTransport` against response shapes captured from
+a real `trade-tariff-backend` during development, not a live Rails server.
+That means `trade-tariff-backend` is not a test dependency and these tests
+run without any external services — but it also means they prove "this
+client correctly handles this exact response shape," not "the backend still
+returns this shape today." If the backend's API contract changes, these
+tests won't catch that on their own.
+
 ## Configuration
 
 Copy the example environment file and fill in only the values needed for the

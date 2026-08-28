@@ -1846,6 +1846,7 @@ _DEPLOYABLE_WORKBENCH_PREFIXES = (
     "/api/complexity/",
     "/api/atar/",
     "/api/benchmark/",
+    "/api/evaluation/",
     "/api/kg/",
 )
 
