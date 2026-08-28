@@ -81,22 +81,20 @@ below were found:
    and `terraform/locals.tf`'s SSL env vars currently describe the
    placeholder's shape, not the real app's.
 
-3. **ECR repository doesn't exist.** `ai-search-evaluation-suite` is not in
+3. ~~ECR repository doesn't exist~~ — **correction, 2026-08-28: already done.**
+   `ai-search-evaluation-suite` was added to
    `trade-tariff-platform-aws-terraform`'s `modules/ecr/locals.tf`
-   `applications` map, so `tariff-ai-search-evaluation-suite-production`
-   (the repo this app's own Terraform already points at) has never been
-   created. ECR repos in this account are shared across all three
-   environments and provisioned once, in
-   `environments/production/common/ecr.tf`.
+   `applications` map back in commit `3b2706f` ("feat(platform): provision
+   AI evaluation service", Jira AI-1064, 2026-07-21) — before this design
+   was even written. That commit predates this document; the gap above was
+   found against a local checkout that hadn't pulled recent `main`. No
+   change needed here.
 
-4. **GitHub OIDC trust policy blocks the deploy outright.** Every step of
-   `deploy-ecs.yml` (terraform plan, image push, terraform apply) assumes
-   the `GithubActions-ECS-Deployments-Role`. That role's trust policy, in
-   `trade-tariff-platform-aws-terraform`'s
-   `environments/development/common/iam-roles.tf`, is an explicit allowlist
-   of GitHub repos — `ai-search-evaluation-suite` is not on it. Without
-   this, the workflow fails at the very first AWS login step with an OIDC
-   `AssumeRoleWithWebIdentity` rejection, before touching anything else.
+4. ~~GitHub OIDC trust policy blocks the deploy outright~~ — **correction,
+   2026-08-28: already done.** The same `3b2706f` commit also added
+   `"repo:trade-tariff/ai-search-evaluation-suite:*"` to
+   `GithubActions-ECS-Deployments-Role`'s trust policy in
+   `environments/development/common/iam-roles.tf`. No change needed here.
 
 5. **No secret holds `OPENAI_API_KEY` for this app.** Every other app in
    this account gets its own per-app JSON-blob secret in Secrets Manager
@@ -120,10 +118,22 @@ below were found:
 - **`target_group_arn` is optional in the `ecs-service` module** (defaults
   to `null`; the load-balancer attachment block is skipped entirely when
   unset). Choosing internal-only means we don't need an ALB target group at
-  all, so nothing new needs creating in `alb.tf` in any environment, and
-  the existing `data.aws_lb_target_group.this` reference in this repo's
-  own `terraform/data.tf` can simply be deleted rather than pointed at a
-  new resource.
+  all, so the existing `data.aws_lb_target_group.this` reference in this
+  repo's own `terraform/data.tf` can simply be deleted rather than pointed
+  at a new resource.
+
+**Correction, 2026-08-28 — this one wasn't fine after all:** the same
+`3b2706f` commit that fixed the ECR/OIDC gaps above *also* added a public
+ALB route for eval (an `ai_eval` block in `alb.tf`, in development,
+staging, **and** production, each producing a target group named
+`ai-eval-https` — exactly what `data.aws_lb_target_group.this` above
+resolves to today). That directly contradicts this design's internal-only
+decision. Deleting the eval app's own reference to it (as already planned)
+leaves that ALB route live but pointing at nothing — not broken, but dead
+infrastructure nobody asked for. See "Changes required" and "Staging/
+production follow-up" below: the `ai_eval` block is being removed from
+`environments/development/common/alb.tf` as part of this round of work;
+staging/production removal is added to the deferred follow-up list.
 - **`TradeTariffBackendClient` (AI-1073) is already configurable.** It
   reads its target from `TRADE_TARIFF_BACKEND_BASE_URL`, defaulting to
   `http://127.0.0.1:3000` for local dev. No code change needed — just an
@@ -207,18 +217,20 @@ below were found:
 
 ### `trade-tariff-platform-aws-terraform`, development only
 
-- **`modules/ecr/locals.tf`**: add an `"ai-search-evaluation-suite"` entry
-  to the `applications` map (this file is shared across all environments —
-  one change, not per-environment).
-- **`environments/development/common/iam-roles.tf`**: add
-  `"repo:trade-tariff/ai-search-evaluation-suite:*"` to
-  `GithubActions-ECS-Deployments-Role`'s trust policy repo list.
+- ~~`modules/ecr/locals.tf`: add an `"ai-search-evaluation-suite"` entry~~ —
+  already done (`3b2706f`, AI-1064). No change needed.
+- ~~`environments/development/common/iam-roles.tf`: add the repo to the
+  trust policy~~ — already done (`3b2706f`, AI-1064). No change needed.
 - **`environments/development/common/secrets.tf`**: add an
   `eval_api_configuration` module block, matching the shape of
   `backend_uk_api_configuration`. After apply, hand-populate the secret's
   value with `{"OPENAI_API_KEY": "<copy of backend's key>"}` — same manual
   step every other app's configuration secret already required (values are
   never in Terraform state in this account).
+- **`environments/development/common/alb.tf`**: remove the `ai_eval` block
+  (added by `3b2706f`, produces the now-unwanted `ai-eval-https` target
+  group). Development only for now — see follow-up below for
+  staging/production.
 
 ## Data flow
 
@@ -251,21 +263,24 @@ permits them.
 
 ## Staging/production follow-up (not built now)
 
-Once development is proven end-to-end, the same three
+Once development is proven end-to-end, the following
 `trade-tariff-platform-aws-terraform` changes need repeating in
 `environments/staging/common/` and `environments/production/common/`:
 
-- Add the `ai-search-evaluation-suite` repo to
-  `GithubActions-ECS-Deployments-Role`'s trust policy in each environment's
-  `iam-roles.tf`.
+- ~~Add the `ai-search-evaluation-suite` repo to the OIDC trust policy~~ —
+  **correction, 2026-08-28:** already done for all three environments by
+  `3b2706f` (AI-1064). Confirmed by reading `iam-roles.tf` directly in
+  staging and production, not just development. Nothing to do here.
 - Add an `eval_api_configuration` secret module block to each environment's
   `secrets.tf`, then hand-populate it (a separate OpenAI key per
   environment, or a copy of the same one — worth revisiting given the
   design decision above already anticipates a dedicated eval key
   eventually).
+- Remove the `ai_eval` block from `alb.tf` in each environment — same
+  orphaned-target-group cleanup as development, just not done yet because
+  staging/production are out of scope for this round of work.
 - The ECR repo entry (`modules/ecr/locals.tf`) is already shared across all
-  three environments by the development-only change, so nothing further
-  needed there.
+  three environments (also `3b2706f`), so nothing further needed there.
 - `ai-search-evaluation-suite`'s own `deploy-to-staging.yml` /
   `deploy-to-production.yml` workflows already exist and follow the same
   `deploy-ecs.yml` pattern — no changes anticipated there beyond what
