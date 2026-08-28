@@ -44,6 +44,17 @@ data "aws_iam_policy_document" "execution" {
     ]
     resources = [data.aws_secretsmanager_secret.ecs_tls_certificate.arn]
   }
+
+  statement {
+    effect = "Allow"
+    actions = [
+      "secretsmanager:DescribeSecret",
+      "secretsmanager:GetResourcePolicy",
+      "secretsmanager:GetSecretValue",
+      "secretsmanager:ListSecretVersionIds",
+    ]
+    resources = [data.aws_secretsmanager_secret.eval_api_configuration.arn]
+  }
 }
 
 resource "aws_iam_policy" "execution" {
