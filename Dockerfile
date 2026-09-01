@@ -11,6 +11,13 @@ WORKDIR /app
 
 COPY apps/deployment /app/deployment
 
+# This image only ever runs deployment.app (stdlib-only), so pip is unused at
+# runtime. Removing it drops its vendored msgpack/setuptools copies, which
+# Trivy flags via pip's own vendor.txt even though nothing here calls pip.
+RUN apk upgrade --no-cache libcrypto3 libssl3 && \
+    rm -rf /usr/local/lib/python3.*/site-packages/pip* \
+           /usr/local/lib/python3.*/ensurepip
+
 RUN addgroup -S tariff \
     && adduser -S -D -H -h /app -G tariff tariff \
     && chown -R tariff:tariff /app
