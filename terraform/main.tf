@@ -28,6 +28,7 @@ module "service" {
   enable_ecs_exec            = true
 
   service_environment_config = local.service_environment
+  service_secrets_config     = local.eval_secrets_config
 
   has_autoscaler = false
   min_capacity   = 1

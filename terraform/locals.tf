@@ -16,13 +16,11 @@ locals {
     },
   ]
 
-  eval_secret_value = try(data.aws_secretsmanager_secret_version.eval_api_configuration.secret_string, "{}")
-  eval_secret_map   = jsondecode(local.eval_secret_value)
-  eval_secret_env_vars = [
-    for key, value in local.eval_secret_map : {
-      name  = key
-      value = value
-    }
+  eval_secrets_config = [
+    {
+      name      = "OPENAI_API_KEY"
+      valueFrom = "${data.aws_secretsmanager_secret.eval_api_configuration.arn}:OPENAI_API_KEY::"
+    },
   ]
 
   backend_url_env_vars = [
@@ -32,5 +30,5 @@ locals {
     },
   ]
 
-  service_environment = concat(local.eval_secret_env_vars, local.tls_env_vars, local.backend_url_env_vars)
+  service_environment = concat(local.tls_env_vars, local.backend_url_env_vars)
 }
