@@ -31,10 +31,6 @@ data "aws_secretsmanager_secret" "eval_api_configuration" {
   name = "eval-api-configuration"
 }
 
-data "aws_secretsmanager_secret_version" "eval_api_configuration" {
-  secret_id = data.aws_secretsmanager_secret.eval_api_configuration.id
-}
-
 data "aws_sns_topic" "slack" {
   name = "slack-topic"
 }
