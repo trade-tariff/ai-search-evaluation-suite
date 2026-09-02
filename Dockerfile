@@ -91,15 +91,15 @@ COPY apps/product/data apps/product/data
 COPY --from=frontend-build /srv/ai-search-evaluation-suite/apps/product/frontend/dist apps/product/frontend/dist
 COPY apps/classification-evals apps/classification-evals
 RUN mkdir -p /srv/ai-search-evaluation-suite/apps/classification-evals/var /srv/ai-search-evaluation-suite/apps/product/results \
-    && addgroup -S appuser && adduser -S appuser -G appuser \
-    && chown -R appuser:appuser /srv/ai-search-evaluation-suite
+    && addgroup -S tariff && adduser -S tariff -G tariff \
+    && chown -R tariff:tariff /srv/ai-search-evaluation-suite
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD ["python", "-c", "import ssl, urllib.request; urllib.request.urlopen('https://127.0.0.1:8443/api/health', context=ssl._create_unverified_context()).read()"]
 
 WORKDIR /srv/ai-search-evaluation-suite/apps/classification-evals
 EXPOSE 8443
-USER appuser
+USER tariff
 
 RUN chmod +x docker-entrypoint.sh
 
