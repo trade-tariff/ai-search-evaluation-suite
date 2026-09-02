@@ -329,7 +329,14 @@ def _record_exit(job_id: str, returncode: int, status: str | None = None) -> Non
         _PROCESSES.pop(job_id, None)
 
 
-def _watch_process(job_id: str, process: subprocess.Popen) -> None:
+def _watch_process(job_id: str, process: subprocess.Popen, log_path: Path) -> None:
+    assert process.stdout is not None
+    with log_path.open("ab") as log_file:
+        for line in process.stdout:
+            log_file.write(line)
+            log_file.flush()
+            sys.stdout.buffer.write(f"[job {job_id}] ".encode() + line)
+            sys.stdout.buffer.flush()
     returncode = process.wait()
     _record_exit(job_id, returncode)
 
@@ -1369,18 +1376,17 @@ def create_job(req: JobCreate) -> dict:
     estimated_sessions = _estimated_sessions(req)
     estimated_cost = _estimated_cost_usd(req)
 
-    with log_path.open("ab") as log_file:
-        process = subprocess.Popen(
-            cmd,
-            cwd=PRODUCT_BACKEND,
-            env=env,
-            stdout=log_file,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
+    process = subprocess.Popen(
+        cmd,
+        cwd=PRODUCT_BACKEND,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+    )
     with _PROCESS_LOCK:
         _PROCESSES[job_id] = process
-    threading.Thread(target=_watch_process, args=(job_id, process), daemon=True).start()
+    threading.Thread(target=_watch_process, args=(job_id, process, log_path), daemon=True).start()
 
     now = time.time()
     with _connect() as conn:
