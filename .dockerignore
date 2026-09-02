@@ -24,5 +24,14 @@ apps/product/data/complexity_chart_cache/
 apps/product/data/intercept_runs/
 apps/product/results/
 
+# scratch/experiment scripts and journey-test fixtures, not part of the
+# deployed app (journey/ has its own apps/product/Dockerfile.journey)
+apps/product/backend/exp*.py
+apps/product/backend/granular_kg.py
+apps/product/backend/measure_eliminate.py
+apps/product/backend/suite_primer.py
+apps/product/backend/journey/
+apps/product/backend/classification_core/run_source_ablation.py
+
 # editor/backup residue
 *.bak*
