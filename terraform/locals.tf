@@ -21,6 +21,14 @@ locals {
       name      = "OPENAI_API_KEY"
       valueFrom = "${data.aws_secretsmanager_secret.eval_api_configuration.arn}:OPENAI_API_KEY::"
     },
+    {
+      name      = "AI_FAN_OUT_BASIC_AUTH_USER"
+      valueFrom = "${data.aws_secretsmanager_secret.eval_api_configuration.arn}:AI_FAN_OUT_BASIC_AUTH_USER::"
+    },
+    {
+      name      = "AI_FAN_OUT_BASIC_AUTH_PASSWORD"
+      valueFrom = "${data.aws_secretsmanager_secret.eval_api_configuration.arn}:AI_FAN_OUT_BASIC_AUTH_PASSWORD::"
+    },
   ]
 
   backend_url_env_vars = [
@@ -30,5 +38,12 @@ locals {
     },
   ]
 
-  service_environment = concat(local.tls_env_vars, local.backend_url_env_vars)
+  auth_env_vars = [
+    {
+      name  = "AI_FAN_OUT_AUTH_PUBLIC_PATHS"
+      value = "/api/health"
+    },
+  ]
+
+  service_environment = concat(local.tls_env_vars, local.backend_url_env_vars, local.auth_env_vars)
 }
