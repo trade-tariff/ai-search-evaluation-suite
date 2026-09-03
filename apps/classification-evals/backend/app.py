@@ -1376,8 +1376,15 @@ def create_job(req: JobCreate) -> dict:
     estimated_sessions = _estimated_sessions(req)
     estimated_cost = _estimated_cost_usd(req)
 
+    # CodeQL py/command-line-injection: cmd is a plain list (no shell=True,
+    # so shell metacharacters aren't special), and every JobCreate field that
+    # reaches it is constrained by a Pydantic Literal/regex/bounds - see
+    # _build_command and JobCreate above. Dismissed on GitHub as a false
+    # positive; this comment is the reasoning, kept out of the alert's
+    # exact flagged line so future edits nearby don't reopen it under a new
+    # alert number.
     process = subprocess.Popen(
-        cmd,  # codeql[py/command-line-injection] list-form Popen, no shell=True; every JobCreate field reaching cmd is constrained by a Pydantic Literal/regex/bounds - see _build_command and JobCreate above
+        cmd,
         cwd=PRODUCT_BACKEND,
         env=env,
         stdout=subprocess.PIPE,
