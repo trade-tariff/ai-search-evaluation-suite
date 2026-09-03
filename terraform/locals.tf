@@ -29,6 +29,10 @@ locals {
       name      = "AI_FAN_OUT_BASIC_AUTH_PASSWORD"
       valueFrom = "${data.aws_secretsmanager_secret.eval_api_configuration.arn}:AI_FAN_OUT_BASIC_AUTH_PASSWORD::"
     },
+    {
+      name      = "CLASSIFICATION_ALLOW_PROVIDER_CALLS"
+      valueFrom = "${data.aws_secretsmanager_secret.eval_api_configuration.arn}:CLASSIFICATION_ALLOW_PROVIDER_CALLS::"
+    },
   ]
 
   backend_url_env_vars = [
