@@ -1377,7 +1377,7 @@ def create_job(req: JobCreate) -> dict:
     estimated_cost = _estimated_cost_usd(req)
 
     process = subprocess.Popen(
-        cmd,
+        cmd,  # codeql[py/command-line-injection] list-form Popen, no shell=True; every JobCreate field reaching cmd is constrained by a Pydantic Literal/regex/bounds - see _build_command and JobCreate above
         cwd=PRODUCT_BACKEND,
         env=env,
         stdout=subprocess.PIPE,
