@@ -31,7 +31,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app/apps/product/backend \
     PATH="/opt/venv/bin:$PATH"
 
-RUN apk add --no-cache bash libgomp
+RUN apk add --no-cache bash libgomp libgcc libstdc++
 
 COPY --from=python-build /opt/venv /opt/venv
 
