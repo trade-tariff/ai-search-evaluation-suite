@@ -10,8 +10,7 @@ module "service" {
   subnet_ids      = data.aws_subnets.private.ids
   security_groups = [data.aws_security_group.this.id]
 
-  target_group_arn = data.aws_lb_target_group.this.arn
-  container_port   = 8443
+  container_port = 8443
 
   cloudwatch_log_group_name = "platform-logs-${var.environment}"
 
@@ -29,6 +28,7 @@ module "service" {
   enable_ecs_exec            = true
 
   service_environment_config = local.service_environment
+  service_secrets_config     = local.eval_secrets_config
 
   has_autoscaler = false
   min_capacity   = 1

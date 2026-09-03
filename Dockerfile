@@ -1,32 +1,55 @@
-ARG PYTHON_VERSION=3.13
-ARG ALPINE_VERSION=3.22
+FROM node:24-alpine AS frontend-build
 
-FROM python:${PYTHON_VERSION}-alpine${ALPINE_VERSION}
+WORKDIR /app/apps/product/frontend
+COPY apps/product/frontend/package.json apps/product/frontend/package-lock.json ./
+RUN npm ci --ignore-scripts
+COPY apps/product/frontend ./
+RUN npm run build
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    SSL_PORT=8443
+
+FROM python:3.12-alpine AS python-build
+
+RUN apk add --no-cache build-base
+
+ENV PATH="/opt/venv/bin:$PATH"
+RUN python -m venv /opt/venv
 
 WORKDIR /app
 
-COPY apps/deployment /app/deployment
+COPY apps/product/backend/requirements.txt apps/product/backend/requirements.txt
+COPY apps/classification-evals/requirements.txt apps/classification-evals/requirements.txt
+RUN pip install --no-cache-dir -r apps/classification-evals/requirements.txt
 
-# This image only ever runs deployment.app (stdlib-only), so pip is unused at
-# runtime. Removing it drops its vendored msgpack/setuptools copies, which
-# Trivy flags via pip's own vendor.txt even though nothing here calls pip.
-RUN apk upgrade --no-cache libcrypto3 libssl3 && \
-    rm -rf /usr/local/lib/python3.*/site-packages/pip* \
-           /usr/local/lib/python3.*/ensurepip
 
-RUN addgroup -S tariff \
-    && adduser -S -D -H -h /app -G tariff tariff \
+FROM python:3.12-alpine
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PRODUCT_APP_ROOT=/app/apps/product \
+    CLASSIFY_EVAL_STATE_DIR=/app/apps/classification-evals/var \
+    AI_FAN_OUT_KG_LABEL_PROFILE=deployable \
+    PYTHONPATH=/app/apps/product/backend \
+    PATH="/opt/venv/bin:$PATH"
+
+RUN apk add --no-cache bash libgomp libgcc libstdc++
+
+COPY --from=python-build /opt/venv /opt/venv
+
+WORKDIR /app
+
+COPY apps/product/backend apps/product/backend
+COPY apps/product/data apps/product/data
+COPY --from=frontend-build /app/apps/product/frontend/dist apps/product/frontend/dist
+COPY apps/classification-evals apps/classification-evals
+RUN mkdir -p /app/apps/classification-evals/var /app/apps/product/results \
+    && addgroup -S tariff && adduser -S tariff -G tariff \
     && chown -R tariff:tariff /app
 
-EXPOSE 8443
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD ["python", "-c", "import ssl, urllib.request; urllib.request.urlopen('https://127.0.0.1:8443/api/health', context=ssl._create_unverified_context()).read()"]
 
+WORKDIR /app/apps/classification-evals
+EXPOSE 8443
 USER tariff
 
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD ["python", "-c", "import ssl, urllib.request; urllib.request.urlopen('https://127.0.0.1:8443/healthcheckz', context=ssl._create_unverified_context()).read()"]
-
-CMD ["python", "-m", "deployment.app"]
+CMD ["./docker-entrypoint.sh"]
