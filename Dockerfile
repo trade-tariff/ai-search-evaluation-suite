@@ -33,6 +33,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 RUN apk add --no-cache bash libgomp libgcc libstdc++
 
+# CVE-2026-53612/53613/53614/76642/78408/78409/78410: bump libuuid past the
+# vulnerable 2.42.1-r0 pulled in transitively by the base image.
+RUN apk add --no-cache --upgrade libuuid
+
 COPY --from=python-build /opt/venv /opt/venv
 
 WORKDIR /app
