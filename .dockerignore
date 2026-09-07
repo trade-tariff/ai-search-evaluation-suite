@@ -26,7 +26,7 @@ apps/product/results/
 
 # scratch/experiment scripts and journey-test fixtures, not part of the
 # deployed app (journey/ has its own apps/product/Dockerfile.journey)
-apps/product/backend/exp*.py
+apps/product/backend/exp[0-9]*.py
 apps/product/backend/granular_kg.py
 apps/product/backend/measure_eliminate.py
 apps/product/backend/suite_primer.py
