@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import ssl
 from typing import Any, Optional
 
 import httpx
@@ -18,6 +19,21 @@ DEFAULT_BASE_URL = os.environ.get("TRADE_TARIFF_BACKEND_BASE_URL", "http://127.0
 REQUEST_TIMEOUT_S = float(os.environ.get("TRADE_TARIFF_BACKEND_REQUEST_TIMEOUT_S", "30"))
 MAX_ATTEMPTS = 3
 RETRY_BASE_DELAY_S = 0.5
+
+
+def _internal_ssl_context() -> ssl.SSLContext | bool:
+    """trade-tariff-backend's internal endpoints (e.g.
+    https://backend-uk.tariff.internal:8443) present the platform's shared
+    self-signed TLS cert (SSL_CERT_PEM) - the same cert this container uses
+    for its own inbound TLS (see docker-entrypoint.sh) and the same one
+    every other internal service presents. Verify against that specific
+    cert rather than disabling verification outright, mirroring
+    trade-tariff-admin's and trade-tariff-frontend's ClientBuilder
+    (conn.ssl.ca_file = cert_path)."""
+    cert_pem = os.environ.get("SSL_CERT_PEM")
+    if not cert_pem:
+        return True  # local dev talks to plain http://127.0.0.1:3000; unused
+    return ssl.create_default_context(cadata=cert_pem.replace("\\n", "\n"))
 
 
 class TradeTariffBackendValidationError(Exception):
@@ -45,7 +61,9 @@ class TradeTariffBackendClient:
     def __init__(self, base_url: str = DEFAULT_BASE_URL, transport: Optional[httpx.MockTransport] = None):
         self._admin_base = f"{base_url}/uk/admin/search/evaluation"
         self._internal_base = f"{base_url}/uk/internal"
-        self._http = httpx.AsyncClient(timeout=REQUEST_TIMEOUT_S, transport=transport)
+        self._http = httpx.AsyncClient(
+            timeout=REQUEST_TIMEOUT_S, transport=transport, verify=_internal_ssl_context()
+        )
 
     async def _request(self, method: str, url: str, **kwargs) -> dict:
         last_error: Exception | str = "unknown error"

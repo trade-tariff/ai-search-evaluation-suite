@@ -1,5 +1,6 @@
 module "service" {
-  source = "git@github.com:trade-tariff/trade-tariff-platform-terraform-modules.git//aws/ecs-service?ref=aws/ecs-service-v3.1.0"
+  # TODO: bump to a real released tag once trade-tariff-platform-terraform-modules#108 merges and gets one.
+  source = "git@github.com:trade-tariff/trade-tariff-platform-terraform-modules.git//aws/ecs-service?ref=7f0a13b73244e19e750c6b4719cdcd8673c58ff0"
 
   region = var.region
 
@@ -10,8 +11,16 @@ module "service" {
   subnet_ids      = data.aws_subnets.private.ids
   security_groups = [data.aws_security_group.this.id]
 
-  target_group_arn = data.aws_lb_target_group.this.arn
-  container_port   = 8443
+  container_port = 8443
+
+  # Reuses the Dockerfile's own HEALTHCHECK command/timings - ECS otherwise has
+  # no application-level health signal for an internal-only service with no ALB.
+  container_health_check = {
+    command = [
+      "CMD", "python", "-c",
+      "import ssl, urllib.request; urllib.request.urlopen('https://127.0.0.1:8443/api/health', context=ssl._create_unverified_context()).read()"
+    ]
+  }
 
   cloudwatch_log_group_name = "platform-logs-${var.environment}"
 
@@ -29,6 +38,7 @@ module "service" {
   enable_ecs_exec            = true
 
   service_environment_config = local.service_environment
+  service_secrets_config     = local.eval_secrets_config
 
   has_autoscaler = false
   min_capacity   = 1
