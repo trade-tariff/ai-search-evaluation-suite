@@ -24,6 +24,14 @@ def auth_enabled() -> bool:
 
 def install_optional_auth(app: FastAPI, *, realm: str = "AI Fan-Out") -> None:
     """Install deployment auth when auth env vars are configured."""
+    user = os.environ.get("AI_FAN_OUT_BASIC_AUTH_USER")
+    password = os.environ.get("AI_FAN_OUT_BASIC_AUTH_PASSWORD")
+    if bool(user) != bool(password):
+        raise RuntimeError(
+            "AI_FAN_OUT_BASIC_AUTH_USER and AI_FAN_OUT_BASIC_AUTH_PASSWORD must both be "
+            "set or both be unset - a partially configured pair would otherwise silently "
+            "disable auth instead of failing to start."
+        )
 
     @app.middleware("http")
     async def _optional_auth(request: Request, call_next):
