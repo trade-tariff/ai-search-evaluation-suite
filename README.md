@@ -273,6 +273,7 @@ Common variables:
 | `TARIFF_DB_SCHEMA` | Tariff schema name. |
 | `TARIFF_DB_KG_SCHEMA` | Knowledge graph schema name. |
 | `OPENAI_API_KEY` | Optional provider key for OpenAI-backed actions. |
+| `OPENAI_BASE_URL` | Leave unset locally (standard OpenAI host, standard key). Deployed environments set this to `https://gb.api.openai.com/v1`, a UK data-residency host that requires a UK-region-scoped key. |
 | `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `XAI_API_KEY`, `GROQ_API_KEY`, `OPENROUTER_API_KEY`, `CEREBRAS_API_KEY`, `DEEPSEEK_API_KEY`, `MISTRAL_API_KEY`, `SAMBANOVA_API_KEY` | Optional provider keys for benchmark and fan-out comparisons. |
 | `AI_FAN_OUT_WORKBENCH_SPEND_ENABLED` | Enables provider-backed workbench actions when explicitly intended. |
 | `CLASSIFY_EVAL_ALLOWED_MODELS` | Server-side allowlist for classification eval models. |

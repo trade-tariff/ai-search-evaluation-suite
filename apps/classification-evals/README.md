@@ -29,6 +29,13 @@ The local playground OpenAI key, when needed on this machine, is stored in
 `0600`, and must never be copied into docs, screenshots, command logs, Docker
 images, AMIs, or commits.
 
+Deployed environments (development, staging, production) send OpenAI requests
+to `https://gb.api.openai.com/v1` (`OPENAI_BASE_URL`), a UK data-residency
+host that only accepts UK-region-scoped keys. Leave `OPENAI_BASE_URL` unset
+locally unless your own personal key is also UK-region-scoped — a standard
+key against that host fails outright, so the default here is the standard
+OpenAI host with a standard key.
+
 ## Local Start
 
 ```bash
