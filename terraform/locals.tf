@@ -49,5 +49,14 @@ locals {
     },
   ]
 
-  service_environment = concat(local.tls_env_vars, local.backend_url_env_vars, local.auth_env_vars)
+  # AI-1362: OpenAI's UK data-residency host - the eval app's UK-region key
+  # only works against this host, not the standard one.
+  openai_env_vars = [
+    {
+      name  = "OPENAI_BASE_URL"
+      value = "https://gb.api.openai.com/v1"
+    },
+  ]
+
+  service_environment = concat(local.tls_env_vars, local.backend_url_env_vars, local.auth_env_vars, local.openai_env_vars)
 }
