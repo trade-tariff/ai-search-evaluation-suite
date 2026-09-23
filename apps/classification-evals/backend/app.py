@@ -354,30 +354,36 @@ def _log_experiment(event: str, message: str, **fields: object) -> None:
 def _record_exit(job_id: str, returncode: int, status: str | None = None) -> None:
     final_status = status or ("succeeded" if returncode == 0 else "failed")
     with _connect() as conn:
-        row = conn.execute("SELECT status, request_json FROM jobs WHERE id=?", (job_id,)).fetchone()
-        previous = row["status"] if row else None
-        conn.execute(
-            "UPDATE jobs SET status=?, returncode=?, updated_at=? WHERE id=?",
+        # Only the caller that moves the job out of running or stopping logs the finish.
+        # A poll, the watcher, and stop can all observe the same exit.
+        changed = conn.execute(
+            """
+            UPDATE jobs
+               SET status=?, returncode=?, updated_at=?
+             WHERE id=? AND status IN ('running', 'stopping')
+            """,
             (final_status, returncode, time.time(), job_id),
-        )
+        ).rowcount
+        row = conn.execute("SELECT request_json FROM jobs WHERE id=?", (job_id,)).fetchone()
+    if changed != 1:
+        return
     with _PROCESS_LOCK:
         _PROCESSES.pop(job_id, None)
-    if previous in {None, "running", "stopping"}:
-        request = {}
-        if row is not None:
-            try:
-                request = json.loads(row["request_json"])
-            except (TypeError, json.JSONDecodeError):
-                request = {}
-        _log_experiment(
-            "experiment_run_finished",
-            f"experiment run finished job_id={job_id} status={final_status} returncode={returncode}",
-            job_id=job_id,
-            status=final_status,
-            returncode=returncode,
-            run_label=request.get("run_label"),
-            harness=request.get("harness"),
-        )
+    request = {}
+    if row is not None:
+        try:
+            request = json.loads(row["request_json"])
+        except (TypeError, json.JSONDecodeError):
+            request = {}
+    _log_experiment(
+        "experiment_run_finished",
+        f"experiment run finished job_id={job_id} status={final_status} returncode={returncode}",
+        job_id=job_id,
+        status=final_status,
+        returncode=returncode,
+        run_label=request.get("run_label"),
+        harness=request.get("harness"),
+    )
 
 
 def _watch_process(job_id: str, process: subprocess.Popen, log_path: Path) -> None:
