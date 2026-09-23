@@ -12,7 +12,12 @@ permissions:
   id-token: write
 
 jobs:
+  simulation-tests:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    uses: ./.github/workflows/simulation-tests.yml
+
   deploy:
+    needs: simulation-tests
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     uses: trade-tariff/trade-tariff-tools/.github/workflows/deploy-ecs.yml@main
     with:

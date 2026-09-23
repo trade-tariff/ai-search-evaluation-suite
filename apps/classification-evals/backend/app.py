@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import asyncio
+import importlib
 import json
+import logging
 import math
 import os
 import signal
@@ -10,19 +13,22 @@ import sys
 import threading
 import time
 import uuid
-import asyncio
-import importlib
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.routing import APIRoute
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .auth import auth_enabled, install_optional_auth
+from .logging_config import configure_logging, is_healthcheck_path
+
+configure_logging()
+_experiment_log = logging.getLogger("experiment")
+_access_log = logging.getLogger("ecs.access")
 
 
 APP_ROOT = Path(__file__).resolve().parents[1]
@@ -59,6 +65,29 @@ app = FastAPI(
     description="AI search evaluation suite with retrieval, classification, KG, ATaR, benchmark, and intercept tooling.",
 )
 install_optional_auth(app, realm="AI Search Evaluation Suite")
+
+
+@app.middleware("http")
+async def log_http_requests(request: Request, call_next):
+    started = time.perf_counter()
+    response = await call_next(request)
+    path = request.url.path
+    if is_healthcheck_path(path):
+        return response
+    duration_ms = round((time.perf_counter() - started) * 1000, 2)
+    _access_log.info(
+        "[%s] %s %s",
+        response.status_code,
+        request.method,
+        path,
+        extra={
+            "method": request.method,
+            "path": path,
+            "status": response.status_code,
+            "duration": duration_ms,
+        },
+    )
+    return response
 
 _PROCESS_LOCK = threading.Lock()
 _CLASSIFY_TRIAL_LOCK = threading.Lock()
@@ -318,15 +347,37 @@ def _refresh_job(row: sqlite3.Row, *, include_internal: bool = False) -> dict:
     return job
 
 
+def _log_experiment(event: str, message: str, **fields: object) -> None:
+    _experiment_log.info(message, extra={"event": event, **fields})
+
+
 def _record_exit(job_id: str, returncode: int, status: str | None = None) -> None:
     final_status = status or ("succeeded" if returncode == 0 else "failed")
     with _connect() as conn:
+        row = conn.execute("SELECT status, request_json FROM jobs WHERE id=?", (job_id,)).fetchone()
+        previous = row["status"] if row else None
         conn.execute(
             "UPDATE jobs SET status=?, returncode=?, updated_at=? WHERE id=?",
             (final_status, returncode, time.time(), job_id),
         )
     with _PROCESS_LOCK:
         _PROCESSES.pop(job_id, None)
+    if previous in {None, "running", "stopping"}:
+        request = {}
+        if row is not None:
+            try:
+                request = json.loads(row["request_json"])
+            except (TypeError, json.JSONDecodeError):
+                request = {}
+        _log_experiment(
+            "experiment_run_finished",
+            f"experiment run finished job_id={job_id} status={final_status} returncode={returncode}",
+            job_id=job_id,
+            status=final_status,
+            returncode=returncode,
+            run_label=request.get("run_label"),
+            harness=request.get("harness"),
+        )
 
 
 def _watch_process(job_id: str, process: subprocess.Popen, log_path: Path) -> None:
@@ -335,8 +386,13 @@ def _watch_process(job_id: str, process: subprocess.Popen, log_path: Path) -> No
         for line in process.stdout:
             log_file.write(line)
             log_file.flush()
-            sys.stdout.buffer.write(f"[job {job_id}] ".encode() + line)
-            sys.stdout.buffer.flush()
+            text = line.decode("utf-8", errors="replace").rstrip("\n")
+            if text:
+                _log_experiment(
+                    "experiment_run_output",
+                    text,
+                    job_id=job_id,
+                )
     returncode = process.wait()
     _record_exit(job_id, returncode)
 
@@ -945,6 +1001,15 @@ def retrieval_search(req: RetrievalSearch) -> dict:
         ranked_candidates.append(item)
     top_candidates = ranked_candidates[:DISPLAY_LIMIT]
 
+    _log_experiment(
+        "experiment_run",
+        (
+            f"experiment run run_label={selected.get('run_label')} "
+            f"rank={rank} hit_at_10={bool(rank and rank <= 10)}"
+        ),
+        run_label=selected.get("run_label"),
+        harness="retrieval",
+    )
     return {
         "query": req.query,
         "processed_query": processed_query,
@@ -1393,7 +1458,6 @@ def create_job(req: JobCreate) -> dict:
     )
     with _PROCESS_LOCK:
         _PROCESSES[job_id] = process
-    threading.Thread(target=_watch_process, args=(job_id, process, log_path), daemon=True).start()
 
     now = time.time()
     with _connect() as conn:
@@ -1420,6 +1484,18 @@ def create_job(req: JobCreate) -> dict:
                 estimated_cost,
             ),
         )
+    threading.Thread(target=_watch_process, args=(job_id, process, log_path), daemon=True).start()
+    _log_experiment(
+        "experiment_run_started",
+        (
+            f"experiment run started job_id={job_id} run_label={req.run_label} "
+            f"harness={req.harness} model={req.model}"
+        ),
+        job_id=job_id,
+        run_label=req.run_label,
+        harness=req.harness,
+        model=req.model,
+    )
     return {
         "job_id": job_id,
         "status": "running",

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+cd "$(dirname "$0")"
+
 : "${SSL_CERT_PEM:?SSL_CERT_PEM is required}"
 : "${SSL_KEY_PEM:?SSL_KEY_PEM is required}"
 
@@ -14,5 +16,6 @@ chmod 600 "$CERT_DIR/certificate.pem" "$CERT_DIR/private-key.pem"
 exec uvicorn backend.app:app \
   --host 0.0.0.0 \
   --port 8443 \
+  --no-access-log \
   --ssl-keyfile "$CERT_DIR/private-key.pem" \
   --ssl-certfile "$CERT_DIR/certificate.pem"

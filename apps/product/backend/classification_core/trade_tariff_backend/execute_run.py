@@ -5,6 +5,7 @@ function rather than duplicating the loop.
 """
 from __future__ import annotations
 
+import logging
 import os
 from datetime import datetime, timezone
 
@@ -13,6 +14,20 @@ from openai import AsyncOpenAI
 from classification_core.provider_guard import TRUE_VALUES, openai_allowed
 
 from .qa_loop import run_qa_session_via_trade_tariff_backend
+
+_experiment_log = logging.getLogger("experiment")
+
+
+def _log_experiment(message: str, **fields: object) -> None:
+    """Emit one experiment-run line.
+
+    The eval app configures a JSON handler on the root logger. A subprocess
+    runner has no handler, so it prints and the parent wraps that line.
+    """
+    if _experiment_log.handlers or logging.getLogger().handlers:
+        _experiment_log.info(message, extra={"event": "experiment_run", **fields})
+        return
+    print(message, flush=True)
 
 
 def _progress_logging_enabled() -> bool:
@@ -75,8 +90,15 @@ async def execute_run(run_id: str, client) -> dict:
 
         gold_queries = await client.get_gold_queries()
         total_gold_queries = len(gold_queries)
+        _log_experiment(
+            f"experiment run started run_id={run_id} gold_queries={total_gold_queries}",
+            run_id=run_id,
+        )
         if _progress_logging_enabled():
-            print(f"[eval progress] run {run_id}: {total_gold_queries} gold queries to process", flush=True)
+            _log_experiment(
+                f"[eval progress] run {run_id}: {total_gold_queries} gold queries to process",
+                run_id=run_id,
+            )
 
         # Built once for the whole run, the same way classification_core.qa_loop's
         # existing run_qa_session builds it. openai_allowed() is this repo's spend
@@ -100,10 +122,10 @@ async def execute_run(run_id: str, client) -> dict:
             expected_code_digits = gold.get("expected_code_digits")
 
             if _progress_logging_enabled():
-                print(
+                _log_experiment(
                     f"[eval progress] {index}/{total_gold_queries} {source_id} ({persona}) "
                     f"expected={expected_code}: {gold.get('query')!r}",
-                    flush=True,
+                    run_id=run_id,
                 )
 
             try:
@@ -159,16 +181,19 @@ async def execute_run(run_id: str, client) -> dict:
                 })
                 succeeded += 1
                 if _progress_logging_enabled():
-                    print(
+                    _log_experiment(
                         f"[eval progress] {index}/{total_gold_queries} {source_id} ({persona}): "
                         f"final={final_code} top1={_matches_gold(final_code, expected_code, expected_code_digits)} "
                         f"top5={any(_matches_gold(c, expected_code, expected_code_digits) for c in top5_codes)} "
                         f"questions_answered={session_result.get('questions_answered', 0)}",
-                        flush=True,
+                        run_id=run_id,
                     )
             except Exception as exc:  # noqa: BLE001 - one bad gold query must not abort the run
                 if _progress_logging_enabled():
-                    print(f"[eval progress] {index}/{total_gold_queries} {source_id} ({persona}): FAILED error={exc}", flush=True)
+                    _log_experiment(
+                        f"[eval progress] {index}/{total_gold_queries} {source_id} ({persona}): FAILED error={exc}",
+                        run_id=run_id,
+                    )
                 try:
                     await client.post_result({
                         "run_id": run_id, "source_type": source_type, "source_id": source_id,
@@ -199,8 +224,17 @@ async def execute_run(run_id: str, client) -> dict:
         prefix = f"{error_summary}; " if error_summary else ""
         error_summary = f"{prefix}run aborted early: {outer_exc}"
 
+    _log_experiment(
+        f"experiment run finished run_id={run_id} status={final_status} succeeded={succeeded} failed={failed}",
+        run_id=run_id,
+        status=final_status,
+    )
     if _progress_logging_enabled():
-        print(f"[eval progress] run {run_id} finished: status={final_status} succeeded={succeeded} failed={failed}", flush=True)
+        _log_experiment(
+            f"[eval progress] run {run_id} finished: status={final_status} succeeded={succeeded} failed={failed}",
+            run_id=run_id,
+            status=final_status,
+        )
 
     # Deliberately NOT wrapped in a swallowing try/except: if this call itself
     # fails (e.g. the backend is genuinely down for the whole run), there is

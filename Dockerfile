@@ -31,7 +31,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app/apps/product/backend \
     PATH="/opt/venv/bin:$PATH"
 
-RUN apk add --no-cache bash libgomp libgcc libstdc++
+RUN apk add --no-cache bash curl libgomp libgcc libstdc++
 
 # CVE-2026-53612/53613/53614/76642/78408/78409/78410: bump libuuid past the
 # vulnerable 2.42.1-r0 pulled in transitively by the base image.
@@ -50,10 +50,10 @@ RUN mkdir -p /app/apps/classification-evals/var /app/apps/product/results \
     && chown -R tariff:tariff /app
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD ["python", "-c", "import ssl, urllib.request; urllib.request.urlopen('https://127.0.0.1:8443/api/health', context=ssl._create_unverified_context()).read()"]
+  CMD ["curl", "-fsS", "--insecure", "https://127.0.0.1:8443/api/health"]
 
-WORKDIR /app/apps/classification-evals
+WORKDIR /app
 EXPOSE 8443
 USER tariff
 
-CMD ["./docker-entrypoint.sh"]
+CMD ["/app/apps/classification-evals/docker-entrypoint.sh"]

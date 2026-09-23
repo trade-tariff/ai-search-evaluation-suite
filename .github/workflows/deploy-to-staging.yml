@@ -10,7 +10,11 @@ permissions:
   id-token: write
 
 jobs:
+  simulation-tests:
+    uses: ./.github/workflows/simulation-tests.yml
+
   deploy:
+    needs: simulation-tests
     uses: trade-tariff/trade-tariff-tools/.github/workflows/deploy-ecs.yml@main
     with:
       app-name: tariff-ai-search-evaluation-suite

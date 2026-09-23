@@ -31,4 +31,5 @@ fi
 
 exec uvicorn backend.app:app \
   --host "${CLASSIFY_EVAL_HOST:-127.0.0.1}" \
-  --port "${CLASSIFY_EVAL_PORT:-8100}"
+  --port "${CLASSIFY_EVAL_PORT:-8100}" \
+  --no-access-log

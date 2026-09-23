@@ -49,9 +49,9 @@ services:
     ports:
       - "127.0.0.1:${CLASSIFY_EVAL_PORT:-8100}:8100"
     volumes:
-      - classification_eval_state:/srv/ai-search-evaluation-suite/apps/classification-evals/var
-      - product_app_data:/srv/ai-search-evaluation-suite/apps/product/data
-      - product_app_results:/srv/ai-search-evaluation-suite/apps/product/results
+      - classification_eval_state:/app/apps/classification-evals/var
+      - product_app_data:/app/apps/product/data
+      - product_app_results:/app/apps/product/results
     depends_on:
       tariff-db:
         condition: service_healthy
@@ -59,7 +59,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/api/health').read()"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8100/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -80,11 +80,12 @@ services:
       EXTRACTION_ALLOW_PROVIDER_CALLS: ${EXTRACTION_ALLOW_PROVIDER_CALLS:-0}
       EXTRACTION_ALLOW_NETWORK: ${EXTRACTION_ALLOW_NETWORK:-0}
       HSEN_DIR: ${HSEN_DIR:-}
+    working_dir: /app/apps/classification-evals
     command: ["python", "scripts/extraction_pipeline.py", "status"]
     volumes:
-      - classification_eval_state:/srv/ai-search-evaluation-suite/apps/classification-evals/var
-      - product_app_data:/srv/ai-search-evaluation-suite/apps/product/data
-      - product_app_results:/srv/ai-search-evaluation-suite/apps/product/results
+      - classification_eval_state:/app/apps/classification-evals/var
+      - product_app_data:/app/apps/product/data
+      - product_app_results:/app/apps/product/results
     depends_on:
       tariff-db:
         condition: service_healthy
@@ -109,11 +110,12 @@ services:
       EXTRACTION_ALLOW_NETWORK: ${EXTRACTION_ALLOW_NETWORK:-0}
       EXTRACTION_RUN_INTERVAL_SECONDS: ${EXTRACTION_RUN_INTERVAL_SECONDS:-86400}
       HSEN_DIR: ${HSEN_DIR:-}
+    working_dir: /app/apps/classification-evals
     command: ["sh", "-c", "python scripts/extraction_pipeline.py schedule --profile safe --interval-seconds \"$${EXTRACTION_RUN_INTERVAL_SECONDS:-86400}\""]
     volumes:
-      - classification_eval_state:/srv/ai-search-evaluation-suite/apps/classification-evals/var
-      - product_app_data:/srv/ai-search-evaluation-suite/apps/product/data
-      - product_app_results:/srv/ai-search-evaluation-suite/apps/product/results
+      - classification_eval_state:/app/apps/classification-evals/var
+      - product_app_data:/app/apps/product/data
+      - product_app_results:/app/apps/product/results
     depends_on:
       tariff-db:
         condition: service_healthy

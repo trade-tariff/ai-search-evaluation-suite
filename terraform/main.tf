@@ -16,8 +16,7 @@ module "service" {
   # no application-level health signal for an internal-only service with no ALB.
   container_health_check = {
     command = [
-      "CMD", "python", "-c",
-      "import ssl, urllib.request; urllib.request.urlopen('https://127.0.0.1:8443/api/health', context=ssl._create_unverified_context()).read()"
+      "CMD", "curl", "-fsS", "--insecure", "https://127.0.0.1:8443/api/health"
     ]
   }
 
