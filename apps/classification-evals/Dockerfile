@@ -1,6 +1,6 @@
 FROM node:20-slim AS frontend-build
 
-WORKDIR /srv/ai-search-evaluation-suite/apps/product/frontend
+WORKDIR /app/apps/product/frontend
 COPY apps/product/frontend/package.json apps/product/frontend/package-lock.json ./
 RUN npm ci --ignore-scripts
 COPY apps/product/frontend ./
@@ -9,14 +9,18 @@ RUN npm run build
 
 FROM python:3.12-slim
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PRODUCT_APP_ROOT=/srv/ai-search-evaluation-suite/apps/product \
-    CLASSIFY_EVAL_STATE_DIR=/srv/ai-search-evaluation-suite/apps/classification-evals/var \
+    PRODUCT_APP_ROOT=/app/apps/product \
+    CLASSIFY_EVAL_STATE_DIR=/app/apps/classification-evals/var \
     AI_FAN_OUT_KG_LABEL_PROFILE=deployable \
-    PYTHONPATH=/srv/ai-search-evaluation-suite/apps/product/backend
+    PYTHONPATH=/app/apps/product/backend
 
-WORKDIR /srv/ai-search-evaluation-suite
+WORKDIR /app
 
 COPY apps/product/backend/requirements.txt apps/product/backend/requirements.txt
 COPY apps/classification-evals/requirements.txt apps/classification-evals/requirements.txt
@@ -73,14 +77,14 @@ COPY apps/product/backend/classification_core/data/commodities.json \
      apps/product/backend/classification_core/data/kg_edges.json \
      apps/product/backend/classification_core/data/
 COPY apps/product/data apps/product/data
-COPY --from=frontend-build /srv/ai-search-evaluation-suite/apps/product/frontend/dist apps/product/frontend/dist
+COPY --from=frontend-build /app/apps/product/frontend/dist apps/product/frontend/dist
 COPY apps/classification-evals apps/classification-evals
-RUN mkdir -p /srv/ai-search-evaluation-suite/apps/classification-evals/var /srv/ai-search-evaluation-suite/apps/product/results \
+RUN mkdir -p /app/apps/classification-evals/var /app/apps/product/results \
     && useradd --create-home --shell /usr/sbin/nologin appuser \
-    && chown -R appuser:appuser /srv/ai-search-evaluation-suite
+    && chown -R appuser:appuser /app
 
-WORKDIR /srv/ai-search-evaluation-suite/apps/classification-evals
+WORKDIR /app
 EXPOSE 8100
 USER appuser
 
-CMD ["uvicorn", "backend.app:app", "--host", "0.0.0.0", "--port", "8100"]
+CMD ["uvicorn", "backend.app:app", "--app-dir", "/app/apps/classification-evals", "--host", "0.0.0.0", "--port", "8100", "--no-access-log"]

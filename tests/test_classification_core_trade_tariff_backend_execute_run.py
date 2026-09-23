@@ -1,4 +1,5 @@
 import io
+import logging
 import os
 import sys
 import unittest
@@ -406,9 +407,20 @@ class NoOracleTextDisablesSimulatorTest(unittest.IsolatedAsyncioTestCase):
 
 
 class ProgressLoggingTest(unittest.IsolatedAsyncioTestCase):
-    async def test_prints_nothing_when_eval_progress_logging_is_unset(self):
-        # Off by default everywhere unless explicitly set -- matches
-        # CLASSIFICATION_ALLOW_PROVIDER_CALLS's convention.
+    def setUp(self):
+        # These tests assert the no-handler print path used by subprocess runners.
+        self._root_handlers = logging.getLogger().handlers[:]
+        self._experiment_handlers = logging.getLogger("experiment").handlers[:]
+        logging.getLogger().handlers.clear()
+        logging.getLogger("experiment").handlers.clear()
+
+    def tearDown(self):
+        logging.getLogger().handlers[:] = self._root_handlers
+        logging.getLogger("experiment").handlers[:] = self._experiment_handlers
+
+    async def test_prints_the_run_but_not_each_query_when_eval_progress_logging_is_unset(self):
+        # Per-query progress stays off unless explicitly set. The run itself
+        # is always logged so an experiment is visible in container logs.
         client = FakeClient()
 
         with (
@@ -426,7 +438,11 @@ class ProgressLoggingTest(unittest.IsolatedAsyncioTestCase):
             with redirect_stdout(buffer):
                 await execute_run("107", client)
 
-        self.assertEqual(buffer.getvalue(), "")
+        output = buffer.getvalue()
+        self.assertIn("experiment run started run_id=107", output)
+        self.assertIn("experiment run finished run_id=107 status=completed", output)
+        self.assertNotIn("[eval progress]", output)
+        self.assertNotIn("women's trainers", output)
 
     async def test_prints_the_full_progress_sequence_when_enabled(self):
         client = FakeClient()

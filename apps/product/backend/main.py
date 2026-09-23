@@ -4,6 +4,7 @@ import asyncio
 import csv
 import io
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -2847,6 +2848,11 @@ async def api_start_evaluation_run(run_id: str):
     task = asyncio.create_task(_run_and_release())
     _background_evaluation_tasks.add(task)
     task.add_done_callback(_background_evaluation_tasks.discard)
+    logging.getLogger("experiment").info(
+        "experiment run accepted run_id=%s",
+        run_id,
+        extra={"event": "experiment_run_started", "run_id": run_id},
+    )
     return {"started": True, "run_id": run_id}
 
 

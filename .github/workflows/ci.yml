@@ -2,6 +2,8 @@ name: ci
 
 on:
   pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -21,7 +23,10 @@ jobs:
       # apps/product/backend/requirements.txt via -r, so this one install
       # covers everything tests/ imports (httpx, openai, fastapi, etc.).
       - run: pip install -r apps/classification-evals/requirements.txt
-      - run: python -m unittest discover -s tests
+      - name: Run simulation unit tests
+        run: python -m unittest discover -s tests -p 'test_simulator.py' -v
+      - name: Run unit tests
+        run: python -m unittest discover -s tests
       - run: python -m compileall -q apps
       - run: docker build --tag ai-search-evaluation-suite:test .
 
