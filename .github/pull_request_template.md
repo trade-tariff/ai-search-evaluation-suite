@@ -25,8 +25,11 @@ Rate the overall risk of deploying this change:
 
 ───────────────────────────────────────────────────
 
+This evaluation app is unused. It does not serve the live Trade Tariff service. A change to this app is low risk unless it rotates secrets, destroys data, or cannot be rolled back. CI/CD steps, container health checks, logs, and image layout for this app are low risk.
+
 🟢 GREEN – things that are typically low risk:
 ───────────────────────────────────────────────────
+- Changes to this unused evaluation app, including its CI/CD steps, container health check, logs, and image layout
 - Dependency bumps with no API changes (e.g. minor/patch packages)
 - Copy or documentation changes
 - Adding or updating CloudWatch alarms or dashboards (read-only observability)
