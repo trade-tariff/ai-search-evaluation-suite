@@ -91,6 +91,27 @@ Generated outputs, local result files, runtime configuration, and database
 snapshots are runtime state. Do not treat them as source documentation or
 deployment defaults.
 
+## Checks, contributions and licence
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) for the fork workflow, review process and
+private security reporting. After installing the dependencies used by
+[CI](.github/workflows/ci.yml), run:
+
+```sh
+python -m unittest discover -s tests
+python -m compileall -q apps
+```
+
+Live evaluations are separate from unit tests. They can send prompts to external
+providers, consume paid API quota and change shared evaluation data. Use
+non-sensitive fixtures and confirm the target and budget before running them.
+
+### Licence
+
+The code and associated documentation use the [MIT licence](LICENCE.md), with
+Crown copyright (HM Revenue & Customs). Models, evaluation datasets and
+third-party dependencies retain their own terms.
+
 ## Local Development Quickstart
 
 Prerequisites:
