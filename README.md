@@ -133,6 +133,18 @@ the not-yet-built AI-1067 Admin Portal integration will, once it exists — then
 trigger execution. This is the workflow to use to prove the whole integration
 works after this plan has been implemented.
 
+**0. Have a gold query set.** A run scores one saved set of gold queries, chosen
+on its experiment, and fails as soon as it starts if its experiment has none. Create a
+set in the Admin app, or from a shell in `trade-tariff-backend`:
+
+```bash
+NAME="Set A" SIZE=10 bundle exec rake tariff:evaluation:generate_gold_queries
+```
+
+Generation runs in the background, so wait until its status is `ready` before you start
+a run (`EvaluationGoldQuerySet[<id>].status` in a Rails console). Starting a run earlier
+scores only the gold queries generated so far.
+
 **1. Create an experiment** (`trade-tariff-backend` Rails console —
 `bin/rails console`):
 
@@ -140,6 +152,7 @@ works after this plan has been implemented.
 experiment = EvaluationExperiment.create(
   name: "my-manual-test-#{Time.now.to_i}",  # must be unique — validates_unique :name
   description: "Manual end-to-end test",
+  gold_query_set_id: EvaluationGoldQuerySet.first(name: "Set A").id,  # required to run — see step 0
   enabled: true,
   configuration_overrides: {},              # optional — merged over the admin-config baseline; see EvaluationConfiguration::ALLOWED_OVERRIDE_KEYS for what's allowed here
 )
@@ -212,7 +225,7 @@ you specifically want to verify that split works.
 ```bash
 export TRADE_TARIFF_BACKEND_BASE_URL=http://127.0.0.1:3000  # defaults to this already
 cd apps/product/backend
-python -m classification_core.trade_tariff_backend.cli "my-local-test-experiment"
+python -m classification_core.trade_tariff_backend.cli "my-local-test-experiment" --gold-query-set 5
 ```
 
 ### Run-level cost and latency (retrieval side only)

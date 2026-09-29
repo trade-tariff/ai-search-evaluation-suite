@@ -12,7 +12,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "product" 
 
 from classification_core.trade_tariff_backend.execute_run import execute_run
 from classification_core_trade_tariff_backend_fixtures import (
-    ATAR_RULING_RESPONSE,
     GOLD_QUERIES_RESPONSE,
     GOLD_QUERY_SIX_DIGIT,
     RUN_SHOW_RESPONSE,
@@ -26,17 +25,15 @@ class FakeClient:
         self.post_result_calls = []
         self.run_attrs = RUN_SHOW_RESPONSE["data"]["attributes"] | {"id": "107"}
         self.gold_queries = [row["attributes"] | {"id": row["id"]} for row in GOLD_QUERIES_RESPONSE["data"]]
-        self.atar = ATAR_RULING_RESPONSE["data"]["attributes"]
+        self.gold_query_set_ids = []
 
     async def get_run(self, run_id):
         assert run_id == "107"
         return self.run_attrs
 
-    async def get_gold_queries(self):
+    async def get_gold_queries(self, set_id=None):
+        self.gold_query_set_ids.append(set_id)
         return self.gold_queries
-
-    async def get_atar_ruling(self, ref):
-        return self.atar
 
     async def update_run(self, run_id, status, **fields):
         self.update_run_calls.append(status)
@@ -300,7 +297,7 @@ class FailureRecordingItselfFailsClient(FakeClient):
 
 
 class GetGoldQueriesFailsClient(FakeClient):
-    async def get_gold_queries(self):
+    async def get_gold_queries(self, set_id=None):
         raise RuntimeError("gold queries endpoint unreachable")
 
 
@@ -353,12 +350,12 @@ class RunStrandingGuardTest(unittest.IsolatedAsyncioTestCase):
 
 class NoOracleTextDisablesSimulatorTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_gold_query_with_no_oracle_text_is_run_with_sim_client_none(self):
-        # An ATAR ruling with neither description nor justification leaves
-        # oracle_text == "" — there is nothing grounding a simulated answer,
+        # A gold query whose source had no description or justification has an
+        # empty oracle_text — there is nothing grounding a simulated answer,
         # so the simulator must not be invoked for this gold query even though
         # a run-level sim_client exists.
         client = FakeClient()
-        client.atar = {}  # no description, no justification -> oracle_text == ""
+        client.gold_queries[0]["oracle_text"] = ""
 
         with (
             patch(
@@ -384,7 +381,7 @@ class NoOracleTextDisablesSimulatorTest(unittest.IsolatedAsyncioTestCase):
         # Companion to the test above: proves the fix varies per gold query
         # rather than accidentally disabling the simulator for the whole run
         # just because ONE gold query in it has no oracle text.
-        client = FakeClient()  # default ATAR fixture has both description and justification
+        client = FakeClient()  # the default gold query carries oracle text
 
         with (
             patch(
@@ -404,6 +401,96 @@ class NoOracleTextDisablesSimulatorTest(unittest.IsolatedAsyncioTestCase):
 
         mocked_qa_session.assert_awaited_once()
         self.assertIsNotNone(mocked_qa_session.await_args.kwargs["sim_client"])
+
+
+class GoldQuerySetTest(unittest.IsolatedAsyncioTestCase):
+    """A run scores the one gold query set its experiment points at, using each
+    query's own oracle text."""
+
+    async def test_it_fetches_the_gold_queries_of_the_runs_set_and_only_that_set(self):
+        client = FakeClient()
+
+        with patch(
+            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            new=AsyncMock(return_value={
+                "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
+                "converged": True, "simulator_failed": False,
+            }),
+        ):
+            await execute_run("107", client)
+
+        self.assertEqual(client.gold_query_set_ids, [5])  # RUN_SHOW_RESPONSE's gold_query_set_id
+
+    async def test_it_answers_clarifying_questions_from_the_gold_querys_own_oracle_text(self):
+        client = FakeClient()
+
+        with patch(
+            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            new=AsyncMock(return_value={
+                "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
+                "converged": True, "simulator_failed": False,
+            }),
+        ) as mocked_qa_session:
+            await execute_run("107", client)
+
+        self.assertEqual(
+            mocked_qa_session.await_args.kwargs["oracle_text"],
+            "Women's lace-up trainers, uppers of textile material.",
+        )
+
+    async def test_a_synthetic_atar_gold_query_runs_the_same_way(self):
+        client = FakeClient()
+        client.gold_queries = [row["attributes"] | {"id": row["id"]} for row in [GOLD_QUERIES_RESPONSE["data"][0]]]
+        client.gold_queries[0] |= {
+            "source_type": "synthetic_atar", "source_id": "42", "oracle_text": "A synthetic description.",
+        }
+
+        with patch(
+            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            new=AsyncMock(return_value={
+                "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
+                "converged": True, "simulator_failed": False,
+            }),
+        ) as mocked_qa_session:
+            summary = await execute_run("107", client)
+
+        self.assertEqual(summary["status"], "completed")
+        self.assertEqual(mocked_qa_session.await_args.kwargs["oracle_text"], "A synthetic description.")
+        self.assertEqual(client.post_result_calls[0]["source_type"], "synthetic_atar")
+
+    async def test_a_run_whose_experiment_has_no_gold_query_set_fails_before_it_starts(self):
+        client = FakeClient()
+        client.run_attrs = client.run_attrs | {"gold_query_set_id": None}
+
+        summary = await execute_run("107", client)
+
+        # Never marked "running", and no gold query was fetched or scored.
+        self.assertEqual(client.update_run_calls, ["failed"])
+        self.assertEqual(client.gold_query_set_ids, [])
+        self.assertEqual(client.post_result_calls, [])
+        self.assertEqual(summary, {"status": "failed", "succeeded": 0, "failed": 0})
+        self.assertIn("no gold query set", client.update_run_kwargs[-1]["error_summary"])
+        self.assertIn("Choose a gold query set", client.update_run_kwargs[-1]["error_summary"])
+
+    async def test_a_backend_that_does_not_report_a_set_is_treated_as_having_none(self):
+        client = FakeClient()
+        client.run_attrs = {k: v for k, v in client.run_attrs.items() if k != "gold_query_set_id"}
+
+        summary = await execute_run("107", client)
+
+        self.assertEqual(summary["status"], "failed")
+        self.assertEqual(client.update_run_calls, ["failed"])
+
+    async def test_an_empty_gold_query_set_fails_the_run_with_a_clear_message(self):
+        client = FakeClient()
+        client.gold_queries = []
+
+        summary = await execute_run("107", client)
+
+        self.assertEqual(client.update_run_calls, ["running", "failed"])
+        self.assertEqual(summary, {"status": "failed", "succeeded": 0, "failed": 0})
+        self.assertIn("gold query set 5 has no gold queries", client.update_run_kwargs[-1]["error_summary"])
+        self.assertIn("still be generating", client.update_run_kwargs[-1]["error_summary"])
 
 
 class ProgressLoggingTest(unittest.IsolatedAsyncioTestCase):

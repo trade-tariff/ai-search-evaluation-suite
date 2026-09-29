@@ -1,3 +1,4 @@
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -29,6 +30,30 @@ class CreateExperimentTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result["id"], "42")
         self.assertEqual(result["name"], "ai1073-test-experiment")
+
+    async def test_sends_the_gold_query_set_id_when_one_is_given(self):
+        sent = []
+
+        def handler(request):
+            sent.append(json.loads(request.read()))
+            return httpx.Response(201, json=EXPERIMENT_CREATE_RESPONSE)
+
+        client = _client_with_transport(handler)
+        await client.create_experiment("with-set", gold_query_set_id=5)
+
+        self.assertEqual(sent, [{"data": {"attributes": {"name": "with-set", "gold_query_set_id": 5}}}])
+
+    async def test_omits_the_gold_query_set_id_when_none_is_given(self):
+        sent = []
+
+        def handler(request):
+            sent.append(json.loads(request.read()))
+            return httpx.Response(201, json=EXPERIMENT_CREATE_RESPONSE)
+
+        client = _client_with_transport(handler)
+        await client.create_experiment("without-set")
+
+        self.assertEqual(sent, [{"data": {"attributes": {"name": "without-set"}}}])
 
 
 class CreateRunTest(unittest.IsolatedAsyncioTestCase):

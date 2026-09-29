@@ -91,8 +91,13 @@ class TradeTariffBackendClient:
         except ValueError:
             return response.text
 
-    async def get_gold_queries(self) -> list[dict]:
-        """Every gold query, flattened to plain dicts and across every page.
+    async def get_gold_queries(self, set_id: int | str | None = None) -> list[dict]:
+        """Every gold query of one gold query set (of every set when set_id is
+        omitted), flattened to plain dicts and across every page.
+
+        A run scores one saved set, so execute_run always passes the run's
+        set_id. Each row carries its own oracle_text, so a caller needs no
+        second lookup to answer a clarifying question from it.
 
         Flattened (`attributes` merged with `id`) like every other method here,
         because callers such as execute_run read `gold["source_type"]` as a flat
@@ -107,9 +112,12 @@ class TradeTariffBackendClient:
         rows: list[dict] = []
         page = 1
         while True:
+            params: dict[str, Any] = {"page": page, "per_page": 250}
+            if set_id is not None:
+                params["set_id"] = set_id
             body = await self._request(
                 "GET", f"{self._internal_base}/evaluation_gold_queries",
-                params={"page": page, "per_page": 250},
+                params=params,
             )
             page_rows = body["data"]
             rows.extend(row["attributes"] | {"id": row["id"]} for row in page_rows)
@@ -127,10 +135,15 @@ class TradeTariffBackendClient:
         body = await self._request("GET", f"{self._internal_base}/atars/{ref}")
         return body["data"]["attributes"]
 
-    async def create_experiment(self, name: str) -> dict:
+    async def create_experiment(self, name: str, gold_query_set_id: int | str | None = None) -> dict:
+        """gold_query_set_id is the saved set every run of this experiment is scored
+        against. A run for an experiment without one fails as soon as it starts."""
+        attributes: dict[str, Any] = {"name": name}
+        if gold_query_set_id is not None:
+            attributes["gold_query_set_id"] = gold_query_set_id
         body = await self._request(
             "POST", f"{self._admin_base}/experiments",
-            json={"data": {"attributes": {"name": name}}},
+            json={"data": {"attributes": attributes}},
         )
         return body["data"]["attributes"] | {"id": body["data"]["id"]}
 
