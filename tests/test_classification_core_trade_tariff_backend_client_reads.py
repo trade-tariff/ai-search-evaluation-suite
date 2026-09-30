@@ -59,6 +59,38 @@ class GetGoldQueriesTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, _flattened(GOLD_QUERIES_RESPONSE_PAGE_1) + _flattened(GOLD_QUERIES_RESPONSE_PAGE_2))
         self.assertEqual([row["id"] for row in result], ["1", "2"])
 
+    async def test_asks_for_one_gold_query_set_when_given_its_id(self):
+        seen = []
+
+        def handler(request):
+            seen.append(dict(request.url.params))
+            return httpx.Response(200, json=GOLD_QUERIES_RESPONSE)
+
+        client = _client_with_transport(handler)
+        await client.get_gold_queries(5)
+
+        self.assertEqual(seen, [{"page": "1", "per_page": "250", "set_id": "5"}])
+
+    async def test_asks_for_every_set_when_no_set_id_is_given(self):
+        seen = []
+
+        def handler(request):
+            seen.append(dict(request.url.params))
+            return httpx.Response(200, json=GOLD_QUERIES_RESPONSE)
+
+        client = _client_with_transport(handler)
+        await client.get_gold_queries()
+
+        self.assertNotIn("set_id", seen[0])
+
+    async def test_carries_the_set_id_and_oracle_text_of_every_row(self):
+        client = _client_with_transport(lambda request: httpx.Response(200, json=GOLD_QUERIES_RESPONSE))
+
+        result = await client.get_gold_queries(5)
+
+        self.assertEqual(result[0]["set_id"], 5)
+        self.assertEqual(result[0]["oracle_text"], "Women's lace-up trainers, uppers of textile material.")
+
     async def test_requests_the_largest_page_size_the_backend_allows(self):
         def handler(request):
             self.assertEqual(request.url.params["per_page"], "250")  # controller's MAX_PER_PAGE

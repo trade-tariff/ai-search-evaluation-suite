@@ -23,7 +23,6 @@ import httpx
 from classification_core.trade_tariff_backend.client import TradeTariffBackendClient
 from classification_core.trade_tariff_backend.execute_run import execute_run
 from classification_core_trade_tariff_backend_fixtures import (
-    ATAR_RULING_RESPONSE,
     GOLD_QUERIES_RESPONSE,
     GOLD_QUERIES_RESPONSE_PAGE_1,
     GOLD_QUERIES_RESPONSE_PAGE_2,
@@ -46,6 +45,7 @@ class RecordingBackend:
     def __init__(self, gold_pages=None):
         self._gold_pages = gold_pages or {"1": GOLD_QUERIES_RESPONSE}
         self.requests = []
+        self.gold_query_params = []
         self.posted_results = []
         self.run_updates = []
 
@@ -54,10 +54,12 @@ class RecordingBackend:
         self.requests.append((request.method, path))
 
         if path == "/uk/internal/evaluation_gold_queries":
+            self.gold_query_params.append(dict(request.url.params))
             page = request.url.params.get("page", "1")
             return httpx.Response(200, json=self._gold_pages[page])
-        if path.startswith("/uk/internal/atars/"):
-            return httpx.Response(200, json=ATAR_RULING_RESPONSE)
+        # There is deliberately no /uk/internal/atars/ route. Each gold query carries its
+        # own oracle text, so a run must never look an ATaR up: if it did, the
+        # AssertionError below would fail the test.
         if path == "/uk/admin/search/evaluation/runs/107":
             if request.method == "PATCH":
                 self.run_updates.append(json.loads(request.read())["data"]["attributes"])
@@ -85,6 +87,8 @@ class RealClientExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         await client.aclose()
 
         self.assertEqual(summary, {"status": "completed", "succeeded": 1, "failed": 0})
+        # The gold queries were requested for the run's own set, from page 1.
+        self.assertEqual(backend.gold_query_params, [{"page": "1", "per_page": "250", "set_id": "5"}])
         self.assertEqual(len(backend.posted_results), 1)
         self.assertEqual(len(backend.run_updates), 2)  # running, then completed
         self.assertEqual(backend.run_updates[0]["status"], "running")
@@ -120,6 +124,8 @@ class RealClientExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         # "completed" here having silently scored only the first one.
         self.assertEqual(summary, {"status": "completed", "succeeded": 2, "failed": 0})
         self.assertEqual(len(backend.posted_results), 2)
+        # Every page was requested for the same set.
+        self.assertEqual({params["set_id"] for params in backend.gold_query_params}, {"5"})
 
 
 if __name__ == "__main__":

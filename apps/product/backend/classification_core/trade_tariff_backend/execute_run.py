@@ -86,9 +86,26 @@ async def execute_run(run_id: str, client) -> dict:
     run: dict = {}
     try:
         run = await client.get_run(run_id)
+
+        # A run scores one saved gold query set, chosen on its experiment, so every
+        # run of that experiment is compared like with like. With no set there is
+        # nothing to score, so fail now (queued -> failed, never "running") with a
+        # message that says what to do, instead of scoring some other set.
+        set_id = run.get("gold_query_set_id")
+        if set_id is None:
+            raise RuntimeError(
+                "its experiment has no gold query set, so there is nothing to score. "
+                "Choose a gold query set for the experiment, then start a new run"
+            )
+
         await client.update_run(run_id, status="running")
 
-        gold_queries = await client.get_gold_queries()
+        gold_queries = await client.get_gold_queries(set_id)
+        if not gold_queries:
+            raise RuntimeError(
+                f"gold query set {set_id} has no gold queries. It may still be generating, "
+                "or every item in it may have failed"
+            )
         total_gold_queries = len(gold_queries)
         _log_experiment(
             f"experiment run started run_id={run_id} gold_queries={total_gold_queries}",
@@ -129,8 +146,10 @@ async def execute_run(run_id: str, client) -> dict:
                 )
 
             try:
-                ruling = await client.get_atar_ruling(source_id)
-                oracle_text = ruling.get("description") or ruling.get("justification") or ""
+                # Each gold query carries its own oracle text, copied from its source
+                # when the set was generated. It is the same for an ATaR and a
+                # synthetic ATaR, so nothing is looked up here.
+                oracle_text = gold.get("oracle_text") or ""
 
                 session_result = await run_qa_session_via_trade_tariff_backend(
                     # No oracle text means there is nothing for the simulator to
