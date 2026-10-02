@@ -26,9 +26,18 @@ class FakeClient:
         self.run_attrs = RUN_SHOW_RESPONSE["data"]["attributes"] | {"id": "107"}
         self.gold_queries = [row["attributes"] | {"id": row["id"]} for row in GOLD_QUERIES_RESPONSE["data"]]
         self.gold_query_set_ids = []
+        self.get_run_call_count = 0
+        # None = never cancel. Set to N in a test to make the (N+1)th get_run call, and every
+        # call after it, report status="cancelled". Call 1 is always execute_run's own initial
+        # fetch (line ~88) before the loop starts; call 2 is the first in-loop check (before gold
+        # query 1), call 3 is the second in-loop check (before gold query 2), and so on.
+        self.cancel_after_calls = None
 
     async def get_run(self, run_id):
         assert run_id == "107"
+        self.get_run_call_count += 1
+        if self.cancel_after_calls is not None and self.get_run_call_count > self.cancel_after_calls:
+            return self.run_attrs | {"status": "cancelled"}
         return self.run_attrs
 
     async def get_gold_queries(self, set_id=None):
@@ -179,6 +188,33 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(client.post_result_calls[0]["gold_in_top1"])
         self.assertFalse(client.post_result_calls[0]["gold_in_top5"])
         self.assertEqual(summary, {"status": "failed", "succeeded": 0, "failed": 1})
+
+    async def test_stops_processing_remaining_gold_queries_once_the_run_is_cancelled(self):
+        client = FakeClient()
+        # Three gold queries, so there's a real "remaining" item left unprocessed when cancellation
+        # is noticed after the first.
+        client.gold_queries = [
+            GOLD_QUERIES_RESPONSE["data"][0]["attributes"] | {"id": "1"},
+            GOLD_QUERY_SIX_DIGIT,
+            GOLD_QUERIES_RESPONSE["data"][0]["attributes"] | {"id": "3", "source_id": "600099999"},
+        ]
+        # Call 1 = the initial fetch (not cancelled). Call 2 = the pre-check before gold query 1 (not
+        # cancelled yet, it proceeds). Call 3 = the pre-check before gold query 2 — this is where
+        # cancel_after_calls=2 makes it report cancelled, so gold queries 2 and 3 never run.
+        client.cancel_after_calls = 2
+
+        with patch(
+            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            new=AsyncMock(return_value={
+                "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
+                "converged": True, "simulator_failed": False,
+            }),
+        ):
+            summary = await execute_run("107", client)
+
+        self.assertEqual(len(client.post_result_calls), 1)
+        self.assertEqual(client.update_run_calls, ["running", "cancelled"])
+        self.assertEqual(summary, {"status": "cancelled", "succeeded": 1, "failed": 0})
 
 
 class ScoringGranularityTest(unittest.IsolatedAsyncioTestCase):

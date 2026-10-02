@@ -69,6 +69,7 @@ def _matches_gold(candidate_code, expected_code, expected_code_digits) -> bool:
 async def execute_run(run_id: str, client) -> dict:
     succeeded = 0
     failed = 0
+    cancelled = False
     gold_queries: list = []
     # This outer try/except covers EVERYTHING from the initial get_run/
     # update_run(status="running") onward — not just the per-gold-query
@@ -127,6 +128,20 @@ async def execute_run(run_id: str, client) -> dict:
         sim_client = AsyncOpenAI(api_key=api_key) if (openai_allowed() and api_key) else None
 
         for index, gold in enumerate(gold_queries, start=1):
+            # Checked before every gold query, not just once at the top of execute_run, so a
+            # cancel click actually stops in-flight spend instead of only changing a status label
+            # after the fact. One extra GET per item is negligible next to the LLM calls this loop
+            # already makes per item.
+            current_run = await client.get_run(run_id)
+            if current_run.get("status") == "cancelled":
+                cancelled = True
+                if _progress_logging_enabled():
+                    _log_experiment(
+                        f"[eval progress] run {run_id} cancelled after {index - 1}/{total_gold_queries} gold queries",
+                        run_id=run_id,
+                    )
+                break
+
             # Read the identity fields ONCE, before the try, via .get(). The except
             # handler below builds a failure result from these same fields — if it
             # read them off the gold dict itself, a malformed row would make the
@@ -226,7 +241,9 @@ async def execute_run(run_id: str, client) -> dict:
     except Exception as exc:  # noqa: BLE001 - anything escaping the block above (e.g. get_gold_queries() itself) must still let the run reach a terminal status below, not strand it at "running"
         outer_exc = exc
 
-    if outer_exc is not None:
+    if cancelled:
+        final_status = "cancelled"
+    elif outer_exc is not None:
         # An abort that hit after some gold queries already succeeded must
         # never read as "completed" — the remaining, unscored gold queries
         # would silently be missing from a run that looks like a clean pass.
