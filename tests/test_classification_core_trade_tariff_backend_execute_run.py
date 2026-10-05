@@ -216,6 +216,16 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(client.update_run_calls, ["running", "cancelled"])
         self.assertEqual(summary, {"status": "cancelled", "succeeded": 1, "failed": 0})
 
+    async def test_a_run_cancelled_before_it_is_even_picked_up_never_transitions_through_running(self):
+        client = FakeClient()
+        client.cancel_after_calls = 0
+
+        summary = await execute_run("107", client)
+
+        self.assertEqual(client.update_run_calls, ["cancelled"])
+        self.assertEqual(len(client.post_result_calls), 0)
+        self.assertEqual(summary, {"status": "cancelled", "succeeded": 0, "failed": 0})
+
 
 class ScoringGranularityTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_six_digit_expected_code_matches_a_ten_digit_search_result(self):
