@@ -238,6 +238,32 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(client.post_result_calls[0]["gold_in_top5"])
         self.assertEqual(summary, {"status": "failed", "succeeded": 0, "failed": 1})
 
+    async def test_a_simulator_failures_trace_up_to_the_failed_round_still_reaches_the_backend(self):
+        # The exact round where the simulator gave up is the one an operator investigating a
+        # failed result most needs to see (Review Focus item 4) — losing it here means the
+        # drill-in page can only ever say "No Q&A trace recorded", never show which round broke.
+        client = FakeClient()
+        trace_so_far = [
+            {"round": 1, "question": "What material?", "chosen": "Rubber", "simulator_failed": False},
+            {"round": 2, "question": "What closure?", "chosen": None, "simulator_failed": True},
+        ]
+
+        with patch(
+            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            new=AsyncMock(return_value={
+                "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
+                "converged": False, "simulator_failed": True, "question_trace": trace_so_far,
+                "cost_usd": 0.002, "latency_seconds": 0.8, "provider_calls": 2,
+            }),
+        ):
+            await execute_run("107", client)
+
+        posted = client.post_result_calls[0]
+        self.assertEqual(posted["trace"], {"question_trace": trace_so_far})
+        self.assertAlmostEqual(posted["cost_usd"], 0.002)
+        self.assertAlmostEqual(posted["latency_seconds"], 0.8)
+        self.assertEqual(posted["provider_calls"], 2)
+
     async def test_stops_processing_remaining_gold_queries_once_the_run_is_cancelled(self):
         client = FakeClient()
         # Three gold queries, so there's a real "remaining" item left unprocessed when cancellation

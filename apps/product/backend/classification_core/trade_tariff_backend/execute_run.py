@@ -180,6 +180,12 @@ async def execute_run(run_id: str, client) -> dict:
                     run_id=run_id,
                 )
 
+            # Set before the try, not inside it: a simulator failure raises *after*
+            # run_qa_session_via_trade_tariff_backend already returned a trace up to the
+            # round that failed (see the simulator_failed check below) — the except handler
+            # needs that value to post it, and must not raise a NameError reading an unset
+            # variable on the rarer path where the session call itself is what failed.
+            session_result = None
             try:
                 # Each gold query carries its own oracle text, copied from its source
                 # when the set was generated. It is the same for an ATaR and a
@@ -250,11 +256,22 @@ async def execute_run(run_id: str, client) -> dict:
                         run_id=run_id,
                     )
                 try:
+                    # (session_result or {}): a simulator failure leaves a real trace up to
+                    # the round that broke — the exact round an operator investigating this
+                    # failure most needs to see — but session_result is still None on the
+                    # rarer path where the session call itself raised before returning
+                    # anything. Usage so far is worth recording too: a round that burned real
+                    # cost/latency/provider calls before failing still burned them.
+                    usage = session_result or {}
                     await client.post_result({
                         "run_id": run_id, "source_type": source_type, "source_id": source_id,
                         "persona": persona, "expected_code": expected_code, "final_code": None,
                         "final_rank": None,
                         "gold_in_top1": False, "gold_in_top5": False, "error": str(exc),
+                        "trace": {"question_trace": usage.get("question_trace", [])},
+                        "cost_usd": usage.get("cost_usd", 0.0),
+                        "latency_seconds": usage.get("latency_seconds", 0.0),
+                        "provider_calls": usage.get("provider_calls", 0),
                     })
                 except Exception:  # noqa: BLE001 - the failure-recording write itself can fail too (a malformed row rejected by a DB constraint, or the backend briefly unreachable); swallow it so it doesn't also abort the remaining gold queries in this run. It's still counted locally via failed += 1 below, just without a guaranteed remote record.
                     pass
