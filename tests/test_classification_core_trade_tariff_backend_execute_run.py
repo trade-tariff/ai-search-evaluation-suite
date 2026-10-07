@@ -130,6 +130,38 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(posted["latency_seconds"], 0.0)
         self.assertEqual(posted["provider_calls"], 0)
 
+    async def test_the_question_trace_is_sent_on_the_posted_result(self):
+        client = FakeClient()
+        trace = [{"round": 1, "question": "What material?", "chosen": "Rubber", "simulator_failed": False}]
+
+        with patch(
+            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            new=AsyncMock(return_value={
+                "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
+                "converged": True, "simulator_failed": False, "question_trace": trace,
+            }),
+        ):
+            await execute_run("107", client)
+
+        self.assertEqual(client.post_result_calls[0]["trace"], {"question_trace": trace})
+
+    async def test_a_session_result_missing_question_trace_posts_an_empty_one_rather_than_raising(self):
+        # Same defensive-default reasoning as the existing cost_usd/latency_seconds/provider_calls
+        # test just above this one in the file — plenty of tests in this file mock
+        # run_qa_session_via_trade_tariff_backend with a bare dict that has no question_trace key.
+        client = FakeClient()
+
+        with patch(
+            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            new=AsyncMock(return_value={
+                "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
+                "converged": True, "simulator_failed": False,
+            }),
+        ):
+            await execute_run("107", client)
+
+        self.assertEqual(client.post_result_calls[0]["trace"], {"question_trace": []})
+
     async def test_final_update_run_sends_completed_at_and_no_error_summary_when_nothing_failed(self):
         client = FakeClient()
 

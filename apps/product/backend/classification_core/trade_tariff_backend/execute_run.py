@@ -224,6 +224,7 @@ async def execute_run(run_id: str, client) -> dict:
                     "gold_in_top1": _matches_gold(final_code, expected_code, expected_code_digits),
                     "gold_in_top5": any(_matches_gold(c, expected_code, expected_code_digits) for c in top5_codes),
                     "error": None,
+                    "trace": {"question_trace": session_result.get("question_trace", [])},
                     # .get() with a default, not direct indexing: every real
                     # run_qa_session_via_trade_tariff_backend call includes these
                     # (see qa_loop.py's usage_totals()), but a genuinely absent key
