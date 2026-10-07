@@ -129,6 +129,25 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(posted["cost_usd"], 0.0)
         self.assertEqual(posted["latency_seconds"], 0.0)
         self.assertEqual(posted["provider_calls"], 0)
+        # No usage at all makes no claim about pricing either way.
+        self.assertTrue(posted["pricing_known"])
+
+    async def test_pricing_known_is_sent_on_the_posted_result(self):
+        client = FakeClient()
+
+        with patch(
+            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            new=AsyncMock(return_value={
+                "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
+                "converged": True, "simulator_failed": False, "pricing_known": False,
+            }),
+        ):
+            await execute_run("107", client)
+
+        # cost_usd still posts whatever partial total was priceable (AI-1068's whole point is
+        # not to hide that number) -- pricing_known is what flags it might be understated, a run
+        # that used a model missing from config/openai_model_pricing.yml in trade-tariff-backend.
+        self.assertFalse(client.post_result_calls[0]["pricing_known"])
 
     async def test_the_question_trace_is_sent_on_the_posted_result(self):
         client = FakeClient()
@@ -253,7 +272,7 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
             new=AsyncMock(return_value={
                 "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                 "converged": False, "simulator_failed": True, "question_trace": trace_so_far,
-                "cost_usd": 0.002, "latency_seconds": 0.8, "provider_calls": 2,
+                "cost_usd": 0.002, "latency_seconds": 0.8, "provider_calls": 2, "pricing_known": False,
             }),
         ):
             await execute_run("107", client)
@@ -263,6 +282,7 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         self.assertAlmostEqual(posted["cost_usd"], 0.002)
         self.assertAlmostEqual(posted["latency_seconds"], 0.8)
         self.assertEqual(posted["provider_calls"], 2)
+        self.assertFalse(posted["pricing_known"])
 
     async def test_stops_processing_remaining_gold_queries_once_the_run_is_cancelled(self):
         client = FakeClient()

@@ -51,12 +51,18 @@ async def run_qa_session_via_trade_tariff_backend(
     total_cost_usd = 0.0
     total_duration_ms = 0.0
     total_provider_calls = 0
+    # True until a round's usage explicitly says otherwise (AiUsage::PricingCalculator in
+    # trade-tariff-backend sets pricing_known=False when a call used a model missing from
+    # config/openai_model_pricing.yml). A round with no usage key at all -- no LLM call made --
+    # makes no claim either way, so it leaves this unchanged rather than defaulting to False.
+    pricing_known = True
 
     def usage_totals() -> dict:
         return {
             "cost_usd": total_cost_usd,
             "latency_seconds": total_duration_ms / 1000,
             "provider_calls": total_provider_calls,
+            "pricing_known": pricing_known,
             # len(answers_so_far), not round_num -- round_num counts every
             # /searches call including the one that finally converges (which
             # answers nothing), so it overcounts by one on convergence.
@@ -76,6 +82,7 @@ async def run_qa_session_via_trade_tariff_backend(
             total_cost_usd += usage.get("total_cost_usd") or 0
             total_duration_ms += usage.get("duration_ms") or 0
             total_provider_calls += usage.get("provider_calls") or 0
+            pricing_known = pricing_known and usage.get("pricing_known", True)
 
         pending = _pending_question(response)
 

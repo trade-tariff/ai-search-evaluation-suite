@@ -239,6 +239,7 @@ async def execute_run(run_id: str, client) -> dict:
                     "cost_usd": session_result.get("cost_usd", 0.0),
                     "latency_seconds": session_result.get("latency_seconds", 0.0),
                     "provider_calls": session_result.get("provider_calls", 0),
+                    "pricing_known": session_result.get("pricing_known", True),
                 })
                 succeeded += 1
                 if _progress_logging_enabled():
@@ -272,6 +273,7 @@ async def execute_run(run_id: str, client) -> dict:
                         "cost_usd": usage.get("cost_usd", 0.0),
                         "latency_seconds": usage.get("latency_seconds", 0.0),
                         "provider_calls": usage.get("provider_calls", 0),
+                        "pricing_known": usage.get("pricing_known", True),
                     })
                 except Exception:  # noqa: BLE001 - the failure-recording write itself can fail too (a malformed row rejected by a DB constraint, or the backend briefly unreachable); swallow it so it doesn't also abort the remaining gold queries in this run. It's still counted locally via failed += 1 below, just without a guaranteed remote record.
                     pass

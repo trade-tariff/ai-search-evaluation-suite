@@ -1,3 +1,4 @@
+import copy
 import sys
 import unittest
 from pathlib import Path
@@ -115,6 +116,54 @@ class RunQaSessionViaBackendTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["cost_usd"], 0.0)
         self.assertEqual(result["latency_seconds"], 0.0)
         self.assertEqual(result["provider_calls"], 0)
+        # No usage at all is not the same as "a call we couldn't price" -- there was no call,
+        # so nothing here casts doubt on the (zero) cost.
+        self.assertTrue(result["pricing_known"])
+
+    async def test_pricing_known_is_true_when_every_rounds_usage_was_priced(self):
+        client = FakeClient([SEARCH_RESPONSE_CONVERGED])
+
+        result = await run_qa_session_via_trade_tariff_backend(
+            client=client, sim_client=None, query="women's trainers",
+            oracle_text="ruling text", run_time_overrides={}, max_rounds=4,
+        )
+
+        self.assertTrue(result["pricing_known"])
+
+    async def test_pricing_known_is_false_when_any_rounds_usage_used_an_unpriced_model(self):
+        # AiUsage::PricingCalculator#pricing_known? is false whenever a call used a model
+        # missing from config/openai_model_pricing.yml in trade-tariff-backend -- cost_usd for
+        # that round is still whatever partial total could be priced, not nil, so this flag is
+        # the only signal that the accumulated total might be understated.
+        unpriced_response = copy.deepcopy(SEARCH_RESPONSE_CONVERGED)
+        unpriced_response["meta"]["usage"]["pricing_known"] = False
+        client = FakeClient([unpriced_response])
+
+        result = await run_qa_session_via_trade_tariff_backend(
+            client=client, sim_client=None, query="women's trainers",
+            oracle_text="ruling text", run_time_overrides={}, max_rounds=4,
+        )
+
+        self.assertFalse(result["pricing_known"])
+
+    async def test_pricing_known_is_false_overall_if_any_round_among_several_was_unpriced(self):
+        unpriced_pending = copy.deepcopy(SEARCH_RESPONSE_PENDING_QUESTION)
+        unpriced_pending["meta"]["usage"]["pricing_known"] = False
+        client = FakeClient([unpriced_pending, SEARCH_RESPONSE_CONVERGED])
+
+        with patch(
+            "classification_core.trade_tariff_backend.qa_loop.simulate_trader_answer",
+            new=AsyncMock(return_value={
+                "chosen": "Textile", "choice_index": 1, "slot": "material", "reasoning": "",
+                "simulator_failed": False, "attempts": 1, "last_error": None,
+            }),
+        ):
+            result = await run_qa_session_via_trade_tariff_backend(
+                client=client, sim_client="fake-openai-client", query="women's trainers",
+                oracle_text="ruling text", run_time_overrides={}, max_rounds=4,
+            )
+
+        self.assertFalse(result["pricing_known"])
 
     async def test_answers_a_pending_question_via_simulate_trader_answer_then_calls_search_again(self):
         client = FakeClient([SEARCH_RESPONSE_PENDING_QUESTION, SEARCH_RESPONSE_CONVERGED])
