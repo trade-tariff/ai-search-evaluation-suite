@@ -13,6 +13,7 @@ from openai import AsyncOpenAI
 
 from classification_core.provider_guard import TRUE_VALUES, openai_allowed
 
+from .client import TradeTariffBackendUnavailableError, TradeTariffBackendValidationError
 from .qa_loop import run_qa_session_via_trade_tariff_backend
 
 _experiment_log = logging.getLogger("experiment")
@@ -89,158 +90,174 @@ async def execute_run(run_id: str, client) -> dict:
         run = await client.get_run(run_id)
 
         if run.get("status") == "cancelled":
-            cancelled = True
-        else:
-            # A run scores one saved gold query set, chosen on its experiment, so every
-            # run of that experiment is compared like with like. With no set there is
-            # nothing to score, so fail now (queued -> failed, never "running") with a
-            # message that says what to do, instead of scoring some other set.
-            set_id = run.get("gold_query_set_id")
-            if set_id is None:
-                raise RuntimeError(
-                    "its experiment has no gold query set, so there is nothing to score. "
-                    "Choose a gold query set for the experiment, then start a new run"
-                )
+            await client.update_run(
+                run_id,
+                status="cancelled",
+                completed_at=datetime.now(timezone.utc).isoformat(),
+                error_summary=None,
+            )
+            return {"status": "cancelled", "succeeded": 0, "failed": 0}
+        # A run scores one saved gold query set, chosen on its experiment, so every
+        # run of that experiment is compared like with like. With no set there is
+        # nothing to score, so fail now (queued -> failed, never "running") with a
+        # message that says what to do, instead of scoring some other set.
+        set_id = run.get("gold_query_set_id")
+        if set_id is None:
+            raise RuntimeError(
+                "its experiment has no gold query set, so there is nothing to score. "
+                "Choose a gold query set for the experiment, then start a new run"
+            )
 
+        try:
             await client.update_run(run_id, status="running")
+        except TradeTariffBackendValidationError:
+            if await _is_cancelled(client, run_id):
+                return {"status": "cancelled", "succeeded": 0, "failed": 0}
+            raise
 
-            gold_queries = await client.get_gold_queries(set_id)
-            if not gold_queries:
-                raise RuntimeError(
-                    f"gold query set {set_id} has no gold queries. It may still be generating, "
-                    "or every item in it may have failed"
-                )
-            total_gold_queries = len(gold_queries)
+        gold_queries = await client.get_gold_queries(set_id)
+        if not gold_queries:
+            raise RuntimeError(
+                f"gold query set {set_id} has no gold queries. It may still be generating, "
+                "or every item in it may have failed"
+            )
+        total_gold_queries = len(gold_queries)
+        _log_experiment(
+            f"experiment run started run_id={run_id} gold_queries={total_gold_queries}",
+            run_id=run_id,
+        )
+        if _progress_logging_enabled():
             _log_experiment(
-                f"experiment run started run_id={run_id} gold_queries={total_gold_queries}",
+                f"[eval progress] run {run_id}: {total_gold_queries} gold queries to process",
                 run_id=run_id,
             )
+
+        # Built once for the whole run, the same way classification_core.qa_loop's
+        # existing run_qa_session builds it. openai_allowed() is this repo's spend
+        # gate (CLASSIFICATION_ALLOW_PROVIDER_CALLS + OPENAI_API_KEY): with it off,
+        # sim_client stays None and any gold query that reaches a clarifying
+        # question fails fast and explicitly via simulator_failed, rather than
+        # silently spending credits.
+        api_key = os.environ.get("OPENAI_API_KEY")
+        sim_client = AsyncOpenAI(api_key=api_key) if (openai_allowed() and api_key) else None
+
+        for index, gold in enumerate(gold_queries, start=1):
+            # Checked before every gold query, not just once at the top of execute_run, so a
+            # cancel click actually stops in-flight spend instead of only changing a status label
+            # after the fact. One extra GET per item is negligible next to the LLM calls this loop
+            # already makes per item.
+            # A blip on this check must not end an otherwise healthy run; the check runs again
+            # before the next item.
+            try:
+                current_run = await client.get_run(run_id)
+            except TradeTariffBackendUnavailableError as exc:
+                _log_experiment(f"could not check whether run {run_id} was cancelled, carrying on: {exc}", run_id=run_id)
+                current_run = {}
+            if current_run.get("status") == "cancelled":
+                cancelled = True
+                if _progress_logging_enabled():
+                    _log_experiment(
+                        f"[eval progress] run {run_id} cancelled after {index - 1}/{total_gold_queries} gold queries",
+                        run_id=run_id,
+                    )
+                break
+
+            # Read the identity fields ONCE, before the try, via .get(). The except
+            # handler below builds a failure result from these same fields — if it
+            # read them off the gold dict itself, a malformed row would make the
+            # handler raise too, escaping execute_run entirely and stranding the run
+            # at status="running" with update_run never called again.
+            source_type = gold.get("source_type")
+            source_id = gold.get("source_id")
+            persona = gold.get("persona")
+            expected_code = gold.get("expected_code")
+            expected_code_digits = gold.get("expected_code_digits")
+
             if _progress_logging_enabled():
                 _log_experiment(
-                    f"[eval progress] run {run_id}: {total_gold_queries} gold queries to process",
+                    f"[eval progress] {index}/{total_gold_queries} {source_id} ({persona}) "
+                    f"expected={expected_code}: {gold.get('query')!r}",
                     run_id=run_id,
                 )
 
-            # Built once for the whole run, the same way classification_core.qa_loop's
-            # existing run_qa_session builds it. openai_allowed() is this repo's spend
-            # gate (CLASSIFICATION_ALLOW_PROVIDER_CALLS + OPENAI_API_KEY): with it off,
-            # sim_client stays None and any gold query that reaches a clarifying
-            # question fails fast and explicitly via simulator_failed, rather than
-            # silently spending credits.
-            api_key = os.environ.get("OPENAI_API_KEY")
-            sim_client = AsyncOpenAI(api_key=api_key) if (openai_allowed() and api_key) else None
+            try:
+                # Each gold query carries its own oracle text, copied from its source
+                # when the set was generated. It is the same for an ATaR and a
+                # synthetic ATaR, so nothing is looked up here.
+                oracle_text = gold.get("oracle_text") or ""
 
-            for index, gold in enumerate(gold_queries, start=1):
-                # Checked before every gold query, not just once at the top of execute_run, so a
-                # cancel click actually stops in-flight spend instead of only changing a status label
-                # after the fact. One extra GET per item is negligible next to the LLM calls this loop
-                # already makes per item.
-                current_run = await client.get_run(run_id)
-                if current_run.get("status") == "cancelled":
-                    cancelled = True
-                    if _progress_logging_enabled():
-                        _log_experiment(
-                            f"[eval progress] run {run_id} cancelled after {index - 1}/{total_gold_queries} gold queries",
-                            run_id=run_id,
-                        )
-                    break
+                session_result = await run_qa_session_via_trade_tariff_backend(
+                    # No oracle text means there is nothing for the simulator to
+                    # answer from — matches the "and oracle_text" gate qa_loop.py
+                    # uses when it builds its own sim_client. Without this, a gold
+                    # query missing both description and justification still got a
+                    # simulated (ungrounded) answer that scored as a legitimate
+                    # result instead of a failure.
+                    client=client, sim_client=sim_client if oracle_text else None, query=gold["query"], oracle_text=oracle_text,
+                    run_time_overrides=run["effective_configuration"], max_rounds=run["effective_configuration"].get("max_rounds", 5),
+                )
+                if session_result.get("simulator_failed"):
+                    # Never score a fabricated answer — route it through the same
+                    # failure-recording path as any other exception below.
+                    raise RuntimeError("simulator exhausted its retries without producing an answer")
 
-                # Read the identity fields ONCE, before the try, via .get(). The except
-                # handler below builds a failure result from these same fields — if it
-                # read them off the gold dict itself, a malformed row would make the
-                # handler raise too, escaping execute_run entirely and stranding the run
-                # at status="running" with update_run never called again.
-                source_type = gold.get("source_type")
-                source_id = gold.get("source_id")
-                persona = gold.get("persona")
-                expected_code = gold.get("expected_code")
-                expected_code_digits = gold.get("expected_code_digits")
+                final_candidates = session_result["final_candidates"]
+                # Indexed directly, not via .get(): a search response missing these
+                # keys is a genuine problem, and inside this try it is recorded as a
+                # failed result with an error rather than quietly scored as a miss.
+                candidate_codes = [c["attributes"]["goods_nomenclature_item_id"] for c in final_candidates]
+                final_code = candidate_codes[0] if candidate_codes else None
+                top5_codes = candidate_codes[:5]
+                final_rank = next(
+                    (
+                        index + 1
+                        for index, code in enumerate(candidate_codes)
+                        if _matches_gold(code, expected_code, expected_code_digits)
+                    ),
+                    None,
+                )
 
+                await client.post_result({
+                    "run_id": run_id, "source_type": source_type, "source_id": source_id,
+                    "persona": persona, "expected_code": expected_code, "final_code": final_code,
+                    "final_rank": final_rank,
+                    "gold_in_top1": _matches_gold(final_code, expected_code, expected_code_digits),
+                    "gold_in_top5": any(_matches_gold(c, expected_code, expected_code_digits) for c in top5_codes),
+                    "error": None,
+                    # .get() with a default, not direct indexing: every real
+                    # run_qa_session_via_trade_tariff_backend call includes these
+                    # (see qa_loop.py's usage_totals()), but a genuinely absent key
+                    # here means "no usage data available" the same way an absent
+                    # meta.usage on a /searches round does -- zero, not a crash.
+                    "cost_usd": session_result.get("cost_usd", 0.0),
+                    "latency_seconds": session_result.get("latency_seconds", 0.0),
+                    "provider_calls": session_result.get("provider_calls", 0),
+                })
+                succeeded += 1
                 if _progress_logging_enabled():
                     _log_experiment(
-                        f"[eval progress] {index}/{total_gold_queries} {source_id} ({persona}) "
-                        f"expected={expected_code}: {gold.get('query')!r}",
+                        f"[eval progress] {index}/{total_gold_queries} {source_id} ({persona}): "
+                        f"final={final_code} top1={_matches_gold(final_code, expected_code, expected_code_digits)} "
+                        f"top5={any(_matches_gold(c, expected_code, expected_code_digits) for c in top5_codes)} "
+                        f"questions_answered={session_result.get('questions_answered', 0)}",
                         run_id=run_id,
                     )
-
+            except Exception as exc:  # noqa: BLE001 - one bad gold query must not abort the run
+                if _progress_logging_enabled():
+                    _log_experiment(
+                        f"[eval progress] {index}/{total_gold_queries} {source_id} ({persona}): FAILED error={exc}",
+                        run_id=run_id,
+                    )
                 try:
-                    # Each gold query carries its own oracle text, copied from its source
-                    # when the set was generated. It is the same for an ATaR and a
-                    # synthetic ATaR, so nothing is looked up here.
-                    oracle_text = gold.get("oracle_text") or ""
-
-                    session_result = await run_qa_session_via_trade_tariff_backend(
-                        # No oracle text means there is nothing for the simulator to
-                        # answer from — matches the "and oracle_text" gate qa_loop.py
-                        # uses when it builds its own sim_client. Without this, a gold
-                        # query missing both description and justification still got a
-                        # simulated (ungrounded) answer that scored as a legitimate
-                        # result instead of a failure.
-                        client=client, sim_client=sim_client if oracle_text else None, query=gold["query"], oracle_text=oracle_text,
-                        run_time_overrides=run["effective_configuration"], max_rounds=run["effective_configuration"].get("max_rounds", 5),
-                    )
-                    if session_result.get("simulator_failed"):
-                        # Never score a fabricated answer — route it through the same
-                        # failure-recording path as any other exception below.
-                        raise RuntimeError("simulator exhausted its retries without producing an answer")
-
-                    final_candidates = session_result["final_candidates"]
-                    # Indexed directly, not via .get(): a search response missing these
-                    # keys is a genuine problem, and inside this try it is recorded as a
-                    # failed result with an error rather than quietly scored as a miss.
-                    candidate_codes = [c["attributes"]["goods_nomenclature_item_id"] for c in final_candidates]
-                    final_code = candidate_codes[0] if candidate_codes else None
-                    top5_codes = candidate_codes[:5]
-                    final_rank = next(
-                        (
-                            index + 1
-                            for index, code in enumerate(candidate_codes)
-                            if _matches_gold(code, expected_code, expected_code_digits)
-                        ),
-                        None,
-                    )
-
                     await client.post_result({
                         "run_id": run_id, "source_type": source_type, "source_id": source_id,
-                        "persona": persona, "expected_code": expected_code, "final_code": final_code,
-                        "final_rank": final_rank,
-                        "gold_in_top1": _matches_gold(final_code, expected_code, expected_code_digits),
-                        "gold_in_top5": any(_matches_gold(c, expected_code, expected_code_digits) for c in top5_codes),
-                        "error": None,
-                        # .get() with a default, not direct indexing: every real
-                        # run_qa_session_via_trade_tariff_backend call includes these
-                        # (see qa_loop.py's usage_totals()), but a genuinely absent key
-                        # here means "no usage data available" the same way an absent
-                        # meta.usage on a /searches round does -- zero, not a crash.
-                        "cost_usd": session_result.get("cost_usd", 0.0),
-                        "latency_seconds": session_result.get("latency_seconds", 0.0),
-                        "provider_calls": session_result.get("provider_calls", 0),
+                        "persona": persona, "expected_code": expected_code, "final_code": None,
+                        "final_rank": None,
+                        "gold_in_top1": False, "gold_in_top5": False, "error": str(exc),
                     })
-                    succeeded += 1
-                    if _progress_logging_enabled():
-                        _log_experiment(
-                            f"[eval progress] {index}/{total_gold_queries} {source_id} ({persona}): "
-                            f"final={final_code} top1={_matches_gold(final_code, expected_code, expected_code_digits)} "
-                            f"top5={any(_matches_gold(c, expected_code, expected_code_digits) for c in top5_codes)} "
-                            f"questions_answered={session_result.get('questions_answered', 0)}",
-                            run_id=run_id,
-                        )
-                except Exception as exc:  # noqa: BLE001 - one bad gold query must not abort the run
-                    if _progress_logging_enabled():
-                        _log_experiment(
-                            f"[eval progress] {index}/{total_gold_queries} {source_id} ({persona}): FAILED error={exc}",
-                            run_id=run_id,
-                        )
-                    try:
-                        await client.post_result({
-                            "run_id": run_id, "source_type": source_type, "source_id": source_id,
-                            "persona": persona, "expected_code": expected_code, "final_code": None,
-                            "final_rank": None,
-                            "gold_in_top1": False, "gold_in_top5": False, "error": str(exc),
-                        })
-                    except Exception:  # noqa: BLE001 - the failure-recording write itself can fail too (a malformed row rejected by a DB constraint, or the backend briefly unreachable); swallow it so it doesn't also abort the remaining gold queries in this run. It's still counted locally via failed += 1 below, just without a guaranteed remote record.
-                        pass
-                    failed += 1
+                except Exception:  # noqa: BLE001 - the failure-recording write itself can fail too (a malformed row rejected by a DB constraint, or the backend briefly unreachable); swallow it so it doesn't also abort the remaining gold queries in this run. It's still counted locally via failed += 1 below, just without a guaranteed remote record.
+                    pass
+                failed += 1
     except Exception as exc:  # noqa: BLE001 - anything escaping the block above (e.g. get_gold_queries() itself) must still let the run reach a terminal status below, not strand it at "running"
         outer_exc = exc
 
@@ -275,14 +292,26 @@ async def execute_run(run_id: str, client) -> dict:
             status=final_status,
         )
 
-    # Deliberately NOT wrapped in a swallowing try/except: if this call itself
-    # fails (e.g. the backend is genuinely down for the whole run), there is
-    # nothing further execute_run can do to record a status anywhere, and
-    # swallowing that too would erase the failure with zero signal at all.
-    await client.update_run(
-        run_id,
-        status=final_status,
-        completed_at=datetime.now(timezone.utc).isoformat(),
-        error_summary=error_summary,
-    )
+    # Only a refusal caused by a cancellation is swallowed: the backend has already recorded the
+    # run as cancelled, so there is nothing left to record. Any other failure is re-raised, since
+    # nothing further execute_run can do to record a status anywhere.
+    try:
+        await client.update_run(
+            run_id,
+            status=final_status,
+            completed_at=datetime.now(timezone.utc).isoformat(),
+            error_summary=error_summary,
+        )
+    except TradeTariffBackendValidationError:
+        if not await _is_cancelled(client, run_id):
+            raise
+        return {"status": "cancelled", "succeeded": succeeded, "failed": failed}
     return {"status": final_status, "succeeded": succeeded, "failed": failed}
+
+
+async def _is_cancelled(client, run_id: str) -> bool:
+    # If the run cannot be re-read, report the refusal we already have rather than guessing.
+    try:
+        return (await client.get_run(run_id)).get("status") == "cancelled"
+    except (TradeTariffBackendUnavailableError, TradeTariffBackendValidationError):
+        return False
