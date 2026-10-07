@@ -22,12 +22,11 @@ locals {
       valueFrom = "${data.aws_secretsmanager_secret.eval_api_configuration.arn}:OPENAI_API_KEY::"
     },
     {
-      name      = "AI_FAN_OUT_BASIC_AUTH_USER"
-      valueFrom = "${data.aws_secretsmanager_secret.eval_api_configuration.arn}:AI_FAN_OUT_BASIC_AUTH_USER::"
-    },
-    {
-      name      = "AI_FAN_OUT_BASIC_AUTH_PASSWORD"
-      valueFrom = "${data.aws_secretsmanager_secret.eval_api_configuration.arn}:AI_FAN_OUT_BASIC_AUTH_PASSWORD::"
+      # AI-1426: trade-tariff-backend's EvalAppClient always sends Authorization: Bearer
+      # <token>, never Basic auth, so this must match. auth.py checks AI_FAN_OUT_BEARER_TOKEN
+      # first and only falls back to Basic auth if that's unset.
+      name      = "AI_FAN_OUT_BEARER_TOKEN"
+      valueFrom = "${data.aws_secretsmanager_secret.eval_api_configuration.arn}:AI_FAN_OUT_BEARER_TOKEN::"
     },
     {
       name      = "CLASSIFICATION_ALLOW_PROVIDER_CALLS"
