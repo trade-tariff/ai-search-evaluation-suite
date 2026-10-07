@@ -237,11 +237,11 @@ run.evaluation_results_dataset.first.values
 ```
 
 **Alternative for local/manual testing only:** `classification_core.trade_tariff_backend.cli`
-does steps 1-3 itself in one process (it calls `create_experiment`/`create_run`/`execute_run`
-over HTTP rather than via Rails console, then runs synchronously instead of
-in the background) — convenient for a quick local check, but it bypasses the
-Rails-console/ingress-endpoint split above, so use the walkthrough above when
-you specifically want to verify that split works.
+creates the experiment and run over HTTP, then follows the run's status until it
+finishes. It does not execute the run itself: creating the run makes
+trade-tariff-backend start it in this app, the same as the admin screens do, so this
+app must be running and reachable from trade-tariff-backend. Use the walkthrough above
+when you want to exercise the Rails-console and ingress-endpoint split directly.
 
 ```bash
 export TRADE_TARIFF_BACKEND_BASE_URL=http://127.0.0.1:3000  # defaults to this already

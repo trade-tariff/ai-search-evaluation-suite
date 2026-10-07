@@ -13,6 +13,7 @@ from openai import AsyncOpenAI
 
 from classification_core.provider_guard import TRUE_VALUES, openai_allowed
 
+from .client import TradeTariffBackendUnavailableError, TradeTariffBackendValidationError
 from .qa_loop import run_qa_session_via_trade_tariff_backend
 
 _experiment_log = logging.getLogger("experiment")
@@ -69,6 +70,7 @@ def _matches_gold(candidate_code, expected_code, expected_code_digits) -> bool:
 async def execute_run(run_id: str, client) -> dict:
     succeeded = 0
     failed = 0
+    cancelled = False
     gold_queries: list = []
     # This outer try/except covers EVERYTHING from the initial get_run/
     # update_run(status="running") onward — not just the per-gold-query
@@ -87,6 +89,14 @@ async def execute_run(run_id: str, client) -> dict:
     try:
         run = await client.get_run(run_id)
 
+        if run.get("status") == "cancelled":
+            await client.update_run(
+                run_id,
+                status="cancelled",
+                completed_at=datetime.now(timezone.utc).isoformat(),
+                error_summary=None,
+            )
+            return {"status": "cancelled", "succeeded": 0, "failed": 0}
         # A run scores one saved gold query set, chosen on its experiment, so every
         # run of that experiment is compared like with like. With no set there is
         # nothing to score, so fail now (queued -> failed, never "running") with a
@@ -98,7 +108,12 @@ async def execute_run(run_id: str, client) -> dict:
                 "Choose a gold query set for the experiment, then start a new run"
             )
 
-        await client.update_run(run_id, status="running")
+        try:
+            await client.update_run(run_id, status="running")
+        except TradeTariffBackendValidationError:
+            if await _is_cancelled(client, run_id):
+                return {"status": "cancelled", "succeeded": 0, "failed": 0}
+            raise
 
         gold_queries = await client.get_gold_queries(set_id)
         if not gold_queries:
@@ -127,6 +142,26 @@ async def execute_run(run_id: str, client) -> dict:
         sim_client = AsyncOpenAI(api_key=api_key) if (openai_allowed() and api_key) else None
 
         for index, gold in enumerate(gold_queries, start=1):
+            # Checked before every gold query, not just once at the top of execute_run, so a
+            # cancel click actually stops in-flight spend instead of only changing a status label
+            # after the fact. One extra GET per item is negligible next to the LLM calls this loop
+            # already makes per item.
+            # A blip on this check must not end an otherwise healthy run; the check runs again
+            # before the next item.
+            try:
+                current_run = await client.get_run(run_id)
+            except TradeTariffBackendUnavailableError as exc:
+                _log_experiment(f"could not check whether run {run_id} was cancelled, carrying on: {exc}", run_id=run_id)
+                current_run = {}
+            if current_run.get("status") == "cancelled":
+                cancelled = True
+                if _progress_logging_enabled():
+                    _log_experiment(
+                        f"[eval progress] run {run_id} cancelled after {index - 1}/{total_gold_queries} gold queries",
+                        run_id=run_id,
+                    )
+                break
+
             # Read the identity fields ONCE, before the try, via .get(). The except
             # handler below builds a failure result from these same fields — if it
             # read them off the gold dict itself, a malformed row would make the
@@ -226,7 +261,9 @@ async def execute_run(run_id: str, client) -> dict:
     except Exception as exc:  # noqa: BLE001 - anything escaping the block above (e.g. get_gold_queries() itself) must still let the run reach a terminal status below, not strand it at "running"
         outer_exc = exc
 
-    if outer_exc is not None:
+    if cancelled:
+        final_status = "cancelled"
+    elif outer_exc is not None:
         # An abort that hit after some gold queries already succeeded must
         # never read as "completed" — the remaining, unscored gold queries
         # would silently be missing from a run that looks like a clean pass.
@@ -255,14 +292,26 @@ async def execute_run(run_id: str, client) -> dict:
             status=final_status,
         )
 
-    # Deliberately NOT wrapped in a swallowing try/except: if this call itself
-    # fails (e.g. the backend is genuinely down for the whole run), there is
-    # nothing further execute_run can do to record a status anywhere, and
-    # swallowing that too would erase the failure with zero signal at all.
-    await client.update_run(
-        run_id,
-        status=final_status,
-        completed_at=datetime.now(timezone.utc).isoformat(),
-        error_summary=error_summary,
-    )
+    # Only a refusal caused by a cancellation is swallowed: the backend has already recorded the
+    # run as cancelled, so there is nothing left to record. Any other failure is re-raised, since
+    # nothing further execute_run can do to record a status anywhere.
+    try:
+        await client.update_run(
+            run_id,
+            status=final_status,
+            completed_at=datetime.now(timezone.utc).isoformat(),
+            error_summary=error_summary,
+        )
+    except TradeTariffBackendValidationError:
+        if not await _is_cancelled(client, run_id):
+            raise
+        return {"status": "cancelled", "succeeded": succeeded, "failed": failed}
     return {"status": final_status, "succeeded": succeeded, "failed": failed}
+
+
+async def _is_cancelled(client, run_id: str) -> bool:
+    # If the run cannot be re-read, report the refusal we already have rather than guessing.
+    try:
+        return (await client.get_run(run_id)).get("status") == "cancelled"
+    except (TradeTariffBackendUnavailableError, TradeTariffBackendValidationError):
+        return False

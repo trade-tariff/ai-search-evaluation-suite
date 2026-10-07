@@ -10,6 +10,10 @@ from unittest.mock import AsyncMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "product" / "backend"))
 
+from classification_core.trade_tariff_backend.client import (
+    TradeTariffBackendUnavailableError,
+    TradeTariffBackendValidationError,
+)
 from classification_core.trade_tariff_backend.execute_run import execute_run
 from classification_core_trade_tariff_backend_fixtures import (
     GOLD_QUERIES_RESPONSE,
@@ -26,9 +30,27 @@ class FakeClient:
         self.run_attrs = RUN_SHOW_RESPONSE["data"]["attributes"] | {"id": "107"}
         self.gold_queries = [row["attributes"] | {"id": row["id"]} for row in GOLD_QUERIES_RESPONSE["data"]]
         self.gold_query_set_ids = []
+        self.get_run_call_count = 0
+        # None = never cancel. Set to N in a test to make the (N+1)th get_run call, and every
+        # call after it, report status="cancelled". Call 1 is always execute_run's own initial
+        # fetch (line ~88) before the loop starts; call 2 is the first in-loop check (before gold
+        # query 1), call 3 is the second in-loop check (before gold query 2), and so on.
+        self.cancel_after_calls = None
+        # get_run call numbers that fail with a transient backend error, to simulate a blip.
+        self.transient_get_run_failures = set()
+        # Statuses the backend refuses with a 422, as it does for a write against a cancelled run.
+        self.rejected_statuses = set()
+        # When True, a refused write also means the run was cancelled, so later reads report it.
+        self.cancel_when_rejected = False
+        self.is_cancelled = False
 
     async def get_run(self, run_id):
         assert run_id == "107"
+        self.get_run_call_count += 1
+        if self.get_run_call_count in self.transient_get_run_failures:
+            raise TradeTariffBackendUnavailableError("connection reset")
+        if self.is_cancelled or (self.cancel_after_calls is not None and self.get_run_call_count > self.cancel_after_calls):
+            return self.run_attrs | {"status": "cancelled"}
         return self.run_attrs
 
     async def get_gold_queries(self, set_id=None):
@@ -38,6 +60,10 @@ class FakeClient:
     async def update_run(self, run_id, status, **fields):
         self.update_run_calls.append(status)
         self.update_run_kwargs.append(fields)
+        if status in self.rejected_statuses:
+            if self.cancel_when_rejected:
+                self.is_cancelled = True
+            raise TradeTariffBackendValidationError(422, {"errors": [{"detail": "run is cancelled"}]})
 
     async def post_result(self, result):
         self.post_result_calls.append(result)
@@ -179,6 +205,103 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(client.post_result_calls[0]["gold_in_top1"])
         self.assertFalse(client.post_result_calls[0]["gold_in_top5"])
         self.assertEqual(summary, {"status": "failed", "succeeded": 0, "failed": 1})
+
+    async def test_stops_processing_remaining_gold_queries_once_the_run_is_cancelled(self):
+        client = FakeClient()
+        # Three gold queries, so there's a real "remaining" item left unprocessed when cancellation
+        # is noticed after the first.
+        client.gold_queries = [
+            GOLD_QUERIES_RESPONSE["data"][0]["attributes"] | {"id": "1"},
+            GOLD_QUERY_SIX_DIGIT,
+            GOLD_QUERIES_RESPONSE["data"][0]["attributes"] | {"id": "3", "source_id": "600099999"},
+        ]
+        # Call 1 = the initial fetch (not cancelled). Call 2 = the pre-check before gold query 1 (not
+        # cancelled yet, it proceeds). Call 3 = the pre-check before gold query 2 — this is where
+        # cancel_after_calls=2 makes it report cancelled, so gold queries 2 and 3 never run.
+        client.cancel_after_calls = 2
+
+        with patch(
+            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            new=AsyncMock(return_value={
+                "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
+                "converged": True, "simulator_failed": False,
+            }),
+        ):
+            summary = await execute_run("107", client)
+
+        self.assertEqual(len(client.post_result_calls), 1)
+        self.assertEqual(client.update_run_calls, ["running", "cancelled"])
+        self.assertEqual(summary, {"status": "cancelled", "succeeded": 1, "failed": 0})
+
+    async def test_a_run_cancelled_before_it_is_even_picked_up_never_transitions_through_running(self):
+        client = FakeClient()
+        client.cancel_after_calls = 0
+
+        summary = await execute_run("107", client)
+
+        self.assertEqual(client.update_run_calls, ["cancelled"])
+        self.assertEqual(len(client.post_result_calls), 0)
+        self.assertEqual(summary, {"status": "cancelled", "succeeded": 0, "failed": 0})
+
+    async def test_a_transient_cancel_check_failure_does_not_end_the_run(self):
+        client = FakeClient()
+        client.gold_queries = [
+            GOLD_QUERIES_RESPONSE["data"][0]["attributes"] | {"id": "1"},
+            GOLD_QUERY_SIX_DIGIT,
+            GOLD_QUERIES_RESPONSE["data"][0]["attributes"] | {"id": "3", "source_id": "600099999"},
+        ]
+        # Call 1 is the initial fetch; call 3 is the check before gold query 2. Let that one blip.
+        client.transient_get_run_failures = {3}
+
+        with patch(
+            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            new=AsyncMock(return_value={
+                "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
+                "converged": True, "simulator_failed": False,
+            }),
+        ):
+            summary = await execute_run("107", client)
+
+        self.assertEqual(len(client.post_result_calls), 3)
+        self.assertEqual(client.update_run_calls, ["running", "completed"])
+        self.assertEqual(summary, {"status": "completed", "succeeded": 3, "failed": 0})
+
+    async def test_a_pickup_write_refused_because_the_run_was_cancelled_stops_quietly(self):
+        client = FakeClient()
+        client.rejected_statuses = {"running"}
+        client.cancel_when_rejected = True
+
+        summary = await execute_run("107", client)
+
+        self.assertEqual(client.update_run_calls, ["running"])
+        self.assertEqual(client.post_result_calls, [])
+        self.assertEqual(summary, {"status": "cancelled", "succeeded": 0, "failed": 0})
+
+    async def test_a_pickup_write_refused_for_another_reason_is_still_recorded_as_failed(self):
+        client = FakeClient()
+        client.rejected_statuses = {"running"}
+
+        summary = await execute_run("107", client)
+
+        self.assertEqual(client.update_run_calls, ["running", "failed"])
+        self.assertEqual(summary["status"], "failed")
+
+    async def test_a_final_write_refused_because_the_run_was_cancelled_does_not_raise(self):
+        client = FakeClient()
+        client.rejected_statuses = {"completed"}
+        client.cancel_when_rejected = True
+
+        with patch(
+            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            new=AsyncMock(return_value={
+                "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
+                "converged": True, "simulator_failed": False,
+            }),
+        ):
+            summary = await execute_run("107", client)
+
+        self.assertEqual(client.update_run_calls, ["running", "completed"])
+        self.assertEqual(summary["status"], "cancelled")
 
 
 class ScoringGranularityTest(unittest.IsolatedAsyncioTestCase):
