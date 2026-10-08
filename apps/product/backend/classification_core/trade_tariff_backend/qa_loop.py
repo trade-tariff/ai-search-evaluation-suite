@@ -23,6 +23,8 @@ produce, with nothing in the result to show it happened.
 """
 from __future__ import annotations
 
+import uuid
+
 from classification_core.qa_loop import SessionFacts, simulate_trader_answer
 
 
@@ -38,6 +40,7 @@ async def run_qa_session_via_trade_tariff_backend(
 ) -> dict:
     session = SessionFacts()
     answers_so_far: list[dict] = []
+    question_trace: list[dict] = []
     response: dict = {}
     # meta.usage is present per /searches round (see SearchesController#with_usage_meta
     # in trade-tariff-backend) only when that round made at least one LLM/embedding
@@ -48,25 +51,38 @@ async def run_qa_session_via_trade_tariff_backend(
     total_cost_usd = 0.0
     total_duration_ms = 0.0
     total_provider_calls = 0
+    # True until a round's usage explicitly says otherwise (AiUsage::PricingCalculator in
+    # trade-tariff-backend sets pricing_known=False when a call used a model missing from
+    # config/openai_model_pricing.yml). A round with no usage key at all -- no LLM call made --
+    # makes no claim either way, so it leaves this unchanged rather than defaulting to False.
+    pricing_known = True
 
     def usage_totals() -> dict:
         return {
             "cost_usd": total_cost_usd,
             "latency_seconds": total_duration_ms / 1000,
             "provider_calls": total_provider_calls,
+            "pricing_known": pricing_known,
             # len(answers_so_far), not round_num -- round_num counts every
             # /searches call including the one that finally converges (which
             # answers nothing), so it overcounts by one on convergence.
             "questions_answered": len(answers_so_far),
+            "question_trace": question_trace,
         }
 
     for round_num in range(1, max_rounds + 1):
-        response = await client.search(query=query, answers_so_far=answers_so_far, run_time_overrides=run_time_overrides)
+        # Generated once per round, before the search call it tags — a UUID the backend's own
+        # Api::Internal::SearchService accepts and threads through every log line that call
+        # produces (confirmed by reading the service), so the admin app's drill-in page can later
+        # link straight into Search Diagnostics for this exact round.
+        request_id = str(uuid.uuid4())
+        response = await client.search(query=query, answers_so_far=answers_so_far, run_time_overrides=run_time_overrides, request_id=request_id)
         usage = (response.get("meta") or {}).get("usage")
         if usage:
             total_cost_usd += usage.get("total_cost_usd") or 0
             total_duration_ms += usage.get("duration_ms") or 0
             total_provider_calls += usage.get("provider_calls") or 0
+            pricing_known = pricing_known and usage.get("pricing_known", True)
 
         pending = _pending_question(response)
 
@@ -87,6 +103,19 @@ async def run_qa_session_via_trade_tariff_backend(
             client=sim_client, session=session, raw_query=query,
             question=pending["question"], options=options, round_number=round_num, oracle_text=oracle_text,
         )
+        # Recorded whether or not the simulator succeeded — a failed round is exactly the round an
+        # operator investigating a bad or incomplete result most needs to see, not a gap in the trace.
+        question_trace.append({
+            "round": round_num,
+            "question": pending["question"],
+            "options": options,
+            "chosen": sim_result.get("chosen"),
+            "choice_index": sim_result.get("choice_index"),
+            "reasoning": sim_result.get("reasoning"),
+            "attempts": sim_result.get("attempts"),
+            "simulator_failed": sim_result.get("simulator_failed", False),
+            "request_id": request_id,
+        })
         if sim_result.get("simulator_failed"):
             return {"final_candidates": response.get("data") or [], "converged": False, "simulator_failed": True, **usage_totals()}
 

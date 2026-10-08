@@ -129,6 +129,57 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(posted["cost_usd"], 0.0)
         self.assertEqual(posted["latency_seconds"], 0.0)
         self.assertEqual(posted["provider_calls"], 0)
+        # No usage at all makes no claim about pricing either way.
+        self.assertTrue(posted["pricing_known"])
+
+    async def test_pricing_known_is_sent_on_the_posted_result(self):
+        client = FakeClient()
+
+        with patch(
+            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            new=AsyncMock(return_value={
+                "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
+                "converged": True, "simulator_failed": False, "pricing_known": False,
+            }),
+        ):
+            await execute_run("107", client)
+
+        # cost_usd still posts whatever partial total was priceable (AI-1068's whole point is
+        # not to hide that number) -- pricing_known is what flags it might be understated, a run
+        # that used a model missing from config/openai_model_pricing.yml in trade-tariff-backend.
+        self.assertFalse(client.post_result_calls[0]["pricing_known"])
+
+    async def test_the_question_trace_is_sent_on_the_posted_result(self):
+        client = FakeClient()
+        trace = [{"round": 1, "question": "What material?", "chosen": "Rubber", "simulator_failed": False}]
+
+        with patch(
+            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            new=AsyncMock(return_value={
+                "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
+                "converged": True, "simulator_failed": False, "question_trace": trace,
+            }),
+        ):
+            await execute_run("107", client)
+
+        self.assertEqual(client.post_result_calls[0]["trace"], {"question_trace": trace})
+
+    async def test_a_session_result_missing_question_trace_posts_an_empty_one_rather_than_raising(self):
+        # Same defensive-default reasoning as the existing cost_usd/latency_seconds/provider_calls
+        # test just above this one in the file — plenty of tests in this file mock
+        # run_qa_session_via_trade_tariff_backend with a bare dict that has no question_trace key.
+        client = FakeClient()
+
+        with patch(
+            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            new=AsyncMock(return_value={
+                "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
+                "converged": True, "simulator_failed": False,
+            }),
+        ):
+            await execute_run("107", client)
+
+        self.assertEqual(client.post_result_calls[0]["trace"], {"question_trace": []})
 
     async def test_final_update_run_sends_completed_at_and_no_error_summary_when_nothing_failed(self):
         client = FakeClient()
@@ -205,6 +256,33 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(client.post_result_calls[0]["gold_in_top1"])
         self.assertFalse(client.post_result_calls[0]["gold_in_top5"])
         self.assertEqual(summary, {"status": "failed", "succeeded": 0, "failed": 1})
+
+    async def test_a_simulator_failures_trace_up_to_the_failed_round_still_reaches_the_backend(self):
+        # The exact round where the simulator gave up is the one an operator investigating a
+        # failed result most needs to see (Review Focus item 4) — losing it here means the
+        # drill-in page can only ever say "No Q&A trace recorded", never show which round broke.
+        client = FakeClient()
+        trace_so_far = [
+            {"round": 1, "question": "What material?", "chosen": "Rubber", "simulator_failed": False},
+            {"round": 2, "question": "What closure?", "chosen": None, "simulator_failed": True},
+        ]
+
+        with patch(
+            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            new=AsyncMock(return_value={
+                "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
+                "converged": False, "simulator_failed": True, "question_trace": trace_so_far,
+                "cost_usd": 0.002, "latency_seconds": 0.8, "provider_calls": 2, "pricing_known": False,
+            }),
+        ):
+            await execute_run("107", client)
+
+        posted = client.post_result_calls[0]
+        self.assertEqual(posted["trace"], {"question_trace": trace_so_far})
+        self.assertAlmostEqual(posted["cost_usd"], 0.002)
+        self.assertAlmostEqual(posted["latency_seconds"], 0.8)
+        self.assertEqual(posted["provider_calls"], 2)
+        self.assertFalse(posted["pricing_known"])
 
     async def test_stops_processing_remaining_gold_queries_once_the_run_is_cancelled(self):
         client = FakeClient()

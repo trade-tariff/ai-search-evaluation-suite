@@ -25,12 +25,27 @@ class SearchTest(unittest.IsolatedAsyncioTestCase):
 
         result = await client.search(
             query="women's trainers", answers_so_far=answers_so_far, run_time_overrides={"max_rounds": 3},
+            request_id="00000000-0000-0000-0000-000000000000",
         )
 
         self.assertEqual(seen_payload["q"], "women's trainers")
         self.assertEqual(seen_payload["answers"], answers_so_far)
         self.assertEqual(seen_payload["configuration_overrides"], {"max_rounds": 3})
         self.assertEqual(result, SEARCH_RESPONSE_CONVERGED)
+
+    async def test_sends_the_given_request_id_so_the_backend_logs_this_call_under_it(self):
+        seen_payload = {}
+
+        def handler(request):
+            import json
+            seen_payload.update(json.loads(request.content))
+            return httpx.Response(200, json=SEARCH_RESPONSE_CONVERGED)
+
+        client = TradeTariffBackendClient(base_url="http://backend.test", transport=httpx.MockTransport(handler))
+
+        await client.search(query="women's trainers", answers_so_far=[], run_time_overrides={}, request_id="11111111-1111-1111-1111-111111111111")
+
+        self.assertEqual(seen_payload["request_id"], "11111111-1111-1111-1111-111111111111")
 
 
 if __name__ == "__main__":

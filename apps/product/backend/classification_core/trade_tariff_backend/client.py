@@ -174,10 +174,10 @@ class TradeTariffBackendClient:
         )
         return body["data"]["attributes"] | {"id": body["data"]["id"]}
 
-    async def search(self, query: str, answers_so_far: list[dict], run_time_overrides: dict) -> dict:
+    async def search(self, query: str, answers_so_far: list[dict], run_time_overrides: dict, request_id: str) -> dict:
         return await self._request(
             "POST", f"{self._admin_base}/searches",
-            json={"q": query, "answers": answers_so_far, "configuration_overrides": run_time_overrides},
+            json={"q": query, "answers": answers_so_far, "configuration_overrides": run_time_overrides, "request_id": request_id},
         )
 
     async def post_result(self, result: dict) -> dict:
