@@ -37,9 +37,6 @@ jobs:
       - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: 1.13.4
-      - uses: trade-tariff/trade-tariff-tools/.github/actions/setup-ssh@main
-        with:
-          ssh-key: ${{ secrets.PRIVATE_SSH_KEY }}
       - run: terraform -chdir=terraform fmt -check -recursive
       - run: terraform -chdir=terraform init -backend=false
       - run: terraform -chdir=terraform validate
