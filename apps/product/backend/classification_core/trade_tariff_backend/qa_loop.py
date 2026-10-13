@@ -102,6 +102,7 @@ async def run_qa_session_via_trade_tariff_backend(
         sim_result = await simulate_trader_answer(
             client=sim_client, session=session, raw_query=query,
             question=pending["question"], options=options, round_number=round_num, oracle_text=oracle_text,
+            model=run_time_overrides.get("simulator_model"),
         )
         # Recorded whether or not the simulator succeeded — a failed round is exactly the round an
         # operator investigating a bad or incomplete result most needs to see, not a gap in the trace.

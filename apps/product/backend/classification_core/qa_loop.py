@@ -380,6 +380,7 @@ async def simulate_trader_answer(
     options: list[str],
     round_number: int,
     oracle_text: Optional[str] = None,
+    model: Optional[str] = None,
 ) -> dict:
     """Pick an answer for one question, using oracle + prior facts.
 
@@ -389,6 +390,13 @@ async def simulate_trader_answer(
     progressively stricter prompt. After exhaustion, returns a result with
     `simulator_failed=True` and no committed fact - the loop should treat
     this as a no-progress round.
+
+    model: the OpenAI model for THIS call only, explicit per-call rather than a
+    shared global (AI-1428) -- several runs can execute concurrently in one
+    process, so a run's own simulator_model override must never leak into a
+    different run's calls. Falls back to the module-level SIMULATOR_MODEL
+    default when omitted, which is what every caller before AI-1428 still
+    gets without passing anything new.
 
     Returns: {
         chosen: str          - the EXACT option text picked, OR None if failed
@@ -419,7 +427,7 @@ async def simulate_trader_answer(
         if attempt > 0 and last_error:
             user_prompt += f"\n\nYour previous attempt failed: {last_error}. Reply STRICTLY in the required JSON shape with choice_index as an integer in [0, {n - 1}]."
         kwargs = {
-            "model": SIMULATOR_MODEL,
+            "model": model or SIMULATOR_MODEL,
             "messages": [
                 {"role": "system", "content": _SIMULATOR_SYSTEM},
                 {"role": "user", "content": user_prompt},
