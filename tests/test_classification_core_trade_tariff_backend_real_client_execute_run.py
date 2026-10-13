@@ -65,8 +65,18 @@ class RecordingBackend:
                 self.run_updates.append(json.loads(request.read())["data"]["attributes"])
                 return httpx.Response(200, json=RUN_UPDATE_RESPONSE)
             return httpx.Response(200, json=RUN_SHOW_RESPONSE)
+        # AI-1438: a search is now queued (POST, returns immediately) and polled for (GET,
+        # by id) rather than executed inline in the POST's own response. This fake answers
+        # the GET as already completed on the very first poll, since this test is proving
+        # the client/orchestrator wiring, not the polling loop itself (which client_search's
+        # own unit tests already cover).
         if path == "/uk/admin/search/evaluation/searches":
-            return httpx.Response(200, json=SEARCH_RESPONSE_CONVERGED)
+            return httpx.Response(202, json={"id": "search-fixture-1", "status": "queued"})
+        if path == "/uk/admin/search/evaluation/searches/search-fixture-1":
+            return httpx.Response(200, json={
+                "id": "search-fixture-1", "status": "completed", "response_status": 200,
+                "result": SEARCH_RESPONSE_CONVERGED,
+            })
         if path == "/uk/admin/search/evaluation/results":
             self.posted_results.extend(json.loads(request.read())["data"])
             return httpx.Response(201, json=RESULT_POST_RESPONSE)
