@@ -189,6 +189,45 @@ class RunQaSessionViaBackendTest(unittest.IsolatedAsyncioTestCase):
         )
         mocked_answer.assert_awaited_once()
 
+    async def test_passes_the_simulator_model_override_through_to_the_simulator(self):
+        # AI-1428: simulator_model was accepted and stored on the run but never reached the
+        # trader-simulator's own API call -- every run used the same hardcoded model
+        # regardless of what was picked. simulate_trader_answer must receive it explicitly
+        # per call, not via a shared global, so two runs with different overrides executing
+        # concurrently in the same process can never leak into each other.
+        client = FakeClient([SEARCH_RESPONSE_PENDING_QUESTION, SEARCH_RESPONSE_CONVERGED])
+
+        with patch(
+            "classification_core.trade_tariff_backend.qa_loop.simulate_trader_answer",
+            new=AsyncMock(return_value={
+                "chosen": "Textile", "choice_index": 1, "slot": "material", "reasoning": "",
+                "simulator_failed": False, "attempts": 1, "last_error": None,
+            }),
+        ) as mocked_answer:
+            await run_qa_session_via_trade_tariff_backend(
+                client=client, sim_client="fake-openai-client", query="women's trainers",
+                oracle_text="ruling text", run_time_overrides={"simulator_model": "gpt-4o"}, max_rounds=4,
+            )
+
+        self.assertEqual(mocked_answer.call_args.kwargs["model"], "gpt-4o")
+
+    async def test_passes_no_simulator_model_override_when_none_was_set(self):
+        client = FakeClient([SEARCH_RESPONSE_PENDING_QUESTION, SEARCH_RESPONSE_CONVERGED])
+
+        with patch(
+            "classification_core.trade_tariff_backend.qa_loop.simulate_trader_answer",
+            new=AsyncMock(return_value={
+                "chosen": "Textile", "choice_index": 1, "slot": "material", "reasoning": "",
+                "simulator_failed": False, "attempts": 1, "last_error": None,
+            }),
+        ) as mocked_answer:
+            await run_qa_session_via_trade_tariff_backend(
+                client=client, sim_client="fake-openai-client", query="women's trainers",
+                oracle_text="ruling text", run_time_overrides={}, max_rounds=4,
+            )
+
+        self.assertIsNone(mocked_answer.call_args.kwargs["model"])
+
     async def test_fails_immediately_without_calling_the_simulator_when_no_sim_client_is_configured(self):
         # With the spend gate off there is no simulator client to answer with.
         # That must fail fast and for the right reason, not call

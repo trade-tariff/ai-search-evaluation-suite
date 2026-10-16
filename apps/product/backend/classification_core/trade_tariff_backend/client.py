@@ -19,6 +19,12 @@ DEFAULT_BASE_URL = os.environ.get("TRADE_TARIFF_BACKEND_BASE_URL", "http://127.0
 REQUEST_TIMEOUT_S = float(os.environ.get("TRADE_TARIFF_BACKEND_REQUEST_TIMEOUT_S", "30"))
 MAX_ATTEMPTS = 3
 RETRY_BASE_DELAY_S = 0.5
+# AI-1438: an evaluation search is now queued on the backend's own evaluation Sidekiq queue
+# instead of executed inline, so the result arrives by polling rather than in the POST's own
+# response. POLL_INTERVAL_S is how often this client checks; POLL_TIMEOUT_S is how long it
+# waits in total before giving up on one search.
+POLL_INTERVAL_S = float(os.environ.get("TRADE_TARIFF_BACKEND_POLL_INTERVAL_S", "0.5"))
+POLL_TIMEOUT_S = float(os.environ.get("TRADE_TARIFF_BACKEND_POLL_TIMEOUT_S", "120"))
 
 
 def _internal_ssl_context() -> ssl.SSLContext | bool:
@@ -58,9 +64,14 @@ class TradeTariffBackendUnavailableError(Exception):
 
 
 class TradeTariffBackendClient:
-    def __init__(self, base_url: str = DEFAULT_BASE_URL, transport: Optional[httpx.MockTransport] = None):
+    def __init__(
+        self, base_url: str = DEFAULT_BASE_URL, transport: Optional[httpx.MockTransport] = None,
+        poll_interval_s: float = POLL_INTERVAL_S, poll_timeout_s: float = POLL_TIMEOUT_S,
+    ):
         self._admin_base = f"{base_url}/uk/admin/search/evaluation"
         self._internal_base = f"{base_url}/uk/internal"
+        self._poll_interval_s = poll_interval_s
+        self._poll_timeout_s = poll_timeout_s
         self._http = httpx.AsyncClient(
             timeout=REQUEST_TIMEOUT_S, transport=transport, verify=_internal_ssl_context()
         )
@@ -175,10 +186,44 @@ class TradeTariffBackendClient:
         return body["data"]["attributes"] | {"id": body["data"]["id"]}
 
     async def search(self, query: str, answers_so_far: list[dict], run_time_overrides: dict, request_id: str) -> dict:
-        return await self._request(
+        """Queues one search round and waits for it to finish (AI-1438).
+
+        The search itself now runs on the backend's own evaluation Sidekiq queue rather
+        than inline in the POST request, so the result is not in this call's own response
+        — it has to be polled for. Raises the same TradeTariffBackendValidationError /
+        TradeTariffBackendUnavailableError a synchronous call would have raised for the
+        same underlying failure, so every existing caller (run_qa_session_via_trade_tariff_backend)
+        needs no change.
+        """
+        queued = await self._request(
             "POST", f"{self._admin_base}/searches",
             json={"q": query, "answers": answers_so_far, "configuration_overrides": run_time_overrides, "request_id": request_id},
         )
+        try:
+            return await asyncio.wait_for(self._poll_search(queued["id"]), timeout=self._poll_timeout_s)
+        except asyncio.TimeoutError:
+            raise TradeTariffBackendUnavailableError(
+                f"queued search {queued['id']} did not complete within {self._poll_timeout_s}s"
+            ) from None
+
+    async def _poll_search(self, search_id: str) -> dict:
+        while True:
+            payload = await self._request("GET", f"{self._admin_base}/searches/{search_id}")
+            status = payload.get("status")
+            if status == "completed":
+                return payload["result"]
+            if status == "failed":
+                response_status = payload.get("response_status")
+                result = payload.get("result")
+                # A response_status under 500 is the search's own validation-style error
+                # (e.g. a bad configuration override) -- the same case a synchronous call
+                # would have raised as TradeTariffBackendValidationError for. 500 means the
+                # search itself raised partway through; this client does not retry that by
+                # re-queuing a fresh search, unlike _request's transport-level retries above.
+                if response_status is not None and response_status < 500:
+                    raise TradeTariffBackendValidationError(response_status, result)
+                raise TradeTariffBackendUnavailableError(result)
+            await asyncio.sleep(self._poll_interval_s)
 
     async def post_result(self, result: dict) -> dict:
         body = await self._request("POST", f"{self._admin_base}/results", json={"data": [result]})
