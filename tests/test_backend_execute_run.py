@@ -16,6 +16,7 @@ from backend_fixtures import (
     GOLD_QUERY_SIX_DIGIT,
     RUN_SHOW_RESPONSE,
     SEARCH_RESPONSE_PENDING_QUESTION,
+    SYNTHETIC_INPUT_SET_ITEMS_RESPONSE,
 )
 
 class FakeClient:
@@ -26,6 +27,10 @@ class FakeClient:
         self.run_attrs = RUN_SHOW_RESPONSE["data"]["attributes"] | {"id": "107"}
         self.gold_queries = [row["attributes"] | {"id": row["id"]} for row in GOLD_QUERIES_RESPONSE["data"]]
         self.gold_query_set_ids = []
+        self.synthetic_input_set_items = [
+            row["attributes"] | {"id": row["id"]} for row in SYNTHETIC_INPUT_SET_ITEMS_RESPONSE["data"]
+        ]
+        self.synthetic_input_set_ids = []
         self.get_run_call_count = 0
         # None = never cancel. Set to N in a test to make the (N+1)th get_run call, and every
         # call after it, report status="cancelled". Call 1 is always execute_run's own initial
@@ -52,6 +57,10 @@ class FakeClient:
     async def get_gold_queries(self, set_id=None):
         self.gold_query_set_ids.append(set_id)
         return self.gold_queries
+
+    async def get_synthetic_input_set_items(self, set_id=None):
+        self.synthetic_input_set_ids.append(set_id)
+        return self.synthetic_input_set_items
 
     async def update_run(self, run_id, status, **fields):
         self.update_run_calls.append(status)
@@ -765,6 +774,94 @@ class GoldQuerySetTest(unittest.IsolatedAsyncioTestCase):
             client.update_run_kwargs[-1]["error_summary"],
             "run aborted early: gold query set 5 has no gold queries",
         )
+
+class SyntheticInputSetTest(unittest.IsolatedAsyncioTestCase):
+    """A run whose experiment points at a synthetic input set (AI-1445) instead of a
+    gold query set runs through the same per-row loop, fetching from the AI-1450
+    endpoint instead of /evaluation_gold_queries."""
+
+    def _with_synthetic_input_set(self, client, set_id=9):
+        # Mirrors the real RunSerializer: at most one of the two ids is ever present.
+        client.run_attrs = {k: v for k, v in client.run_attrs.items() if k != "gold_query_set_id"} | {
+            "synthetic_input_set_id": set_id,
+        }
+        return client
+
+    async def test_it_fetches_the_synthetic_input_set_items_of_the_runs_set_and_only_that_set(self):
+        client = self._with_synthetic_input_set(FakeClient())
+
+        with patch(
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            new=AsyncMock(return_value={
+                "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "3924100000"}}],
+                "converged": True, "simulator_failed": False,
+            }),
+        ):
+            summary = await execute_run("107", client)
+
+        self.assertEqual(client.synthetic_input_set_ids, [9])
+        self.assertEqual(client.gold_query_set_ids, [])  # never asked for a gold query set too
+        self.assertEqual(summary["status"], "completed")
+
+    async def test_posts_one_result_per_item_with_persona_raw(self):
+        client = self._with_synthetic_input_set(FakeClient())
+
+        with patch(
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            new=AsyncMock(return_value={
+                "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "3924100000"}}],
+                "converged": True, "simulator_failed": False,
+            }),
+        ):
+            await execute_run("107", client)
+
+        self.assertEqual(len(client.post_result_calls), 1)
+        self.assertEqual(client.post_result_calls[0]["persona"], "raw")
+        self.assertEqual(client.post_result_calls[0]["source_type"], "synthetic_atar")
+        self.assertEqual(client.post_result_calls[0]["source_id"], "501")
+
+    async def test_answers_clarifying_questions_from_the_items_own_text_served_as_oracle_text(self):
+        client = self._with_synthetic_input_set(FakeClient())
+
+        with patch(
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            new=AsyncMock(return_value={
+                "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "3924100000"}}],
+                "converged": True, "simulator_failed": False,
+            }),
+        ) as mocked_qa_session:
+            await execute_run("107", client)
+
+        self.assertEqual(
+            mocked_qa_session.await_args.kwargs["oracle_text"],
+            "Reusable plastic food storage box with a clip-on lid, made of polypropylene, for household use.",
+        )
+
+    async def test_an_empty_synthetic_input_set_fails_the_run_without_guessing_why(self):
+        client = self._with_synthetic_input_set(FakeClient())
+        client.synthetic_input_set_items = []
+
+        summary = await execute_run("107", client)
+
+        self.assertEqual(client.update_run_calls, ["running", "failed"])
+        self.assertEqual(summary, {"status": "failed", "succeeded": 0, "failed": 0})
+        self.assertEqual(
+            client.update_run_kwargs[-1]["error_summary"],
+            "run aborted early: synthetic input set 9 has no items",
+        )
+
+    async def test_a_run_with_neither_set_still_raises_the_existing_error(self):
+        client = FakeClient()
+        client.run_attrs = {k: v for k, v in client.run_attrs.items() if k != "gold_query_set_id"} | {
+            "synthetic_input_set_id": None,
+        }
+
+        summary = await execute_run("107", client)
+
+        self.assertEqual(summary, {"status": "failed", "succeeded": 0, "failed": 0})
+        self.assertEqual(client.synthetic_input_set_ids, [])
+        self.assertEqual(client.gold_query_set_ids, [])
+        self.assertIn("no gold query set", client.update_run_kwargs[-1]["error_summary"])
 
 class ProgressLoggingTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self):

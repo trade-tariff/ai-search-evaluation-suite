@@ -8,6 +8,9 @@ from backend_fixtures import (
     GOLD_QUERIES_RESPONSE,
     GOLD_QUERIES_RESPONSE_PAGE_1,
     GOLD_QUERIES_RESPONSE_PAGE_2,
+    SYNTHETIC_INPUT_SET_ITEMS_RESPONSE,
+    SYNTHETIC_INPUT_SET_ITEMS_RESPONSE_PAGE_1,
+    SYNTHETIC_INPUT_SET_ITEMS_RESPONSE_PAGE_2,
     VALIDATION_ERROR_RESPONSE,
 )
 
@@ -135,6 +138,49 @@ class GetGoldQueriesTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result, _flattened(GOLD_QUERIES_RESPONSE))
         self.assertEqual(attempts, 2)
+
+class GetSyntheticInputSetItemsTest(unittest.IsolatedAsyncioTestCase):
+    """Same contract as GetGoldQueriesTest, against the AI-1450 endpoint: both
+    share _fetch_all_pages, so retry/4xx/5xx behaviour is covered there already."""
+
+    async def test_returns_flattened_rows_on_success(self):
+        def handler(request):
+            self.assertEqual(request.url.path, "/uk/internal/evaluation_synthetic_input_set_items")
+            return httpx.Response(200, json=SYNTHETIC_INPUT_SET_ITEMS_RESPONSE)
+
+        client = _client_with_transport(handler)
+        result = await client.get_synthetic_input_set_items()
+
+        self.assertEqual(result, _flattened(SYNTHETIC_INPUT_SET_ITEMS_RESPONSE))
+        self.assertEqual(result[0]["source_type"], "synthetic_atar")
+        self.assertEqual(result[0]["persona"], "raw")
+        self.assertEqual(result[0]["oracle_text"], result[0]["query"])
+
+    async def test_follows_pagination_until_every_row_has_been_collected(self):
+        def handler(request):
+            if request.url.params["page"] == "1":
+                return httpx.Response(200, json=SYNTHETIC_INPUT_SET_ITEMS_RESPONSE_PAGE_1)
+            return httpx.Response(200, json=SYNTHETIC_INPUT_SET_ITEMS_RESPONSE_PAGE_2)
+
+        client = _client_with_transport(handler)
+        result = await client.get_synthetic_input_set_items()
+
+        self.assertEqual(
+            result,
+            _flattened(SYNTHETIC_INPUT_SET_ITEMS_RESPONSE_PAGE_1) + _flattened(SYNTHETIC_INPUT_SET_ITEMS_RESPONSE_PAGE_2),
+        )
+
+    async def test_asks_for_one_set_when_given_its_id(self):
+        seen = []
+
+        def handler(request):
+            seen.append(dict(request.url.params))
+            return httpx.Response(200, json=SYNTHETIC_INPUT_SET_ITEMS_RESPONSE)
+
+        client = _client_with_transport(handler)
+        await client.get_synthetic_input_set_items(9)
+
+        self.assertEqual(seen, [{"page": "1", "per_page": "250", "set_id": "9"}])
 
 class GetAtarRulingTest(unittest.IsolatedAsyncioTestCase):
     async def test_returns_the_ruling_attributes_by_ref(self):
