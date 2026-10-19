@@ -36,16 +36,15 @@ source files. A merged entry needs a pull request link and merge commit.
 | F09 | `trader-journey/stages/DeclareStage.tsx` | Merged | [#61](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/61) / `d072987e2a5b570b7a891616e47da1e4692d9a35` |
 | F10 | `trader-journey/components/Stepper.tsx` | Merged | [#62](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/62) / `0f0db62e50f851bbad32c2ca756e0c3f95685f91` |
 | F11 | `trader-journey/components/Money.tsx` | Merged | [#63](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/63) / `21b138cbe15159385445c18d86a81e562871631f` |
-| F12 | `trader-journey/api.ts` | In progress | Pending |
-| F13 | `trader-journey/types.ts` | Depends on F10-F12 and stage removals | |
+| F12 | `trader-journey/api.ts` | Merged | [#64](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/64) / `bbf63bc47217ed7290b06fd79a226105aca251b3` |
+| F13 | `trader-journey/types.ts` | In progress | Pending |
 
-P01 must merge before F04. It moves `Stage` to the shared types file so that
-`Stepper.tsx` does not import the app. TypeScript checks all of `src`, including
-components that are not mounted. Keep the type until Stepper and the remaining
-type consumers are removed.
+P01 moved `Stage` to the shared types file before F04 so that Stepper could
+still type-check. F05-F12 removed the remaining Journey components and API
+client. F13 removes the shared types file after those consumers.
 
-The current `src/main.tsx` renders only `App`, which does not import these
-components. [PR #37](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/37)
+The workbench entrypoint `src/main.tsx` renders only `App`. It does not import
+the Journey code. [PR #37](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/37)
 proposed a separate journey entrypoint but is closed without merge. The frontend
 removals supersede that proposal. They do not remove the separate Journey
 backend, its API, or its deployment files. R01 still requires a decision on that
