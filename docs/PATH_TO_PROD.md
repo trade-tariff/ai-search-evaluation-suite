@@ -1,12 +1,15 @@
 # Path to Production - AI Search Evaluation Suite
 
-This plan comes from a full audit on 2026-07-02: a 31-agent automated review
-of the deployed source code (what each part does, what is dead weight, what
-would break in production) plus a hands-on check of every screen and API on
-the live system. Everything below marked "verified" was checked against the
-running system, not inferred from reading code.
+This is a historical research deployment plan recorded on 2026-07-02. It is not
+the current worker deployment guide. Live-system claims below describe that
+record, not current state or evidence of operator use. Do not execute its
+deployment or retirement proposals as current instructions.
 
-## 1. Where we are (verified)
+The default images now run only the Admin evaluation worker. They do not serve
+the workbench or Journey UI. Use the [worker contract](../README.md#worker-contract)
+and [removal ledger](REMOVAL_LEDGER.md) for current scope and retention decisions.
+
+## 1. Recorded research state (2026-07-02)
 
 - One cloud server runs everything: the evaluation workbench, the trader
   journey app, the tariff database, the search index, and the web front
@@ -140,12 +143,11 @@ carry knowledge):
 - The journey deployment's duplicate copy of the workbench screens - goes
   away by itself with the consolidation in section 3.
 
-Kept deliberately (all verified in use): all 16 workbench tabs (every one is
-reachable and backed by a working API), both versions of the test-question
-seeding script (both wired into the data pipeline), the local quickstart
-script (documented, now fixed), the small duplicated login module (each app
-imports its own copy), and the "suite primer" utility (referenced by
-documentation - risky to delete).
+Research source is retained under R01 and R02 in the removal ledger. Source
+entrypoints establish reachability, not operator use. The workbench, extraction,
+matrix, MCP, experiment, and primer tools are not dead solely because they are
+outside the Admin worker. Operator use remains unverified. Worker images exclude
+research code; a later source deletion needs a separate retirement decision.
 
 ## 6. Decisions needed
 

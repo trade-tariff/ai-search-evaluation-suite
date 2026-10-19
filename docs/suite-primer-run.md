@@ -1,6 +1,9 @@
 # Suite Primer Run
 
-This run primes the deployed app with saved, reviewable benchmark evidence instead of leaving Simulator, Judge, Benchmark, Analysis, and Financial panels empty or abstract.
+This optional research tool creates saved benchmark evidence for the workbench's
+Simulator, Judge, Benchmark, Analysis, and Financial panels. It needs the full
+research source and requirements. It is not included in worker images. See the
+[research setup](../README.md#optional-research-workbench).
 
 The run is intentionally split into two stages:
 

@@ -68,8 +68,8 @@ deletions when they can be reviewed independently.
 | W06 | Remove the React bundle and workbench routes from the worker image | Merged | [#72](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/72) / `e44d633b3bb4b96502acbf1382115051067e771b` |
 | P04 | Preserve the existing extraction Compose profiles with a separate image target | Merged | [#74](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/74) / `3c6fdca18f5a271779468b2b207930a8ec08815b` |
 | W07 | Remove research-only code and dependencies from the worker image | Merged | [#75](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/75) / `1aa7c952fe5ac38b7c5021b02586c32c0e7467a1` |
-| W08 | Remove obsolete placeholder/in-use claims and document the worker contract | Ready | |
-| R01 | Decide whether to retain or archive the separate journey backend and deployment | Retain source and existing deployment definitions | Pending |
+| W08 | Remove obsolete placeholder/in-use claims and document the worker contract | In progress | Pending |
+| R01 | Decide whether to retain or archive the separate journey backend and deployment | Retain source and existing deployment definitions | [#76](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/76) / `637958043cdef3e13407bff7c35defee661db15f` |
 | R02 | Decide whether to retain or archive extraction, matrix, MCP, and experiment tools | Retain source and research entrypoint; excluded from worker images | [#69](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/69) / `b0e7932b4c10bdf43f72e95f9f65cea5edb3918f` |
 
 P03 separates the worker requirements from the full research requirements.

@@ -1,8 +1,9 @@
 # Measurement Review - Can the eval app measure an AI classification system?
 
-Produced 2026-07-02 by a 4-lens code review (statistical rigor, gold data,
-judge loop, stakeholder KPIs) ahead of the demo. Code references are to
-current main.
+This research measurement review was recorded on 2026-07-02. Its code references
+and findings describe the research revision reviewed then, not current main.
+It is not evidence of current worker features, deployments, or operator use.
+Use the [worker contract](../README.md#worker-contract) for the Admin integration.
 
 # Can this app measure an AI classification system? A synthesis of four reviews
 

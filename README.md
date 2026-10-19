@@ -1,12 +1,15 @@
 # AI Search Evaluation Suite
 
-AI Search Evaluation Suite is a standalone deployable app for tariff
-classification/search evaluation and experimentation. It combines a React
-workbench, FastAPI services, retrieval and classification evaluation runners,
-knowledge graph tooling, ATaR workflows, intercept analysis, and provider
-benchmarking in one operator-focused application.
+AI Search Evaluation Suite contains the evaluation worker used by Trade Tariff
+Admin and retained research tools. The default launchers and worker images run
+`backend.worker_app:app`. They do not serve the React workbench or research APIs.
+See the [worker contract](#worker-contract).
 
-## What It Does
+The research source includes a React workbench, local evaluation runners,
+knowledge graph tools, ATaR workflows, intercept analysis, and provider
+benchmarks. These are not features of the default worker deployment.
+
+## Research Features
 
 - Runs retrieval/search experiments over tariff candidates, reference material,
   prompt variants, and provider/model configurations.
@@ -27,7 +30,7 @@ benchmarking in one operator-focused application.
 - Includes Intercepts and Complexity tooling for high-ambiguity search terms,
   streamed analysis, saved-run drilldowns, candidate trees, and complexity KPIs.
 
-## Architecture
+## Research Architecture
 
 ```mermaid
 flowchart LR
@@ -56,12 +59,12 @@ flowchart LR
     Providers --> API
 ```
 
-The deployable app is the classification-evaluation runner, which serves the
-workbench UI and mounts the product evaluation APIs in a single process. It can
-run against an existing tariff/KG database or a local Postgres/pgvector service
-started by Docker Compose.
+The optional research app, `backend.research_app:app`, combines native research
+routes with product research APIs. It uses the full source and research
+requirements. It can use a tariff/KG database. It is not deployed by either
+worker image.
 
-## Evaluation Workflow
+## Research Evaluation Workflow
 
 ```mermaid
 flowchart TD
@@ -80,9 +83,9 @@ flowchart TD
 
 | Path | Purpose |
 |---|---|
-| `apps/classification-evals/` | Standalone deployable app and long-running classification evaluation runner. |
-| `apps/product/` | Shared workbench frontend and supporting backend modules mounted by the deployable app. |
-| `apps/product/backend/` | FastAPI route modules for retrieval, KG, ATaR, simulator, judge, benchmark, analysis, financial, intercepts, and complexity tooling. |
+| `apps/classification-evals/` | Worker app, optional research apps, worker images, and extraction profiles. |
+| `apps/product/` | Shared worker modules and retained research source. |
+| `apps/product/backend/` | Worker ingress, backend client, shared simulator, and retained research APIs and tools. |
 | `apps/product/frontend/` | React/Vite workbench UI. |
 | `apps/product/db/` | KG schema and deployable seed data artifacts when included in the export. |
 | `docs/` and `apps/product/docs/` | Route, dependency, operations, source inventory, KG, and extension notes when included in the export. |
@@ -114,45 +117,94 @@ third-party dependencies retain their own terms.
 
 ## Local Development Quickstart
 
-Prerequisites:
+### Worker
 
-- Python 3.11+.
-- Node.js and npm.
-- PostgreSQL with pgvector for live DB-backed flows.
-- Optional provider API keys for model-backed actions.
-
-Start the deployable evaluation app:
+The worker needs Python 3.11+. It does not need Node.js, local PostgreSQL, or
+OpenSearch. From the repository root:
 
 ```bash
 cd apps/classification-evals
-cp .env.example .env
+# Create .env from .env.example if needed. Do not replace existing secrets.
 ./start.sh
 ```
 
-Open the local app at `http://localhost:8100`.
+In another terminal:
 
-For static or fixture-backed inspection, provider keys can remain blank. Live
-search, KG, classification eval, ATaR extraction, embeddings, judge, benchmark,
-and intercept-generation flows require the relevant database and provider
-configuration.
+```bash
+curl -fsS http://127.0.0.1:8100/api/health
+```
+
+`start.sh` installs `requirements-worker.txt` in this directory's `.venv`.
+An existing `.venv` can still contain research packages from an older install.
+Health does not require provider keys and does not start an evaluation. Send the
+configured authorization header if health is protected. `/` is not a workbench
+page and returns 404.
+
+### Optional Research Workbench
+
+Research needs the full requirements, Node.js and npm for the frontend, and
+PostgreSQL with pgvector for DB-backed actions. Use a separate environment at
+the repository root:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r apps/classification-evals/requirements.txt
+cd apps/product/frontend
+npm ci --ignore-scripts
+npm run build
+cd ../../..
+PRODUCT_APP_ROOT="$PWD/apps/product" AI_FAN_OUT_KG_LABEL_PROFILE=full \
+  python -m uvicorn backend.research_app:app \
+  --app-dir apps/classification-evals --host 127.0.0.1 --port 8000
+```
+
+Supply research configuration through the environment. If using an existing
+trusted `.env`, Uvicorn accepts `--env-file apps/classification-evals/.env`.
+The research UI is at `http://127.0.0.1:8000`. The Vite development proxy also
+targets port 8000. Keep provider spend disabled unless the target and budget are
+approved. This local opt-in does not add a research deployment.
 
 ## Trade Tariff Backend Integration (classification_core/trade_tariff_backend/)
 
-`apps/product/backend/classification_core/trade_tariff_backend/` is a separate path from
-the rest of `classification_core/` — it talks to `trade-tariff-backend` over
-HTTP instead of the local Postgres database the rest of this app's
-classification tooling uses. This is the code that runs a classification-
-matrix experiment for the deployed Admin-integrated workflow; the local-DB
-code elsewhere in `classification_core/` remains for offline research and is
-untouched by this.
+`apps/product/backend/classification_core/trade_tariff_backend/` talks to
+Trade Tariff Backend over HTTP. It does not use the local research database.
+Local-DB classification code remains separate research source.
+
+### Worker Contract
+
+Admin creates and tracks runs through Rails. Trade Tariff Backend starts the
+worker. Admin polls Rails for status and results, not the workbench.
+
+| Application route | Contract |
+|---|---|
+| `POST /api/evaluation/runs/{run_id}/start` | Accept an existing backend run. Return 202 with `started` and `run_id`. Return 409 for a duplicate active run on the same worker. |
+| `GET /api/health` | Return `status`, `auth_enabled`, and `product_backend_present`. This checks source presence, not backend connectivity. It does not create research state. |
+| `GET /api/live` | Return `status: ok`. |
+
+The worker fetches the run and its gold queries from the backend. It submits
+searches, polls queued searches, runs the trader simulator when needed, scores
+results, and posts results and terminal run status back to the backend. It
+checks backend cancellation between gold queries. The backend owns gold-set
+generation and the persistent run record. The worker has no status or
+cancellation API of its own.
+
+Set `TRADE_TARIFF_BACKEND_BASE_URL` for the target backend. Simulator calls need
+`CLASSIFICATION_ALLOW_PROVIDER_CALLS` enabled and an OpenAI key. A run can select
+`simulator_model`; the shared default is `gpt-5-mini`. Backend searches have their
+own provider configuration and controls. Research job caps are not worker budget
+limits. Agree the target and budget before any live evaluation.
+
+The worker keeps optional bearer/basic authentication and structured logging.
+The root image uses its TLS entrypoint on port 8443. The secondary image uses
+HTTP on port 8100. Both install `requirements-worker.txt` and exclude research
+APIs, scripts, seed data, and the frontend. The worker CLI remains available.
 
 ### Running an experiment end-to-end
 
-This is the manual, step-by-step path: you create the experiment and the run
-yourself from a `trade-tariff-backend` Rails console — exactly the same way
-the not-yet-built AI-1067 Admin Portal integration will, once it exists — then
-trigger execution. This is the workflow to use to prove the whole integration
-works after this plan has been implemented.
+Admin provides the normal run workflow. The following manual path is for
+authorized diagnosis through a backend Rails console and the worker ingress.
+It can generate shared data and incur provider costs. It is not a health check.
 
 **0. Have a gold query set.** A run scores one saved set of gold queries, chosen
 on its experiment, and fails as soon as it starts if its experiment has none. Create a
@@ -193,36 +245,28 @@ run.id      # => note this, it's needed for step 3
 run.status  # => "queued" — nothing has executed yet
 ```
 
-**3. Execute the run.** Nothing in `trade-tariff-backend` runs a queued run by
-itself — something has to call the eval app and tell it to start. Two ways to
-do that, both landing on the same `execute_run` code:
-
-- **Once AI-1067 exists:** trigger it from `trade-tariff-backend` itself
-  (Admin Portal button, or its own Rails-side call) — out of scope for this
-  repo, tracked separately.
-- **Today, without AI-1067:** call this app's own ingress endpoint directly.
-  Start this app the normal way (`cd apps/classification-evals && ./start.sh`
-  — this is the deployable app, `apps/classification-evals/backend/app.py`,
-  not `apps/product/backend/main.py` directly; see Task 7 for why it has to
-  be that one), with `TRADE_TARIFF_BACKEND_BASE_URL` pointing at the same
-  `trade-tariff-backend` you just used for steps 1-2, then:
+**3. Execute the run.** The backend starts the worker for Admin-created runs.
+For a run created directly in a Rails console, call the ingress explicitly.
+Start the worker with `cd apps/classification-evals && ./start.sh`. This selects
+`backend.worker_app:app`, not either research app. Set
+`TRADE_TARIFF_BACKEND_BASE_URL` to the backend used in steps 1-2 and set `RUN_ID`
+to the approved run ID:
 
   ```bash
-  curl -X POST http://127.0.0.1:8100/api/evaluation/runs/<run.id>/start
-  # => 202 {"started": true, "run_id": "<run.id>"}
+  curl -X POST "http://127.0.0.1:8100/api/evaluation/runs/${RUN_ID}/start"
+  # => 202 {"started": true, "run_id": "..."}; 409 if already active
   ```
 
   This returns immediately — execution happens in the background
-  (`asyncio.create_task`, Task 7). There is no separate status-polling
+  (`asyncio.create_task`). There is no separate status-polling
   endpoint on this app to watch; progress lives in `trade-tariff-backend`
   itself (next step), because that's the one persistent record of the run
   regardless of which of the two trigger paths above started it.
 
   If this app is deployed with `AI_FAN_OUT_BEARER_TOKEN` or
   `AI_FAN_OUT_BASIC_AUTH_USER`/`_PASSWORD` set (see `## Configuration`
-  below), that same optional auth applies to this route too — AI-1067's
-  Rails-side caller will need to send the matching `Authorization` header,
-  the same as any other route on this app.
+  below), the caller must send the matching `Authorization` header. The Rails
+  caller uses the same authentication as a manual caller.
 
 **4. Confirm the results landed in `trade-tariff-backend`** (same Rails
 console as steps 1-2 — re-fetch, don't reuse the in-memory `run` object,
@@ -264,8 +308,8 @@ Rails side, this repo's half of the same design).
 
 This covers the **retrieval and question-asking** cost only — the Rails-side
 LLM calls behind `/searches`. The simulator/trader side of this app (the
-`simulate_trader_answer` calls in `qa_loop.py`, imported unchanged from
-`classification_core.qa_loop`) has no cost or latency tracking of its own
+`simulate_trader_answer` calls imported from
+`classification_core.trader_simulator`) has no cost or latency tracking of its own
 yet — tracked separately as AI-1226, since it needs its own small $/token
 pricing table in Python (`AiUsage::PricingCalculator` isn't callable from
 this repo). Until AI-1226 lands, a run's totals understate a gold query's
@@ -294,14 +338,18 @@ run mode:
 
 ```bash
 cd apps/classification-evals
-cp .env.example .env
+test -f .env || cp .env.example .env
 ```
 
-Common variables:
+The backend URL and simulator gate below apply to the worker. Database,
+OpenSearch, workbench-provider, and `CLASSIFY_EVAL_*` job settings apply to the
+retained research tools, not the worker. Authentication settings are shared.
 
 | Variable | Purpose |
 |---|---|
-| `TARIFF_DB_DSN` | PostgreSQL DSN for the tariff and KG database. |
+| `TRADE_TARIFF_BACKEND_BASE_URL` | Worker target backend URL. |
+| `CLASSIFICATION_ALLOW_PROVIDER_CALLS` | Explicit worker simulator provider-call gate. Backend search spend is controlled separately. |
+| `TARIFF_DB_DSN` | Research PostgreSQL DSN for the tariff and KG database. |
 | `OPENSEARCH_URL` | Optional local OpenSearch URL for the keyword leg. |
 | `OPENSEARCH_INDEX` | Local OpenSearch tariff commodity index name. |
 | `TARIFF_DB_SCHEMA` | Tariff schema name. |
@@ -321,28 +369,21 @@ Use placeholders such as `<database-dsn>`, `<provider-api-key>`, and
 
 ## Deployment Notes
 
-The platform deployment currently builds the repository-root `Dockerfile`. It intentionally runs only a small backend placeholder that responds `OKAY` at `/` and `/healthcheckz`; it does not package the existing frontend, connect to a database, or run evaluation features. Those capabilities will be integrated incrementally through backend APIs.
+The platform builds the repository-root `Dockerfile` and runs the backend-driven
+worker with TLS on port 8443. Health checks use `/api/health`, not `/` or
+`/healthcheckz`. This is an evaluation worker, not a placeholder.
 
-The full evaluation app currently lives in `apps/classification-evals/` for
-local development and future platform integration. It is not included in the
-placeholder deployment. Its Docker Compose setup runs the app with local
-Postgres/pgvector and local OpenSearch services:
+`apps/classification-evals/Dockerfile` defaults to the `worker` target on port
+8100. Its separate `extraction-tools` target keeps the full requirements and
+source for the existing manual and scheduler extraction profiles. It adds no
+research web deployment.
 
-```bash
-cd apps/classification-evals
-cp .env.example .env
-# edit .env with deployment placeholders or secret-store injected values
-docker compose up -d --build
-```
-
-Hydrate the local OpenSearch commodity index from the VM database after the
-tariff snapshot is loaded. The hydrator indexes only current-valid, non-stale
-commodity self-text rows according to tariff validity dates:
-
-```bash
-docker compose exec classification-evals \
-  python scripts/hydrate_opensearch_index.py --recreate
-```
+The existing Compose file retains its local PostgreSQL, OpenSearch, and volumes
+for research and extraction. The `classification-evals` service runs only the
+worker. Do not run research scripts with `docker compose exec
+classification-evals`; those scripts are not in that image. Use the retained
+extraction profile or full local research environment. See
+[`apps/classification-evals/README.md`](apps/classification-evals/README.md).
 
 Before running paid or provider-backed jobs in a deployment:
 
@@ -373,8 +414,6 @@ Before running paid or provider-backed jobs in a deployment:
 
 ## Further Reading
 
-- `apps/classification-evals/README.md` for runner-specific operations.
-- `apps/full/docs/API_ROUTES.md` for route groups.
-- `apps/full/docs/KG_SCHEMA.md` for knowledge graph schema notes.
-- `apps/full/docs/OPERATIONS.md` for operational guidance.
-- `apps/full/docs/SOURCE_INVENTORY.md` for source and fixture inventory.
+- [`apps/classification-evals/README.md`](apps/classification-evals/README.md) for worker and research operations.
+- [`docs/REMOVAL_LEDGER.md`](docs/REMOVAL_LEDGER.md) for source-retention decisions.
+- [`apps/classification-evals/docs/QNA_E2E_CONTRACT.md`](apps/classification-evals/docs/QNA_E2E_CONTRACT.md) for the research Q&A contract.
