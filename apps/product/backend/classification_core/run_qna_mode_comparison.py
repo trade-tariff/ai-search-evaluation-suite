@@ -7,6 +7,12 @@ This runner is intentionally separate from run_hydrated_e2e_matrix.py:
   in final_state.policy_eval for each result row
 - LLM trader answers are cached per gold row + option list so identical
   option sets get identical answers across modes.
+
+Session facts are NOT persisted to the shared KG by default (measurement
+isolation): they land in the classification/qa scopes that later eval
+sessions and readers retrieve from, quietly enriching the corpus a run is
+measured against. Pass --persist-session-facts for intentional enrichment
+runs; trace and result recording is unchanged either way.
 """
 from __future__ import annotations
 
@@ -155,6 +161,7 @@ class EvalContext:
     allow_spend: bool
     simulator_client: Any | None
     answer_cache: dict[str, dict]
+    persist_session_facts: bool = False
 
 
 def _answer_cache_key(gold_id: int, options: list[str]) -> str:
@@ -170,7 +177,9 @@ def _session_fact_authority_tier(gold: dict, answerer: str) -> int:
     """
     source_type = str(gold.get("source_type") or "").lower()
     source_id = str(gold.get("source_id") or "").lower()
-    if answerer == "llm_trader" and (source_type == "atar" or source_id.startswith("atar")):
+    if (answerer == "llm_trader"
+            and (source_type == "atar" or source_id.startswith("atar"))
+            and str(gold.get("oracle_text") or "").strip()):
         return 5
     return 8
 
@@ -232,6 +241,27 @@ async def _choose_answer(
             round_number=round_number,
         )
     return answer, meta, debug, 0
+
+
+def _persist_session_facts_opted_in(*, ctx: EvalContext, commodity_code: str,
+                                   facts, source: str, provenance: dict,
+                                   authority_tier: int) -> dict:
+    """Persist session facts to the shared KG only on explicit opt-in.
+
+    Off by default for measurement isolation: these facts land in the shared
+    classification/qa scopes that later eval sessions and readers retrieve
+    from. The trace/results recording is unchanged either way; only the
+    shared-KG write is gated.
+    """
+    if ctx.persist_session_facts:
+        return qa_loop.persist_session_facts_to_kg(
+            commodity_code=commodity_code,
+            facts=facts,
+            source=source,
+            provenance=provenance,
+            authority_tier=authority_tier,
+        )
+    return qa_loop.session_facts_persist_skipped(facts)
 
 
 async def _evaluate_hydration_mode(gold: dict, ctx: EvalContext, candidates: list[dict]) -> dict:
@@ -315,7 +345,8 @@ async def _evaluate_hydration_mode(gold: dict, ctx: EvalContext, candidates: lis
     state = final_hydration.get("qa_state") or {}
     hard_codes = [str(code) for code in (state.get("in_scope_codes") or [])]
     policy_eval = _policy_eval(candidates, str(gold["expected_code"]), question_trace, hard_codes)
-    persisted_session_facts = qa_loop.persist_session_facts_to_kg(
+    persisted_session_facts = _persist_session_facts_opted_in(
+        ctx=ctx,
         commodity_code=str(gold["expected_code"]),
         facts=[f.__dict__ for f in session.snapshot().values()],
         source=f"qna_session:e2e:{ctx.run_label}:{ctx.question_mode}:{gold['id']}",
@@ -432,7 +463,8 @@ async def _evaluate_staging_eliminate(gold: dict, ctx: EvalContext, candidates: 
             "active_before": final_codes[:50],
         })
     rank = _rank_of(final_codes, str(gold["expected_code"]))
-    persisted_session_facts = qa_loop.persist_session_facts_to_kg(
+    persisted_session_facts = _persist_session_facts_opted_in(
+        ctx=ctx,
         commodity_code=str(gold["expected_code"]),
         facts=[f.__dict__ for f in session.snapshot().values()],
         source=f"qna_session:e2e:{ctx.run_label}:{ctx.question_mode}:{ctx.staging_prompt_mode}:{gold['id']}",
@@ -537,7 +569,8 @@ async def run_mode(conn, *, run_label: str, gold_rows: list[dict], retrieval_run
                    answerer: str, allow_spend: bool, pair_limit: int,
                    personas: list[str], concurrency: int, answer_cache: dict[str, dict],
                    staging_prompt_mode: str,
-                   estimated_call_cost_usd: float, cost_cap_usd: float) -> dict:
+                   estimated_call_cost_usd: float, cost_cap_usd: float,
+                   persist_session_facts: bool = False) -> dict:
     if answerer == "llm_trader":
         if not allow_spend or not openai_allowed() or not os.environ.get("OPENAI_API_KEY"):
             raise SystemExit("llm_trader requires --allow-spend plus CLASSIFICATION_ALLOW_PROVIDER_CALLS=1 and OPENAI_API_KEY")
@@ -580,6 +613,7 @@ async def run_mode(conn, *, run_label: str, gold_rows: list[dict], retrieval_run
             "cost_cap_usd": cost_cap_usd,
             "policy_eval": ["hard_prune", "conservative_prune", "score_only"],
             "staging_prompt_mode": staging_prompt_mode,
+            "persist_session_facts": persist_session_facts,
             "classify_reasoning_effort": os.environ.get("CLASSIFY_REASONING_EFFORT"),
         },
     )
@@ -598,6 +632,7 @@ async def run_mode(conn, *, run_label: str, gold_rows: list[dict], retrieval_run
         allow_spend=allow_spend,
         simulator_client=simulator_client,
         answer_cache=answer_cache,
+        persist_session_facts=persist_session_facts,
     )
     sem = asyncio.Semaphore(concurrency)
     done = 0
@@ -641,6 +676,10 @@ def main() -> None:
     parser.add_argument("--allow-spend", action="store_true")
     parser.add_argument("--cost-cap-usd", type=float, default=30.0)
     parser.add_argument("--estimated-call-cost-usd", type=float, default=0.002)
+    parser.add_argument("--persist-session-facts", action="store_true",
+                        help="Opt in to persisting session facts to the shared KG. Off by "
+                             "default for measurement isolation: persisted facts land "
+                             "in the classification/qa scopes later eval sessions read from.")
     args = parser.parse_args()
 
     personas = [p.strip() for p in args.personas.split(",") if p.strip()]
@@ -700,6 +739,7 @@ def main() -> None:
                     staging_prompt_mode=args.staging_prompt_mode,
                     estimated_call_cost_usd=args.estimated_call_cost_usd,
                     cost_cap_usd=args.cost_cap_usd,
+                    persist_session_facts=args.persist_session_facts,
                 )
 
         asyncio.run(run_all_modes())
