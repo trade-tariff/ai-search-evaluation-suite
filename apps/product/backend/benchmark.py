@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
-from collections import defaultdict
+from collections import defaultdict, deque
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import AsyncIterator
@@ -1241,6 +1241,7 @@ async def run_benchmark(
     judge_count = 0
     judge_tasks: dict[int, asyncio.Task] = {}
     pending_judges: set[int] = set()
+    early_judge_results: deque[tuple] = deque()
 
     if judge_enabled:
         from openai import AsyncOpenAI
@@ -1446,8 +1447,11 @@ async def run_benchmark(
             _, name, data = item
             yield SSEEvent(event=name, data=data)
             continue
+        if kind == "judge_done":
+            # Judges overlap with fan-out; retain results until the judge drain.
+            early_judge_results.append(item)
+            continue
         if kind != "candidate_done":
-            # Defensive: ignore stray items from other phases.
             continue
 
         _, mid, pi, result = item
@@ -1553,7 +1557,10 @@ async def run_benchmark(
                 pending_judges.clear()
                 break
             try:
-                item = await asyncio.wait_for(event_bus.get(), timeout=1.0)
+                if early_judge_results:
+                    item = early_judge_results.popleft()
+                else:
+                    item = await asyncio.wait_for(event_bus.get(), timeout=1.0)
             except asyncio.TimeoutError:
                 now = asyncio.get_running_loop().time()
                 if now - last_wait_event >= 15.0:
