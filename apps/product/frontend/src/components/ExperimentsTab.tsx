@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 type Experiment = {
   rank: number | null;
@@ -517,6 +517,8 @@ function shouldRetryLocalBackend(path: string): boolean {
 }
 
 export default function ExperimentsTab() {
+  const trialRequest = useRef(0);
+  const hydrationRequest = useRef(0);
   const [experiments, setExperiments] = useState<Experiment[]>([]);
   const [selectedRunLabel, setSelectedRunLabel] = useState(TOP_RUN_LABEL);
   const [query, setQuery] = useState("");
@@ -569,6 +571,19 @@ export default function ExperimentsTab() {
     return () => {
       cancelled = true;
     };
+  }, []);
+
+  function invalidateTrial() {
+    trialRequest.current += 1;
+    setRunning(false);
+    setTrial(null);
+    setTrialError(null);
+    resetHydratedQa();
+  }
+
+  useEffect(() => () => {
+    trialRequest.current += 1;
+    hydrationRequest.current += 1;
   }, []);
 
   const selectedExperiment = useMemo(
@@ -629,6 +644,8 @@ export default function ExperimentsTab() {
   async function runTrial(event: FormEvent) {
     event.preventDefault();
     if (!canRun) return;
+    invalidateTrial();
+    const requestId = ++trialRequest.current;
     setRunning(true);
     setTrialError(null);
     setTrial(null);
@@ -648,15 +665,17 @@ export default function ExperimentsTab() {
         }),
       });
       const result = await readJson<TrialResult>(response);
+      if (requestId !== trialRequest.current) return;
       setTrial(result);
     } catch (err) {
+      if (requestId !== trialRequest.current) return;
       setTrialError(
         err instanceof Error
           ? `Retrieval trial unavailable: ${err.message}`
           : "Retrieval trial unavailable.",
       );
     } finally {
-      setRunning(false);
+      if (requestId === trialRequest.current) setRunning(false);
     }
   }
 
@@ -667,6 +686,7 @@ export default function ExperimentsTab() {
     setHydrating(true);
     setHydration(null);
     setHydrationError(null);
+    const requestId = ++hydrationRequest.current;
     try {
       const response = await fetchApi("/api/hydration/candidates", {
         method: "POST",
@@ -692,15 +712,17 @@ export default function ExperimentsTab() {
         }),
       });
       const result = await readJson<CandidateHydrationRun>(response);
+      if (requestId !== hydrationRequest.current) return;
       setHydration(result);
     } catch (err) {
+      if (requestId !== hydrationRequest.current) return;
       setHydrationError(
         err instanceof Error
           ? `Hydrated Q&A unavailable: ${err.message}`
           : "Hydrated Q&A unavailable.",
       );
     } finally {
-      setHydrating(false);
+      if (requestId === hydrationRequest.current) setHydrating(false);
     }
   }
 
@@ -708,6 +730,8 @@ export default function ExperimentsTab() {
     setQaHistory([]);
     setHydration(null);
     setHydrationError(null);
+    hydrationRequest.current += 1;
+    setHydrating(false);
   }
 
   async function buildFreshQa() {
@@ -787,6 +811,7 @@ export default function ExperimentsTab() {
               <select
                 value={selectedRunLabel}
                 onChange={(event) => {
+                  invalidateTrial();
                   setSelectedRunLabel(event.target.value);
                   setAllowProviderCalls(false);
                   setQuestionMode("facet_rules");
@@ -815,6 +840,7 @@ export default function ExperimentsTab() {
                 <input
                   value={query}
                   onChange={(event) => {
+                    invalidateTrial();
                     setQuery(event.target.value);
                     setTrial(null);
                     setHydration(null);
@@ -834,7 +860,7 @@ export default function ExperimentsTab() {
                 </label>
                 <input
                   value={expectedCode}
-                  onChange={(event) => setExpectedCode(event.target.value)}
+                  onChange={(event) => { invalidateTrial(); setExpectedCode(event.target.value); }}
                   name="expected_commodity_code"
                   inputMode="numeric"
                   autoComplete="off"
@@ -859,7 +885,7 @@ export default function ExperimentsTab() {
                   max={500}
                   step={10}
                   value={retrievalLimit}
-                  onChange={(event) => setRetrievalLimit(Number(event.target.value))}
+                  onChange={(event) => { invalidateTrial(); setRetrievalLimit(Number(event.target.value)); }}
                   name="retrieval_limit"
                   autoComplete="off"
                   className="mt-2 w-36 rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
@@ -1105,7 +1131,7 @@ export default function ExperimentsTab() {
                     max={500}
                     step={10}
                     value={hydrateLimit}
-                    onChange={(event) => setHydrateLimit(Number(event.target.value))}
+                    onChange={(event) => { resetHydratedQa(); setHydrateLimit(Number(event.target.value)); }}
                     className="mt-2 w-28 rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100"
                   />
                 </label>

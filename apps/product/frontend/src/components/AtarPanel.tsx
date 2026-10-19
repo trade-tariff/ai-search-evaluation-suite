@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   type AtarDraft,
   approveAtarDraft,
@@ -25,6 +25,21 @@ export default function AtarPanel() {
   const [savingFacts, setSavingFacts] = useState(false);
   const [regenBusy, setRegenBusy] = useState(false);
   const [actionMsg, setActionMsg] = useState("");
+  const actionId = useRef(0);
+
+  function nextAction() {
+    setRegenBusy(false);
+    setSavingFacts(false);
+    return ++actionId.current;
+  }
+
+  function selectDraft(ref: string | null) {
+    if (ref === selectedRef) return;
+    nextAction();
+    setSelectedRef(ref);
+  }
+
+  useEffect(() => () => { actionId.current += 1; }, []);
 
   const refresh = async () => {
     setLoading(true);
@@ -94,58 +109,63 @@ export default function AtarPanel() {
 
   const saveFacts = async () => {
     if (!selected) return;
+    const requestId = nextAction();
     setSavingFacts(true);
     setActionMsg("");
     try {
       const cleaned = factEdits.filter((f) => f.slot.trim() && f.answer.trim());
       const updated = await patchAtarDraft(selected.ref, { gold_facts: cleaned });
       setDrafts((cur) => cur.map((d) => (d.ref === updated.ref ? updated : d)));
-      setActionMsg("Saved.");
+      if (requestId === actionId.current) setActionMsg("Saved.");
     } catch (e) {
-      setActionMsg(`Save failed: ${String(e)}`);
+      if (requestId === actionId.current) setActionMsg(`Save failed: ${String(e)}`);
     } finally {
-      setSavingFacts(false);
+      if (requestId === actionId.current) setSavingFacts(false);
     }
   };
 
   const regenFacts = async () => {
     if (!selected) return;
+    const requestId = nextAction();
     setRegenBusy(true);
     setActionMsg("");
     try {
       const r = await regenerateAtarFacts(selected.ref);
+      if (requestId !== actionId.current) return;
       setFactEdits(r.gold_facts);
       setActionMsg(`Regenerated ${r.gold_facts.length} facts. Save to persist.`);
     } catch (e) {
-      setActionMsg(`Regenerate failed: ${String(e)}`);
+      if (requestId === actionId.current) setActionMsg(`Regenerate failed: ${String(e)}`);
     } finally {
-      setRegenBusy(false);
+      if (requestId === actionId.current) setRegenBusy(false);
     }
   };
 
   const approve = async () => {
     if (!selected) return;
+    const requestId = nextAction();
     setActionMsg("");
     try {
       const cleaned = factEdits.filter((f) => f.slot.trim() && f.answer.trim());
       const r = await approveAtarDraft(selected.ref, cleaned);
-      setActionMsg(`Approved as prompt #${r.prompt_index}.`);
+      if (requestId === actionId.current) setActionMsg(`Approved as prompt #${r.prompt_index}.`);
       await refresh();
     } catch (e) {
-      setActionMsg(`Approve failed: ${String(e)}`);
+      if (requestId === actionId.current) setActionMsg(`Approve failed: ${String(e)}`);
     }
   };
 
   const discard = async () => {
     if (!selected) return;
     if (!confirm(`Discard draft ${selected.ref}?`)) return;
+    const requestId = nextAction();
     setActionMsg("");
     try {
       await discardAtarDraft(selected.ref);
-      setSelectedRef(null);
+      if (requestId === actionId.current) selectDraft(null);
       await refresh();
     } catch (e) {
-      setActionMsg(`Discard failed: ${String(e)}`);
+      if (requestId === actionId.current) setActionMsg(`Discard failed: ${String(e)}`);
     }
   };
 
@@ -241,7 +261,7 @@ export default function AtarPanel() {
           {visible.map((d) => (
             <div
               key={d.ref}
-              onClick={() => setSelectedRef(d.ref)}
+              onClick={() => selectDraft(d.ref)}
               className={`bg-gray-900 rounded p-2.5 cursor-pointer border transition-colors text-xs ${
                 selectedRef === d.ref ? "border-blue-500" : "border-gray-800 hover:border-gray-700"
               }`}
