@@ -60,18 +60,25 @@ deletions when they can be reviewed independently.
 | --- | --- | --- | --- |
 | W01 | Direct offline tests for the simulator used by the backend-driven worker | Merged | [#66](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/66) / `58482da70161a3b072e961afa91513556511b004` |
 | W02 | Separate shared simulator/session facts from local classification and DB imports | Merged | [#67](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/67) / `a1375d525679a50b213fcc5d5c2769708477fc6d` |
-| W03 | Separate the run-start ingress from the product workbench module | In progress | Pending |
-| W04 | Remove copied research APIs from the worker app | Depends on W03 | |
+| W03 | Separate the run-start ingress from the product workbench module | Merged | [#68](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/68) / `6cb8620f1c3d058a3791ce60d2b530507f70b784` |
+| W04 | Remove copied research APIs from the worker app | In progress | Pending |
 | W05 | Remove standalone research job, trial, and matrix routes from the worker app | Depends on W04 | |
 | W06 | Remove the React bundle and workbench routes from the worker image | Depends on W05 | |
 | W07 | Remove research-only code and dependencies from the worker image | Depends on W06 | |
 | W08 | Remove obsolete placeholder/in-use claims and document the worker contract | Depends on worker removals | |
 | R01 | Decide whether to retain or archive the separate journey backend and deployment | Ownership review pending; frontend proposal #37 closed | |
-| R02 | Decide whether to retain or archive extraction, matrix, MCP, and experiment tools | Ownership review pending | |
+| R02 | Decide whether to retain or archive extraction, matrix, MCP, and experiment tools | Retain source and research entrypoint; exclude from worker image in W07 | W04 |
 
 Research code that is not part of the Admin flow is not automatically dead.
 The journey has its own Dockerfile and Compose service. Extraction scripts have
 explicit CLI and scheduled entrypoints. Preserve historical experiment evidence.
-Record a source-backed retention or archive decision for R01 and R02 before
+R02 retains those reachable tools and the workbench API source. The optional
+`backend.research_app:app` entrypoint preserves the copied research APIs without
+loading them in the worker. This adds no research deployment. W05 separates the
+remaining native research routes, and W07 excludes research code from the worker
+image. Operator use remains unverified; removal needs a separate retirement
+decision.
+
+Record a source-backed retention or archive decision for R01 before
 closing this ledger. Do not report the campaign complete while any deletion or
 required decision remains unresolved.
