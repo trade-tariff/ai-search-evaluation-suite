@@ -27,6 +27,11 @@ class DeployableAppEvaluationRoutesTest(unittest.TestCase):
         self.assertEqual(response.status_code, 202)
         self.assertEqual(response.json(), {"started": True, "run_id": "107"})
 
+    def test_copied_workbench_api_is_not_exposed(self):
+        response = self.client.get("/api/config")
+
+        self.assertEqual(response.status_code, 404)
+
     def test_evaluation_start_route_keeps_the_duplicate_run_guard(self):
         ingress._active_evaluation_runs.add("107")
 
