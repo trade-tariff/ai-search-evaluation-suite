@@ -102,23 +102,21 @@ class TradeTariffBackendClient:
         except ValueError:
             return response.text
 
-    async def get_gold_queries(self, set_id: int | str | None = None) -> list[dict]:
-        """Every gold query of one gold query set (of every set when set_id is
-        omitted), flattened to plain dicts and across every page.
-
-        A run scores one saved set, so execute_run always passes the run's
-        set_id. Each row carries its own oracle_text, so a caller needs no
-        second lookup to answer a clarifying question from it.
-
-        Flattened (`attributes` merged with `id`) like every other method here,
-        because callers such as execute_run read `gold["source_type"]` as a flat
-        key — returning raw JSON:API rows made those reads raise KeyError.
+    async def _fetch_all_pages(self, path: str, set_id: int | str | None) -> list[dict]:
+        """GETs every page of one paginated internal collection endpoint, flattened
+        to plain dicts (`attributes` merged with `id`) like every other method on
+        this client — callers such as execute_run read e.g. `gold["source_type"]`
+        as a flat key, and raw JSON:API rows made those reads raise KeyError.
 
         Paginated because the Rails controller defaults to 100 rows per page
         (DEFAULT_PER_PAGE), so a single unpaginated request would silently
-        truncate any larger gold set and score only its first 100 queries while
-        still reporting the run as completed. 250 is that controller's
-        MAX_PER_PAGE, so this asks for the largest page it will serve.
+        truncate a larger set and score only its first 100 rows while still
+        reporting the run as completed. 250 is that controller's MAX_PER_PAGE,
+        so this asks for the largest page it will serve.
+
+        Shared by get_gold_queries and get_synthetic_input_set_items: both
+        endpoints use the same page/per_page/set_id convention and the same
+        JSON:API shape (confirmed against both Rails controllers).
         """
         rows: list[dict] = []
         page = 1
@@ -126,10 +124,7 @@ class TradeTariffBackendClient:
             params: dict[str, Any] = {"page": page, "per_page": 250}
             if set_id is not None:
                 params["set_id"] = set_id
-            body = await self._request(
-                "GET", f"{self._internal_base}/evaluation_gold_queries",
-                params=params,
-            )
+            body = await self._request("GET", f"{self._internal_base}/{path}", params=params)
             page_rows = body["data"]
             rows.extend(row["attributes"] | {"id": row["id"]} for row in page_rows)
 
@@ -141,6 +136,25 @@ class TradeTariffBackendClient:
                 # rows would otherwise loop forever against the same page.
                 return rows
             page += 1
+
+    async def get_gold_queries(self, set_id: int | str | None = None) -> list[dict]:
+        """Every gold query of one gold query set (of every set when set_id is
+        omitted).
+
+        A run scores one saved set, so execute_run always passes the run's
+        set_id. Each row carries its own oracle_text, so a caller needs no
+        second lookup to answer a clarifying question from it.
+        """
+        return await self._fetch_all_pages("evaluation_gold_queries", set_id)
+
+    async def get_synthetic_input_set_items(self, set_id: int | str | None = None) -> list[dict]:
+        """Every item of one synthetic input set (of every set when set_id is
+        omitted) — the AI-1450 endpoint, in the same flattened, paginated shape
+        get_gold_queries returns, so execute_run can read either kind of row
+        through the same per-row loop. Each row's one text snapshot is served as
+        both query and oracle_text (there is no separate ruling text here).
+        """
+        return await self._fetch_all_pages("evaluation_synthetic_input_set_items", set_id)
 
     async def get_atar_ruling(self, ref: str) -> dict:
         body = await self._request("GET", f"{self._internal_base}/atars/{ref}")

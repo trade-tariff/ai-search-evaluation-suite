@@ -97,12 +97,23 @@ async def execute_run(run_id: str, client) -> dict:
                 error_summary=None,
             )
             return {"status": "cancelled", "succeeded": 0, "failed": 0}
-        # A run scores one saved gold query set, chosen on its experiment, so every
-        # run of that experiment is compared like with like. With no set there is
+        # A run scores one saved set, chosen on its experiment, so every run of that
+        # experiment is compared like with like. The set is either a gold query set
+        # or a synthetic input set (AI-1445) — at most one is ever present, enforced
+        # on the backend when the experiment is created. With neither there is
         # nothing to score, so fail now (queued -> failed, never "running") with a
         # message that says what to do, instead of scoring some other set.
-        set_id = run.get("gold_query_set_id")
-        if set_id is None:
+        gold_query_set_id = run.get("gold_query_set_id")
+        synthetic_input_set_id = run.get("synthetic_input_set_id")
+        if gold_query_set_id is not None:
+            set_id, set_kind, row_noun, fetch_rows = (
+                gold_query_set_id, "gold query set", "gold queries", client.get_gold_queries,
+            )
+        elif synthetic_input_set_id is not None:
+            set_id, set_kind, row_noun, fetch_rows = (
+                synthetic_input_set_id, "synthetic input set", "items", client.get_synthetic_input_set_items,
+            )
+        else:
             raise RuntimeError(
                 "its experiment has no gold query set, so there is nothing to score. "
                 "Choose a gold query set for the experiment, then start a new run"
@@ -115,12 +126,12 @@ async def execute_run(run_id: str, client) -> dict:
                 return {"status": "cancelled", "succeeded": 0, "failed": 0}
             raise
 
-        gold_queries = await client.get_gold_queries(set_id)
+        gold_queries = await fetch_rows(set_id)
         if not gold_queries:
             # Deliberately doesn't guess why the set is empty (still generating, every
             # item failed, or something else entirely) — the run has no way to tell, and
             # a wrong guess here is worse than no guess.
-            raise RuntimeError(f"gold query set {set_id} has no gold queries")
+            raise RuntimeError(f"{set_kind} {set_id} has no {row_noun}")
         total_gold_queries = len(gold_queries)
         _log_experiment(
             f"experiment run started run_id={run_id} gold_queries={total_gold_queries}",
@@ -307,7 +318,7 @@ async def execute_run(run_id: str, client) -> dict:
     else:
         final_status = "failed"
 
-    error_summary = f"{failed} of {len(gold_queries)} gold queries failed" if failed else None
+    error_summary = f"{failed} of {len(gold_queries)} {row_noun} failed" if failed else None
     if outer_exc is not None:
         prefix = f"{error_summary}; " if error_summary else ""
         error_summary = f"{prefix}run aborted early: {outer_exc}"

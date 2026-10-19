@@ -66,6 +66,50 @@ GOLD_QUERIES_RESPONSE_PAGE_2 = {
 # scoring has to compare on the first expected_code_digits characters.
 GOLD_QUERY_SIX_DIGIT = _GOLD_QUERY_ROW_2["attributes"] | {"id": _GOLD_QUERY_ROW_2["id"]}
 
+SYNTHETIC_INPUT_SET_ITEMS_RESPONSE = {
+    "data": [
+        {
+            "id": "1",
+            "type": "evaluation_synthetic_input_set_item",
+            "attributes": {
+                "query": "Reusable plastic food storage box with a clip-on lid, made of polypropylene, for household use.",
+                "expected_code": "3924100000",
+                "oracle_text": "Reusable plastic food storage box with a clip-on lid, made of polypropylene, for household use.",
+                "source_type": "synthetic_atar",
+                "source_id": "501",
+                "persona": "raw",
+            },
+        },
+    ],
+    "meta": {"pagination": {"page": 1, "per_page": 20, "total_count": 1}},
+}
+
+_SYNTHETIC_INPUT_SET_ITEM_ROW_2 = {
+    "id": "2",
+    "type": "evaluation_synthetic_input_set_item",
+    "attributes": {
+        "query": "Stainless steel vacuum-insulated water bottle, double-walled, 750ml, screw cap.",
+        "expected_code": "9617001000",
+        "oracle_text": "Stainless steel vacuum-insulated water bottle, double-walled, 750ml, screw cap.",
+        "source_type": "synthetic_atar",
+        "source_id": "502",
+        "persona": "raw",
+    },
+}
+
+# Two pages of the SAME collection (total_count 2, one row per page) -- proves
+# the client keeps requesting pages until it has every row, the same way
+# GOLD_QUERIES_RESPONSE_PAGE_1/2 proves it for get_gold_queries.
+SYNTHETIC_INPUT_SET_ITEMS_RESPONSE_PAGE_1 = {
+    "data": SYNTHETIC_INPUT_SET_ITEMS_RESPONSE["data"],
+    "meta": {"pagination": {"page": 1, "per_page": 1, "total_count": 2}},
+}
+
+SYNTHETIC_INPUT_SET_ITEMS_RESPONSE_PAGE_2 = {
+    "data": [_SYNTHETIC_INPUT_SET_ITEM_ROW_2],
+    "meta": {"pagination": {"page": 2, "per_page": 1, "total_count": 2}},
+}
+
 ATAR_RULING_RESPONSE = {
     "data": {
         "id": "600004365",
@@ -93,6 +137,7 @@ RUN_SHOW_RESPONSE = {
         "attributes": {
             "experiment_id": "42",
             "gold_query_set_id": 5,
+            "synthetic_input_set_id": None,
             "status": "queued",
             "triggered_by": "operator",
             "configuration_digest": "abc123def4567890",
