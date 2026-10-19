@@ -331,16 +331,22 @@ def _row_to_dict(row: sqlite3.Row, *, include_internal: bool = False) -> dict:
 
 def _refresh_job(row: sqlite3.Row, *, include_internal: bool = False) -> dict:
     job = _row_to_dict(row, include_internal=include_internal)
-    if job["status"] == "running" and job["pid"]:
+    if job["status"] in ("running", "stopping") and job["pid"]:
         with _PROCESS_LOCK:
             process = _PROCESSES.get(job["id"])
         if process is not None:
             code = process.poll()
             if code is not None:
                 _record_exit(job["id"], code)
-                job["status"] = "succeeded" if code == 0 else "failed"
+                if job["status"] == "stopping":
+                    job["status"] = "cancelled"
+                else:
+                    job["status"] = "succeeded" if code == 0 else "failed"
                 job["returncode"] = code
-        else:
+        elif job["status"] == "running":
+            # A running row without a local process handle belongs to another
+            # runner instance or a restarted process; only that case is
+            # unknowable. A stopping row is finalised by its own stop flow.
             _record_exit(job["id"], -1, status="unknown_exit")
             job["status"] = "unknown_exit"
             job["returncode"] = -1
@@ -352,21 +358,31 @@ def _log_experiment(event: str, message: str, **fields: object) -> None:
 
 
 def _record_exit(job_id: str, returncode: int, status: str | None = None) -> None:
-    final_status = status or ("succeeded" if returncode == 0 else "failed")
+    # The status choice and the transition are one atomic statement so the
+    # transition stays monotonic: only a row still in running or stopping can
+    # move to a terminal status, and a terminal status is never overwritten.
+    # A job that was in stopping exited after a requested stop, so an explicit
+    # status wins, a requested stop is recorded as cancelled, and only an
+    # unrequested exit is succeeded or failed by its return code.
     with _connect() as conn:
-        # Only the caller that moves the job out of running or stopping logs the finish.
-        # A poll, the watcher, and stop can all observe the same exit.
         changed = conn.execute(
             """
             UPDATE jobs
-               SET status=?, returncode=?, updated_at=?
+               SET status=CASE
+                        WHEN ? IS NOT NULL THEN ?
+                        WHEN status='stopping' THEN 'cancelled'
+                        WHEN ?=0 THEN 'succeeded'
+                        ELSE 'failed'
+                    END,
+                   returncode=?, updated_at=?
              WHERE id=? AND status IN ('running', 'stopping')
             """,
-            (final_status, returncode, time.time(), job_id),
+            (status, status, returncode, returncode, time.time(), job_id),
         ).rowcount
-        row = conn.execute("SELECT request_json FROM jobs WHERE id=?", (job_id,)).fetchone()
+        row = conn.execute("SELECT status, request_json FROM jobs WHERE id=?", (job_id,)).fetchone()
     if changed != 1:
         return
+    final_status = row["status"]
     with _PROCESS_LOCK:
         _PROCESSES.pop(job_id, None)
     request = {}
@@ -1528,11 +1544,49 @@ def get_job(job_id: str) -> dict:
     return _refresh_job(row)
 
 
+def _schedule_stop_escalation(job_id: str, process: subprocess.Popen) -> None:
+    # Bounded escalation: a job that ignores SIGTERM is killed after a grace
+    # period. The watcher then records the exit as cancelled.
+    grace = _env_float("CLASSIFY_EVAL_STOP_GRACE_SECONDS", 30.0)
+    if grace <= 0:
+        return
+
+    def escalate() -> None:
+        time.sleep(grace)
+        with _PROCESS_LOCK:
+            current = _PROCESSES.get(job_id)
+        if current is not process or process.poll() is not None:
+            return
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            return
+        _log_experiment(
+            "experiment_run_stop_escalated",
+            f"experiment run stop escalated to SIGKILL job_id={job_id}",
+            job_id=job_id,
+        )
+
+    threading.Thread(target=escalate, name=f"stop-escalation-{job_id}", daemon=True).start()
+
+
 @app.post("/api/jobs/{job_id}/stop")
 def stop_job(job_id: str) -> dict:
     job = get_job(job_id)
     if job["status"] != "running" or not job["pid"]:
         return job
+    # Record the stop intent BEFORE signalling: the conditional update only
+    # claims a still-running row, so it cannot overwrite a terminal status the
+    # watcher has already recorded. The watcher's transition is equally
+    # conditional, so the first side to move wins and the row never gets stuck
+    # in stopping.
+    with _connect() as conn:
+        changed = conn.execute(
+            "UPDATE jobs SET status=?, updated_at=? WHERE id=? AND status=?",
+            ("stopping", time.time(), job_id, "running"),
+        ).rowcount
+    if changed != 1:
+        return get_job(job_id)
     with _PROCESS_LOCK:
         process = _PROCESSES.get(job_id)
     if process is None:
@@ -1542,11 +1596,7 @@ def stop_job(job_id: str) -> dict:
         os.killpg(process.pid, signal.SIGTERM)
     except ProcessLookupError:
         pass
-    with _connect() as conn:
-        conn.execute(
-            "UPDATE jobs SET status=?, updated_at=? WHERE id=?",
-            ("stopping", time.time(), job_id),
-        )
+    _schedule_stop_escalation(job_id, process)
     return get_job(job_id)
 
 
