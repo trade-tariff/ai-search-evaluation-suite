@@ -250,9 +250,48 @@ class RunQaSessionViaBackendTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["final_candidates"], SEARCH_RESPONSE_PENDING_QUESTION["data"])
         self.assertEqual(len(client.calls), 1)
 
-    async def test_stops_at_max_rounds_without_converging_if_questions_never_stop(self):
-        # Every response still has a pending question — max_rounds must cap the loop.
+    async def test_makes_one_terminal_call_after_max_rounds_without_answering_an_extra_question(self):
+        # Every /searches response still asks a question, so the loop answers
+        # max_rounds of them. InteractiveSearchService provides a forced best
+        # answer only once answers.size >= max_rounds, so the loop must end
+        # with one more call that submits every answer and answers nothing,
+        # not stop at max_rounds calls with no final answer.
         client = FakeClient([SEARCH_RESPONSE_PENDING_QUESTION] * 4)
+
+        with patch(
+            "classification_core.trade_tariff_backend.qa_loop.simulate_trader_answer",
+            new=AsyncMock(return_value={
+                "chosen": "Textile", "choice_index": 1, "slot": "material", "reasoning": "",
+                "simulator_failed": False, "attempts": 1, "last_error": None,
+            }),
+        ) as mocked_answer:
+            result = await run_qa_session_via_trade_tariff_backend(
+                client=client, sim_client="fake-openai-client", query="women's trainers",
+                oracle_text="ruling text", run_time_overrides={}, max_rounds=2,
+            )
+
+        self.assertFalse(result["converged"])
+        # One terminal call beyond the max_rounds rounds, and no extra answer.
+        self.assertEqual(len(client.calls), 3)
+        self.assertEqual(mocked_answer.await_count, 2)
+        self.assertEqual(len(client.calls[2]["answers_so_far"]), 2)
+        self.assertEqual(
+            client.calls[2]["answers_so_far"][0],
+            {"question": "What are the uppers made of?", "answer": "Textile", "options": ["Leather", "Textile", "Man-made", "Other"]},
+        )
+        # Every round including the terminal one gets its own request_id.
+        self.assertNotEqual(client.calls[2]["request_id"], client.calls[1]["request_id"])
+
+    async def test_the_terminal_call_surfaces_the_forced_best_answer_when_the_backend_provides_one(self):
+        # Round 1 asks a question (simulator answers), round 2 asks another,
+        # then the terminal call carries both answers and the backend returns
+        # its forced best answer: converged, with the terminal response's
+        # candidates and usage folded in.
+        client = FakeClient([
+            SEARCH_RESPONSE_PENDING_QUESTION,
+            SEARCH_RESPONSE_PENDING_QUESTION,
+            SEARCH_RESPONSE_CONVERGED,
+        ])
 
         with patch(
             "classification_core.trade_tariff_backend.qa_loop.simulate_trader_answer",
@@ -266,7 +305,36 @@ class RunQaSessionViaBackendTest(unittest.IsolatedAsyncioTestCase):
                 oracle_text="ruling text", run_time_overrides={}, max_rounds=2,
             )
 
+        self.assertTrue(result["converged"])
+        self.assertEqual(result["final_candidates"], SEARCH_RESPONSE_CONVERGED["data"])
+        self.assertEqual(len(client.calls), 3)
+        # The terminal call answers no extra question, so questions_answered
+        # stays at the two the simulator committed.
+        self.assertEqual(result["questions_answered"], 2)
+        # Round usage 0.0021 + round usage 0.0021 + terminal usage 0.0035.
+        self.assertAlmostEqual(result["cost_usd"], 0.0021 + 0.0021 + 0.0035)
+        self.assertEqual(result["provider_calls"], 3)
+        self.assertTrue(result["forced_answer_request_id"])
+        self.assertEqual(client.calls[2]["request_id"], result["forced_answer_request_id"])
+
+    async def test_a_terminal_call_that_still_gets_a_question_back_reports_nonconvergence_with_its_request_id(self):
+        client = FakeClient([SEARCH_RESPONSE_PENDING_QUESTION] * 3)
+
+        with patch(
+            "classification_core.trade_tariff_backend.qa_loop.simulate_trader_answer",
+            new=AsyncMock(return_value={
+                "chosen": "Textile", "choice_index": 1, "slot": "material", "reasoning": "",
+                "simulator_failed": False, "attempts": 1, "last_error": None,
+            }),
+        ):
+            result = await run_qa_session_via_trade_tariff_backend(
+                client=client, sim_client="fake-openai-client", query="women's trainers",
+                oracle_text="ruling text", run_time_overrides={}, max_rounds=1,
+            )
+
         self.assertFalse(result["converged"])
+        self.assertFalse(result["simulator_failed"])
+        self.assertTrue(result["forced_answer_request_id"])
         self.assertEqual(len(client.calls), 2)
 
     async def test_question_trace_records_every_round_including_a_failed_one(self):

@@ -14,7 +14,7 @@ from openai import AsyncOpenAI
 from classification_core.provider_guard import TRUE_VALUES, openai_allowed
 
 from .client import TradeTariffBackendUnavailableError, TradeTariffBackendValidationError
-from .qa_loop import run_qa_session_via_trade_tariff_backend
+from .qa_loop import QASessionError, run_qa_session_via_trade_tariff_backend
 
 _experiment_log = logging.getLogger("experiment")
 
@@ -206,6 +206,15 @@ async def execute_run(run_id: str, client) -> dict:
                     # Never score a fabricated answer — route it through the same
                     # failure-recording path as any other exception below.
                     raise RuntimeError("simulator exhausted its retries without producing an answer")
+                if not session_result.get("converged"):
+                    # converged=False with simulator_failed=False means no best
+                    # answer was ever provided, so the candidates below are not
+                    # a committed answer. Raising routes it through the failure
+                    # path, which posts the session's question_trace for drill-in.
+                    raise RuntimeError(
+                        "search never provided a best answer: it still asked a clarifying "
+                        "question after the maximum number of rounds"
+                    )
 
                 final_candidates = session_result["final_candidates"]
                 # Indexed directly, not via .get(): a search response missing these
@@ -230,7 +239,11 @@ async def execute_run(run_id: str, client) -> dict:
                     "gold_in_top1": _matches_gold(final_code, expected_code, expected_code_digits),
                     "gold_in_top5": any(_matches_gold(c, expected_code, expected_code_digits) for c in top5_codes),
                     "error": None,
-                    "trace": {"question_trace": session_result.get("question_trace", [])},
+                    "trace": {
+                        "question_trace": session_result.get("question_trace", []),
+                        **({"forced_answer_request_id": session_result["forced_answer_request_id"]}
+                           if session_result.get("forced_answer_request_id") else {}),
+                    },
                     # .get() with a default, not direct indexing: every real
                     # run_qa_session_via_trade_tariff_backend call includes these
                     # (see qa_loop.py's usage_totals()), but a genuinely absent key
@@ -257,19 +270,19 @@ async def execute_run(run_id: str, client) -> dict:
                         run_id=run_id,
                     )
                 try:
-                    # (session_result or {}): a simulator failure leaves a real trace up to
-                    # the round that broke — the exact round an operator investigating this
-                    # failure most needs to see — but session_result is still None on the
-                    # rarer path where the session call itself raised before returning
-                    # anything. Usage so far is worth recording too: a round that burned real
-                    # cost/latency/provider calls before failing still burned them.
-                    usage = session_result or {}
+                    # Terminal search errors carry completed-round usage even
+                    # though the session call did not return a result.
+                    usage = session_result or (exc.partial_result if isinstance(exc, QASessionError) else {})
                     await client.post_result({
                         "run_id": run_id, "source_type": source_type, "source_id": source_id,
                         "persona": persona, "expected_code": expected_code, "final_code": None,
                         "final_rank": None,
                         "gold_in_top1": False, "gold_in_top5": False, "error": str(exc),
-                        "trace": {"question_trace": usage.get("question_trace", [])},
+                        "trace": {
+                            "question_trace": usage.get("question_trace", []),
+                            **({"forced_answer_request_id": usage["forced_answer_request_id"]}
+                               if usage.get("forced_answer_request_id") else {}),
+                        },
                         "cost_usd": usage.get("cost_usd", 0.0),
                         "latency_seconds": usage.get("latency_seconds", 0.0),
                         "provider_calls": usage.get("provider_calls", 0),

@@ -11,6 +11,11 @@ existing classification_core.qa_loop — they never touched the database
 (oracle_text is already a plain string parameter), so there is nothing to
 adapt about them.
 
+After max_rounds answered questions the loop makes one terminal /searches
+call with the full answer set and no extra answer: InteractiveSearchService
+in trade-tariff-backend provides its forced best answer only once
+answers.size >= max_rounds.
+
 On simulator failure: simulate_trader_answer exhausts its own internal
 retries (SIMULATOR_MAX_RETRIES) before returning simulator_failed=True with
 chosen=None. The loop below stops immediately in that case rather than
@@ -26,6 +31,14 @@ from __future__ import annotations
 import uuid
 
 from classification_core.qa_loop import SessionFacts, simulate_trader_answer
+
+
+class QASessionError(RuntimeError):
+    """Keep completed-round usage and trace when the terminal search fails."""
+
+    def __init__(self, message: str, partial_result: dict):
+        super().__init__(message)
+        self.partial_result = partial_result
 
 
 def _pending_question(search_response: dict) -> dict | None:
@@ -122,4 +135,53 @@ async def run_qa_session_via_trade_tariff_backend(
 
         answers_so_far.append({"question": pending["question"], "answer": sim_result["chosen"], "options": options})
 
+    # Terminal call. The loop submits round r with the r-1 answers collected
+    # so far, so after max_rounds rounds it has answered every allowed question
+    # but never requested the final answer. InteractiveSearchService provides
+    # its forced best answer only once answers.size >= max_rounds, so the
+    # contract for getting that answer is one more /searches call with the
+    # full answer set and no extra answer. A degenerate empty loop
+    # (max_rounds <= 0) has no answers to submit, so it keeps the old shape.
+    if answers_so_far:
+        request_id = str(uuid.uuid4())
+        try:
+            response = await client.search(
+                query=query, answers_so_far=answers_so_far,
+                run_time_overrides=run_time_overrides, request_id=request_id,
+            )
+        except Exception as exc:
+            raise QASessionError(str(exc), {
+                "final_candidates": [], "converged": False, "simulator_failed": False,
+                "forced_answer_request_id": request_id,
+                **usage_totals(),
+                # The failed request may have incurred unreported provider cost.
+                "pricing_known": False,
+            }) from exc
+        usage = (response.get("meta") or {}).get("usage")
+        if usage:
+            total_cost_usd += usage.get("total_cost_usd") or 0
+            total_duration_ms += usage.get("duration_ms") or 0
+            total_provider_calls += usage.get("provider_calls") or 0
+            pricing_known = pricing_known and usage.get("pricing_known", True)
+
+        if _pending_question(response) is None:
+            return {
+                "final_candidates": response.get("data") or [],
+                "converged": True,
+                "simulator_failed": False,
+                "forced_answer_request_id": request_id,
+                **usage_totals(),
+            }
+
+        # Residual nonconvergence: even with max_rounds answers on record the
+        # backend asked another question instead of a forced best answer (for
+        # example a max_rounds override that disagrees with the loop's own).
+        # Reported as converged=False with the terminal request_id for drill-in.
+        return {
+            "final_candidates": response.get("data") or [],
+            "converged": False,
+            "simulator_failed": False,
+            "forced_answer_request_id": request_id,
+            **usage_totals(),
+        }
     return {"final_candidates": response.get("data") or [], "converged": False, "simulator_failed": False, **usage_totals()}

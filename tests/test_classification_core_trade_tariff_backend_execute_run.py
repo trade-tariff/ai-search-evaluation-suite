@@ -19,6 +19,7 @@ from classification_core_trade_tariff_backend_fixtures import (
     GOLD_QUERIES_RESPONSE,
     GOLD_QUERY_SIX_DIGIT,
     RUN_SHOW_RESPONSE,
+    SEARCH_RESPONSE_PENDING_QUESTION,
 )
 
 
@@ -164,6 +165,59 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(client.post_result_calls[0]["trace"], {"question_trace": trace})
 
+    async def test_terminal_request_id_is_preserved_for_success_and_nonconvergence(self):
+        for converged in (True, False):
+            with self.subTest(converged=converged):
+                client = FakeClient()
+                with patch(
+                    "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+                    new=AsyncMock(return_value={
+                        "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
+                        "converged": converged,
+                        "simulator_failed": False,
+                        "forced_answer_request_id": "terminal-fixture",
+                    }),
+                ):
+                    await execute_run("107", client)
+                self.assertEqual(client.post_result_calls[0]["trace"], {
+                    "question_trace": [], "forced_answer_request_id": "terminal-fixture",
+                })
+
+    async def test_terminal_search_errors_preserve_completed_round_usage_and_trace(self):
+        for error in (TimeoutError("terminal request timed out"),
+                      TradeTariffBackendUnavailableError("terminal backend unavailable")):
+            with self.subTest(error=error):
+                client = FakeClient()
+                client.run_attrs["effective_configuration"] = {
+                    **client.run_attrs["effective_configuration"], "max_rounds": 1,
+                }
+                client.search = AsyncMock(side_effect=[SEARCH_RESPONSE_PENDING_QUESTION, error])
+                with (
+                    patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}),
+                    patch("classification_core.trade_tariff_backend.execute_run.openai_allowed", return_value=True),
+                    patch("classification_core.trade_tariff_backend.execute_run.AsyncOpenAI", return_value=object()),
+                    patch("classification_core.trade_tariff_backend.qa_loop.simulate_trader_answer",
+                          new=AsyncMock(return_value={"chosen": "Textile", "slot": "material"})),
+                ):
+                    summary = await execute_run("107", client)
+
+                self.assertEqual(summary, {"status": "failed", "succeeded": 0, "failed": 1})
+                self.assertEqual(client.search.await_count, 2)
+                self.assertEqual(len(client.post_result_calls), 1)
+                posted = client.post_result_calls[0]
+                self.assertEqual(posted["error"], str(error))
+                self.assertIsNone(posted["final_code"])
+                self.assertFalse(posted["gold_in_top1"])
+                self.assertAlmostEqual(posted["cost_usd"], 0.0021)
+                self.assertAlmostEqual(posted["latency_seconds"], 0.54)
+                self.assertEqual(posted["provider_calls"], 1)
+                self.assertFalse(posted["pricing_known"])
+                self.assertEqual(posted["trace"]["question_trace"][0]["chosen"], "Textile")
+                self.assertEqual(posted["trace"]["forced_answer_request_id"],
+                                 client.search.await_args_list[1].kwargs["request_id"])
+                self.assertEqual(posted["trace"]["question_trace"][0]["request_id"],
+                                 client.search.await_args_list[0].kwargs["request_id"])
+
     async def test_a_session_result_missing_question_trace_posts_an_empty_one_rather_than_raising(self):
         # Same defensive-default reasoning as the existing cost_usd/latency_seconds/provider_calls
         # test just above this one in the file — plenty of tests in this file mock
@@ -283,6 +337,33 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         self.assertAlmostEqual(posted["latency_seconds"], 0.8)
         self.assertEqual(posted["provider_calls"], 2)
         self.assertFalse(posted["pricing_known"])
+
+    async def test_residual_nonconvergence_is_recorded_as_a_failed_result_not_a_clean_success(self):
+        # converged=False with simulator_failed=False means no best answer was
+        # ever provided, so the returned candidates are not a committed answer.
+        # Scoring them anyway would post a clean success with error=None and
+        # corrupt the metrics this suite exists to measure.
+        client = FakeClient()
+        trace = [{"round": 1, "question": "What material?", "chosen": "Rubber", "simulator_failed": False}]
+
+        with patch(
+            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            new=AsyncMock(return_value={
+                "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
+                "converged": False, "simulator_failed": False, "question_trace": trace,
+            }),
+        ):
+            summary = await execute_run("107", client)
+
+        self.assertEqual(client.update_run_calls, ["running", "failed"])
+        self.assertEqual(len(client.post_result_calls), 1)
+        posted = client.post_result_calls[0]
+        self.assertIsNotNone(posted["error"])
+        self.assertFalse(posted["gold_in_top1"])
+        self.assertFalse(posted["gold_in_top5"])
+        # The trace up to the nonconvergent terminal call still reaches the backend.
+        self.assertEqual(posted["trace"], {"question_trace": trace})
+        self.assertEqual(summary, {"status": "failed", "succeeded": 0, "failed": 1})
 
     async def test_stops_processing_remaining_gold_queries_once_the_run_is_cancelled(self):
         client = FakeClient()
