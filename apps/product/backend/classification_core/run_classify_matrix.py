@@ -90,6 +90,23 @@ def _est_session_cost(model: str, classify_calls: int, sim_calls: int) -> float:
     return round(classify_calls * cc + sim_calls * _SIM_CALL_USD, 5)
 
 
+def _session_fact_authority_tier(gold: dict, oracle_text: str = "",
+                                 rounds: list[dict] | None = None) -> int:
+    """Use ATAR authority only for verified oracle-backed simulator answers.
+
+    Mixed, fallback, human, or unrecorded answer sources stay at tier 8.
+    """
+    source_type = str(gold.get("source_type") or "").lower()
+    source_id = str(gold.get("source_id") or "").lower()
+    sources = [turn.get("answer_source") for turn in rounds or []
+               if turn.get("chosen") is not None]
+    if ((source_type == "atar" or source_id.startswith("atar"))
+            and oracle_text.strip() and sources
+            and all(source == "simulator" for source in sources)):
+        return 5
+    return 8
+
+
 def build_config(strategy: str, prompt_mode: str, augmentation: str,
                  candidate_limit: int, fact_excl, edge_excl) -> dict:
     aug = AUGMENTATIONS[augmentation]
@@ -195,9 +212,9 @@ async def run_one_session(gold: dict, oracle_text: str, *, strategy: str,
             "prompt_mode": prompt_mode,
             "augmentation": augmentation,
             "model": model,
-            "source_authority_tier": _session_fact_authority_tier(gold),
+            "source_authority_tier": _session_fact_authority_tier(gold, oracle_text, result.get("rounds")),
         },
-        authority_tier=_session_fact_authority_tier(gold),
+        authority_tier=_session_fact_authority_tier(gold, oracle_text, result.get("rounds")),
     )
     result["persisted_session_facts"] = persisted_session_facts
 
@@ -243,7 +260,7 @@ async def run_one_session(gold: dict, oracle_text: str, *, strategy: str,
 async def run_config(conn, *, run_label: str, strategy: str, prompt_mode: str,
                      augmentation: str, model: str, candidate_limit: int,
                      personas: list[str], limit: int | None, concurrency: int,
-                     max_rounds: int) -> list[dict]:
+                     max_rounds: int) -> tuple[list[dict], list[dict]]:
     os.environ["CLASSIFY_LLM_MODEL"] = model  # both classify + eliminate read this
 
     with conn.cursor() as cur:
@@ -281,6 +298,9 @@ async def run_config(conn, *, run_label: str, strategy: str, prompt_mode: str,
 
     sem = asyncio.Semaphore(concurrency)
     results: list[dict] = []
+    # Counted per session so an all-failure run is reported as unsuccessful,
+    # not silently empty.
+    failures: list[dict] = []
 
     async def process(gold):
         async with sem:
@@ -294,12 +314,18 @@ async def run_config(conn, *, run_label: str, strategy: str, prompt_mode: str,
                 )
             except Exception as exc:
                 print(f"  [error] {gold['source_id']} {gold['persona']}: {exc!r}")
-                return None
+                return {
+                    "failure": True,
+                    "source_id": gold.get("source_id"),
+                    "persona": gold.get("persona"),
+                    "error": repr(exc),
+                }
 
     tasks = [process(g) for g in gold_rows]
     for task in asyncio.as_completed(tasks):
         res = await task
-        if res is None:
+        if res.get("failure"):
+            failures.append(res)
             continue
         res["config"] = {**res["config"], "gold_set": {"n": len(gold_rows), "md5": gold_sig}}
         results.append(res)
@@ -328,7 +354,10 @@ async def run_config(conn, *, run_label: str, strategy: str, prompt_mode: str,
                 ),
             )
             conn.commit()
-    return results
+    if failures:
+        print(f"[{run_label}] {len(failures)}/{len(gold_rows)} sessions failed; "
+              f"first: {failures[0]['source_id']} {failures[0]['persona']}: {failures[0]['error']}")
+    return results, failures
 
 
 def _print_summary(run_label: str, results: list[dict]) -> None:
@@ -412,16 +441,27 @@ async def main() -> None:
         combos = [(args.run_label, args.strategy, args.prompt_mode, args.augmentation)]
 
     started = time.time()
+    total_results = 0
+    total_failures = 0
     for label, strategy, prompt_mode, aug in combos:
-        results = await run_config(
+        results, failures = await run_config(
             conn, run_label=label, strategy=strategy, prompt_mode=prompt_mode,
             augmentation=aug, model=args.model, candidate_limit=args.candidate_limit,
             personas=personas, limit=args.limit, concurrency=args.concurrency,
             max_rounds=args.max_rounds,
         )
         _print_summary(label, results)
+        total_results += len(results)
+        total_failures += len(failures)
     print(f"\nTotal wall time: {time.time() - started:.1f}s")
+    if total_failures:
+        print(f"{total_failures} session(s) failed across all run_labels")
     conn.close()
+    if not total_results:
+        # No session produced a row: every session failed, or no gold row was
+        # selected. Never exit 0 on work that scored nothing.
+        print("no session produced results: run unsuccessful", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
