@@ -37,11 +37,11 @@ source files. A merged entry needs a pull request link and merge commit.
 | F10 | `trader-journey/components/Stepper.tsx` | Merged | [#62](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/62) / `0f0db62e50f851bbad32c2ca756e0c3f95685f91` |
 | F11 | `trader-journey/components/Money.tsx` | Merged | [#63](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/63) / `21b138cbe15159385445c18d86a81e562871631f` |
 | F12 | `trader-journey/api.ts` | Merged | [#64](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/64) / `bbf63bc47217ed7290b06fd79a226105aca251b3` |
-| F13 | `trader-journey/types.ts` | In progress | Pending |
+| F13 | `trader-journey/types.ts` | Merged | [#65](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/65) / `d7cd5f484332481c78046f2f569f82e2aac6b461` |
 
 P01 moved `Stage` to the shared types file before F04 so that Stepper could
 still type-check. F05-F12 removed the remaining Journey components and API
-client. F13 removes the shared types file after those consumers.
+client. F13 removed the shared types file after those consumers.
 
 The workbench entrypoint `src/main.tsx` renders only `App`. It does not import
 the Journey code. [PR #37](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/37)
@@ -58,7 +58,7 @@ deletions when they can be reviewed independently.
 
 | ID | Candidate or prerequisite | State | Pull request / merge commit |
 | --- | --- | --- | --- |
-| W01 | Direct offline tests for the simulator used by the backend-driven worker | Queued prerequisite | |
+| W01 | Direct offline tests for the simulator used by the backend-driven worker | In progress | Pending |
 | W02 | Separate shared simulator/session facts from local classification and DB imports | Depends on W01 | |
 | W03 | Separate the run-start ingress from the product workbench module | Depends on W02 | |
 | W04 | Remove copied research APIs from the worker app | Depends on W03 | |
