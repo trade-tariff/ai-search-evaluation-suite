@@ -41,6 +41,9 @@ PRODUCT_APP_ROOT = Path(
 PRODUCT_BACKEND = PRODUCT_APP_ROOT / "backend"
 if str(PRODUCT_BACKEND) not in sys.path:
     sys.path.insert(0, str(PRODUCT_BACKEND))
+
+from evaluation_ingress import router as evaluation_router
+
 STATE_DIR = Path(os.environ.get("CLASSIFY_EVAL_STATE_DIR", APP_ROOT / "var")).resolve()
 JOBS_DIR = STATE_DIR / "jobs"
 DB_PATH = STATE_DIR / "jobs.sqlite"
@@ -65,6 +68,7 @@ app = FastAPI(
     description="AI search evaluation suite with retrieval, classification, KG, ATaR, benchmark, and intercept tooling.",
 )
 install_optional_auth(app, realm="AI Search Evaluation Suite")
+app.include_router(evaluation_router)
 
 
 @app.middleware("http")
@@ -1962,7 +1966,6 @@ _DEPLOYABLE_WORKBENCH_PREFIXES = (
     "/api/complexity/",
     "/api/atar/",
     "/api/benchmark/",
-    "/api/evaluation/",
     "/api/kg/",
 )
 
