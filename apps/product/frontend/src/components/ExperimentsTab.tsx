@@ -536,6 +536,7 @@ export default function ExperimentsTab() {
   const [qaHistory, setQaHistory] = useState<QaHistoryEntry[]>([]);
   const [hydrationError, setHydrationError] = useState<string | null>(null);
   const [hydration, setHydration] = useState<CandidateHydrationRun | null>(null);
+  const [pendingHydration, setPendingHydration] = useState<{ body: string; history: QaHistoryEntry[] } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -633,6 +634,7 @@ export default function ExperimentsTab() {
     setTrialError(null);
     setTrial(null);
     setHydration(null);
+    setPendingHydration(null);
     setQaHistory([]);
     setHydrationError(null);
     try {
@@ -660,39 +662,42 @@ export default function ExperimentsTab() {
     }
   }
 
-  async function hydrateTrial(history: QaHistoryEntry[] = qaHistory) {
+  async function hydrateTrial(history: QaHistoryEntry[] = qaHistory, retryBody?: string) {
     if (!trial || !canHydrate) return;
     const candidates = currentCandidatePool.map(asHydrationCandidate);
     const limit = Math.max(1, Math.min(hydrateLimit, candidates.length, retrievalLimit));
+    const body = retryBody ?? JSON.stringify({
+      query: trial.query,
+      candidates,
+      candidate_limit: candidates.length,
+      hydrate_limit: limit,
+      question_mode: questionMode,
+      question_model: questionModel,
+      qa_history: history,
+      summarize: false,
+      lexical_specificity: trial.lexical_specificity,
+      query_difficulty: trial.query_difficulty,
+      allow_spend: allowProviderCalls && questionMode !== "facet_rules",
+      config: {
+        retrieval: { limit: trial.retrieval_limit },
+        use_llm_question_wording: allowProviderCalls && questionMode !== "facet_rules",
+        question_wording_model: questionModel,
+      },
+      sources: { ...qaContext },
+    });
+    setPendingHydration({ body, history });
     setHydrating(true);
-    setHydration(null);
     setHydrationError(null);
     try {
       const response = await fetchApi("/api/hydration/candidates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query: trial.query,
-          candidates,
-          candidate_limit: candidates.length,
-          hydrate_limit: limit,
-          question_mode: questionMode,
-          question_model: questionModel,
-          qa_history: history,
-          summarize: false,
-          lexical_specificity: trial.lexical_specificity,
-          query_difficulty: trial.query_difficulty,
-          allow_spend: allowProviderCalls && questionMode !== "facet_rules",
-          config: {
-            retrieval: { limit: trial.retrieval_limit },
-            use_llm_question_wording: allowProviderCalls && questionMode !== "facet_rules",
-            question_wording_model: questionModel,
-          },
-          sources: { ...qaContext },
-        }),
+        body,
       });
       const result = await readJson<CandidateHydrationRun>(response);
       setHydration(result);
+      setQaHistory(history);
+      setPendingHydration(null);
     } catch (err) {
       setHydrationError(
         err instanceof Error
@@ -705,13 +710,13 @@ export default function ExperimentsTab() {
   }
 
   function resetHydratedQa() {
+    setPendingHydration(null);
     setQaHistory([]);
     setHydration(null);
     setHydrationError(null);
   }
 
   async function buildFreshQa() {
-    setQaHistory([]);
     await hydrateTrial([]);
   }
 
@@ -730,7 +735,6 @@ export default function ExperimentsTab() {
         mode: hydration.question_hint.mode || questionMode,
       },
     ];
-    setQaHistory(nextHistory);
     await hydrateTrial(nextHistory);
   }
 
@@ -791,6 +795,7 @@ export default function ExperimentsTab() {
                   setAllowProviderCalls(false);
                   setQuestionMode("facet_rules");
                   setTrial(null);
+                  setPendingHydration(null);
                   setHydration(null);
                   setQaHistory([]);
                   setTrialError(null);
@@ -817,6 +822,7 @@ export default function ExperimentsTab() {
                   onChange={(event) => {
                     setQuery(event.target.value);
                     setTrial(null);
+                    setPendingHydration(null);
                     setHydration(null);
                     setQaHistory([]);
                     setTrialError(null);
@@ -1223,7 +1229,17 @@ export default function ExperimentsTab() {
             )}
             {hydrationError && (
               <div className="mt-4 rounded border border-red-900 bg-red-950/40 p-3 text-sm text-red-100">
-                {hydrationError}
+                <div role="alert">{hydrationError}</div>
+                {pendingHydration && (
+                  <button
+                    type="button"
+                    disabled={!canHydrate}
+                    onClick={() => hydrateTrial(pendingHydration.history, pendingHydration.body)}
+                    className="mt-2 rounded bg-emerald-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  >
+                    Retry Q&A request
+                  </button>
+                )}
               </div>
             )}
           </div>
