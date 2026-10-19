@@ -15,7 +15,7 @@
   }
 
   .tj-input {
-    @apply block min-h-[44px] w-full border-2 border-gray-600 bg-gray-950 px-3 py-2 text-base text-gray-100 shadow-none outline-none transition placeholder:text-gray-500 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:border-gray-800 disabled:bg-gray-900 disabled:text-gray-500;
+    @apply block min-h-[44px] w-full border-2 border-gray-600 bg-gray-950 px-3 py-2 text-base text-gray-100 shadow-none outline-hidden transition placeholder:text-gray-500 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:border-gray-800 disabled:bg-gray-900 disabled:text-gray-500;
     color-scheme: dark;
   }
 
@@ -33,10 +33,10 @@
   }
 
   .tj-btn {
-    @apply inline-flex min-h-[44px] items-center justify-center border-2 border-blue-500 bg-blue-500 px-4 py-2 text-sm font-bold text-white transition hover:border-blue-400 hover:bg-blue-400 focus:outline-none focus:ring-4 focus:ring-blue-500/40 disabled:cursor-not-allowed disabled:border-gray-700 disabled:bg-gray-700 disabled:text-gray-400;
+    @apply inline-flex min-h-[44px] items-center justify-center border-2 border-blue-500 bg-blue-500 px-4 py-2 text-sm font-bold text-white transition hover:border-blue-400 hover:bg-blue-400 focus:outline-hidden focus:ring-4 focus:ring-blue-500/40 disabled:cursor-not-allowed disabled:border-gray-700 disabled:bg-gray-700 disabled:text-gray-400;
   }
 
   .tj-btn-secondary {
-    @apply inline-flex min-h-[44px] items-center justify-center border-2 border-gray-600 bg-gray-900 px-4 py-2 text-sm font-bold text-gray-100 transition hover:border-gray-400 hover:bg-gray-800 focus:outline-none focus:ring-4 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:border-gray-800 disabled:bg-gray-900 disabled:text-gray-500;
+    @apply inline-flex min-h-[44px] items-center justify-center border-2 border-gray-600 bg-gray-900 px-4 py-2 text-sm font-bold text-gray-100 transition hover:border-gray-400 hover:bg-gray-800 focus:outline-hidden focus:ring-4 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:border-gray-800 disabled:bg-gray-900 disabled:text-gray-500;
   }
 }

@@ -1052,7 +1052,7 @@ export default function ClassifyStage({ state, update, onNext }: Props) {
                           <button
                             onClick={() => answer(turn.question!.question, o)}
                             disabled={loading || hydratingTarget === "candidates"}
-                            className="w-full text-left border-2 border-gray-700 bg-gray-900 px-4 py-3 text-gray-400 hover:bg-gray-800 focus:outline-none focus:ring-4 focus:ring-blue-500"
+                            className="w-full text-left border-2 border-gray-700 bg-gray-900 px-4 py-3 text-gray-400 hover:bg-gray-800 focus:outline-hidden focus:ring-4 focus:ring-blue-500"
                           >
                             {o}
                           </button>
@@ -1064,7 +1064,7 @@ export default function ClassifyStage({ state, update, onNext }: Props) {
                         key={`${o}-${i}`}
                         onClick={() => answer(turn.question!.question, o)}
                         disabled={loading || hydratingTarget === "candidates"}
-                        className="w-full text-left border-2 border-gray-600 bg-gray-900 px-4 py-3 hover:bg-gray-800 focus:outline-none focus:ring-4 focus:ring-blue-500"
+                        className="w-full text-left border-2 border-gray-600 bg-gray-900 px-4 py-3 hover:bg-gray-800 focus:outline-hidden focus:ring-4 focus:ring-blue-500"
                       >
                         <span className="font-semibold">{prettyOption(o)}</span>
                       </button>

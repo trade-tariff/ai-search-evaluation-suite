@@ -227,7 +227,7 @@ export default function JudgePanel() {
               if (e.target.value === "__custom") return;
               selectPreset(e.target.value);
             }}
-            className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+            className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-hidden focus:border-blue-500"
           >
             {JUDGE_MODEL_PRESETS.map((p) => (
               <option key={p.id} value={p.id}>
@@ -321,7 +321,7 @@ export default function JudgePanel() {
                 setDraft({ ...draft, system_prompt: e.target.value })
               }
               rows={20}
-              className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-blue-500 resize-y"
+              className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm font-mono focus:outline-hidden focus:border-blue-500 resize-y"
               placeholder="Enter custom system prompt..."
             />
             <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
@@ -412,7 +412,7 @@ export default function JudgePanel() {
                 min={500}
                 max={200000}
                 step={1000}
-                className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-hidden focus:border-blue-500"
               />
               <p className="text-xs text-gray-500 mt-1">
                 Reference and target response text are truncated to this length
@@ -443,7 +443,7 @@ export default function JudgePanel() {
                       }
                       min={0}
                       step={0.1}
-                      className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                      className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-hidden focus:border-blue-500"
                     />
                   </div>
                   <div className="flex-1">
@@ -462,7 +462,7 @@ export default function JudgePanel() {
                       }
                       min={0}
                       step={0.1}
-                      className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                      className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-hidden focus:border-blue-500"
                     />
                   </div>
                 </div>
@@ -485,7 +485,7 @@ export default function JudgePanel() {
                   setDraft({ ...draft, model: e.target.value })
                 }
                 placeholder="e.g. gpt-5.2"
-                className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+                className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-hidden focus:border-blue-500"
               />
               <p className="text-xs text-gray-500 mt-1">
                 Override the model ID directly. Use this for models not in the
