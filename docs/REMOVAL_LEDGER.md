@@ -59,8 +59,8 @@ deletions when they can be reviewed independently.
 | ID | Candidate or prerequisite | State | Pull request / merge commit |
 | --- | --- | --- | --- |
 | W01 | Direct offline tests for the simulator used by the backend-driven worker | Merged | [#66](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/66) / `58482da70161a3b072e961afa91513556511b004` |
-| W02 | Separate shared simulator/session facts from local classification and DB imports | In progress | Pending |
-| W03 | Separate the run-start ingress from the product workbench module | Depends on W02 | |
+| W02 | Separate shared simulator/session facts from local classification and DB imports | Merged | [#67](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/67) / `a1375d525679a50b213fcc5d5c2769708477fc6d` |
+| W03 | Separate the run-start ingress from the product workbench module | In progress | Pending |
 | W04 | Remove copied research APIs from the worker app | Depends on W03 | |
 | W05 | Remove standalone research job, trial, and matrix routes from the worker app | Depends on W04 | |
 | W06 | Remove the React bundle and workbench routes from the worker image | Depends on W05 | |

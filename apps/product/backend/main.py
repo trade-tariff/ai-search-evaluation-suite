@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import asyncio
 import csv
 import io
 import json
-import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,8 +20,7 @@ from benchmark import (
     load_saved_run,
     run_benchmark,
 )
-from classification_core.trade_tariff_backend.client import TradeTariffBackendClient
-from classification_core.trade_tariff_backend.execute_run import execute_run
+from evaluation_ingress import router as evaluation_router
 from config import load_config, save_config
 from judge import detect_response_type
 from prompts import get_prompt_detail, list_prompts
@@ -57,22 +54,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 install_optional_auth(app)
+app.include_router(evaluation_router)
 
 RESULTS_DIR = Path(__file__).parent.parent / "results"
 RESULTS_DIR.mkdir(exist_ok=True)
-
-# Guards against starting two concurrent executions of the same evaluation
-# run_id (mirrors benchmark.py's is_run_active() guard for /api/benchmark/start).
-_active_evaluation_runs: set[str] = set()
-# asyncio.create_task() only keeps a WEAK reference to the Task it returns —
-# per the stdlib docs, a task with no other strong reference can be garbage
-# collected mid-execution, silently abandoning it before its finally block
-# (the one that releases _active_evaluation_runs) ever runs. Every other
-# fire-and-forget asyncio.create_task call in this codebase (benchmark.py,
-# intercept_retrieval.py) already retains a reference for exactly this
-# reason — this set does the same, and the done-callback below removes the
-# entry once the task finishes so this doesn't grow without bound.
-_background_evaluation_tasks: set[asyncio.Task] = set()
 
 
 def _workbench_spend_enabled(payload: dict | object | None = None) -> bool:
@@ -2828,34 +2813,6 @@ def api_export_csv():
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
-
-
-@app.post("/api/evaluation/runs/{run_id}/start", status_code=202)
-async def api_start_evaluation_run(run_id: str):
-    if run_id in _active_evaluation_runs:
-        raise HTTPException(409, f"Run {run_id} is already being executed.")
-
-    _active_evaluation_runs.add(run_id)
-
-    async def _run_and_release():
-        try:
-            client = TradeTariffBackendClient()
-            try:
-                await execute_run(run_id, client)
-            finally:
-                await client.aclose()
-        finally:
-            _active_evaluation_runs.discard(run_id)
-
-    task = asyncio.create_task(_run_and_release())
-    _background_evaluation_tasks.add(task)
-    task.add_done_callback(_background_evaluation_tasks.discard)
-    logging.getLogger("experiment").info(
-        "experiment run accepted run_id=%s",
-        run_id,
-        extra={"event": "experiment_run_started", "run_id": run_id},
-    )
-    return {"started": True, "run_id": run_id}
 
 
 @app.get("/api/eval-cost/summary")
