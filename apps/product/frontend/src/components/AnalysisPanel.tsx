@@ -1175,6 +1175,17 @@ export default function AnalysisPanel() {
         </section>
       )}
 
+      {summaries.some((s) => (s.failed_count ?? 0) > 0) && (
+        <section className="rounded-lg border border-amber-800/50 bg-amber-950/20 p-3 text-xs text-amber-200">
+          <p>Some attempts failed. Accuracy counts failed attempts as misses when an answer key is available. Recorded costs include failed attempts.</p>
+          <ul className="mt-2 space-y-1">
+            {summaries.filter((s) => (s.failed_count ?? 0) > 0).map((s) => (
+              <li key={s.model_id}>{s.model_name}: {s.failed_count} of {s.attempted_count} attempts failed.</li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {/* Regression summary banner - visible when Compare With is active */}
       {comparing && compareResults && (() => {
         // Score deltas per model on our strongest signal (top1_accuracy).

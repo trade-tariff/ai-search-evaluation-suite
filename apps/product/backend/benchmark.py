@@ -616,6 +616,31 @@ async def _run_qa_loop(
     )
 
 
+def _evaluate_failure(result: CompletionResult, gold_code: str | None, has_reference: bool = False) -> EvaluationResult:
+    evaluation = _evaluate_gold_only(result, gold_code)
+    evaluation.error = result.error
+    evaluation.schema_valid = 0.0
+    evaluation.question_efficiency = 0.0
+    evaluation.rounds_efficiency = 0.0
+    if gold_code:
+        evaluation.gold_top1_match = False
+        evaluation.gold_top3_hit = False
+        evaluation.gold_top5_hit = False
+        evaluation.gold_reciprocal_rank = 0.0
+        evaluation.gold_heading_match = False
+        evaluation.gold_chapter_match = False
+        evaluation.gold_hierarchical_score = 0.0
+    if has_reference:
+        evaluation.top1_match = False
+        evaluation.top3_hit = False
+        evaluation.top5_overlap = 0.0
+        evaluation.mean_reciprocal_rank = 0.0
+        evaluation.heading_match = False
+        evaluation.chapter_match = False
+        evaluation.hierarchical_score = 0.0
+    return evaluation
+
+
 def compute_summaries(run: BenchmarkRun, model_map: dict) -> list[ModelSummary]:
     """Aggregate per-model summaries from whatever the run has so far.
 
@@ -632,6 +657,20 @@ def compute_summaries(run: BenchmarkRun, model_map: dict) -> list[ModelSummary]:
     evals_by_model: dict[str, list[EvaluationResult]] = defaultdict(list)
     for ev in run.evaluations:
         evals_by_model[ev.model_id].append(ev)
+
+    # Older/interrupted runs may have error completions without evaluations.
+    # Recover their outcomes without changing the saved run or looking up
+    # today's prompt labels for a historical experiment.
+    evaluated = {(ev.model_id, ev.prompt_index) for ev in run.evaluations}
+    gold_by_prompt = {ev.prompt_index: ev.gold_code for ev in run.evaluations if ev.gold_code}
+    references = {r.prompt_index: r for r in run.consensus_results}
+    for result in [*run.model_results, *run.consensus_results]:
+        if result.error and (result.model_id, result.prompt_index) not in evaluated:
+            reference = references.get(result.prompt_index)
+            evals_by_model[result.model_id].append(_evaluate_failure(
+                result, gold_by_prompt.get(result.prompt_index),
+                has_reference=not run.gold_mode and reference is not None and not reference.error,
+            ))
 
     # Index completion results by model_id so we can attribute simulator stats.
     # Consensus rows aggregate across all panel members.
@@ -661,6 +700,8 @@ def compute_summaries(run: BenchmarkRun, model_map: dict) -> list[ModelSummary]:
         err_count = sum(1 for e in evals if e.judge_error)
 
         sim_completions = completions_by_model.get(mid, [])
+        recorded_cost = (sum(c.total_cost or c.cost for c in sim_completions)
+                         if sim_completions else sum(e.total_cost for e in evals))
         sim_total_cost = sum(c.total_simulator_cost for c in sim_completions)
         total_questions = sum(
             sum(len(r.questions_asked) for r in c.rounds) for c in sim_completions
@@ -740,13 +781,16 @@ def compute_summaries(run: BenchmarkRun, model_map: dict) -> list[ModelSummary]:
         summary = ModelSummary(
             model_id=mid,
             model_name=name,
+            attempted_count=n,
+            failed_count=sum(bool(e.error) for e in evals),
+            success_rate=round(sum(not e.error for e in evals) / n, 4),
             avg_cosine_similarity=_none_safe_mean([e.cosine_similarity for e in evals], 4),
             avg_code_match_score=_none_safe_mean([e.code_match_score for e in evals], 4),
             avg_delta_score=_none_safe_mean([e.delta_score for e in evals], 4),
             avg_total_latency_ms=round(sum(e.total_latency_ms for e in evals) / n, 1),
             avg_speed_factor=_none_safe_mean([e.speed_factor for e in evals], 3),
-            total_cost=round(sum(e.total_cost for e in evals), 6),
-            avg_cost_per_classification=round(sum(e.total_cost for e in evals) / n, 6),
+            total_cost=round(recorded_cost, 6),
+            avg_cost_per_classification=round(recorded_cost / n, 6),
             top1_accuracy=round(sum(1 for e in evals if e.top1_match) / n, 4) if has_reference else None,
             avg_top5_overlap=_none_safe_mean([e.top5_overlap for e in evals], 4),
             avg_rounds=round(sum(e.total_rounds for e in evals) / n, 2),
@@ -1470,14 +1514,26 @@ async def run_benchmark(
         # prompt's gold_code (if any) so candidates get scored against the
         # known-correct answer in addition to the reference.
         consensus = consensus_results.get(result.prompt_index)
-        if gold_mode_effective and not result.error:
+        if result.error:
+            _current_run.evaluations.append(_evaluate_failure(
+                result, get_gold_code(result.prompt_index),
+                has_reference=consensus is not None and not consensus.error,
+            ))
+            issue = {
+                "kind": "error", "source": "candidate", "model_id": mid,
+                "prompt_index": pi, "message": result.error[:240],
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            _current_run.issues.append(issue)
+            yield SSEEvent(event="task:failed", data=issue)
+        elif gold_mode_effective:
             # Gold mode: no consensus exists. Score against gold only;
             # reference-agreement fields stay None.
             evaluation = _evaluate_gold_only(
                 result, get_gold_code(result.prompt_index),
             )
             _current_run.evaluations.append(evaluation)
-        elif consensus and not result.error:
+        elif consensus:
             evaluation = evaluate_pair(
                 consensus, result, gold_code=get_gold_code(result.prompt_index),
             )

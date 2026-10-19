@@ -214,6 +214,9 @@ export interface EvaluationResult {
 export interface ModelSummary {
   model_id: string;
   model_name: string;
+  attempted_count?: number;
+  failed_count?: number;
+  success_rate?: number | null;
   // Reference-comparison aggregates: null in gold mode (no reference)
   avg_cosine_similarity: number | null;
   avg_code_match_score: number | null;

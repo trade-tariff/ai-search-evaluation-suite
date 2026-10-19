@@ -254,6 +254,7 @@ class CompletionResult(BaseModel):
 class EvaluationResult(BaseModel):
     model_id: str
     prompt_index: int
+    error: Optional[str] = None
     # ── Deterministic code-agreement signals vs reference ─────────────
     # All Optional: in gold mode there is no reference/consensus, so every
     # reference-agreement field is None ("not evaluated", distinct from 0).
@@ -312,6 +313,9 @@ class EvaluationResult(BaseModel):
 class ModelSummary(BaseModel):
     model_id: str
     model_name: str
+    attempted_count: int = 0
+    failed_count: int = 0
+    success_rate: Optional[float] = None
     # Reference-comparison aggregates are Optional: in gold mode there is no
     # reference/consensus, so they are None ("not evaluated"), never 0.0.
     avg_cosine_similarity: Optional[float]
