@@ -27,13 +27,13 @@ class DeployableAppEvaluationRoutesTest(unittest.TestCase):
         self.assertEqual(response.status_code, 202)
         self.assertEqual(response.json(), {"started": True, "run_id": "107"})
 
-    def test_evaluation_router_is_registered_once_without_a_copied_route(self):
-        endpoints = [
-            route.endpoint for route in deployable_app.routes
-            if getattr(route, "path", None) == "/api/evaluation/runs/{run_id}/start"
-            and "POST" in (getattr(route, "methods", None) or set())
-        ]
-        self.assertEqual(endpoints, [ingress.api_start_evaluation_run])
+    def test_evaluation_start_route_keeps_the_duplicate_run_guard(self):
+        ingress._active_evaluation_runs.add("107")
+
+        response = self.client.post("/api/evaluation/runs/107/start")
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json(), {"detail": "Run 107 is already being executed."})
 
 
 if __name__ == "__main__":
