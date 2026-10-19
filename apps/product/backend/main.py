@@ -6,6 +6,7 @@ import io
 import json
 import logging
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -2725,28 +2726,33 @@ def api_benchmark_results():
     return _serialise_run(run)
 
 
-@app.get("/api/benchmark/export/json")
-def api_export_json():
-    run = get_current_run()
+def _run_for_export(run_id: str | None):
+    if run_id is None or run_id == "current":
+        run = get_current_run()
+    else:
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", run_id):
+            raise HTTPException(422, "Invalid run ID")
+        run = load_saved_run(run_id)
     if run is None:
-        raise HTTPException(404, "No benchmark run")
+        raise HTTPException(404, "Benchmark run not found")
+    return run
 
+
+@app.get("/api/benchmark/export/json")
+def api_export_json(run_id: str | None = None):
+    run = _run_for_export(run_id)
     filename = f"benchmark_{run.id}.json"
-    path = RESULTS_DIR / filename
-    path.write_text(run.model_dump_json(indent=2))
 
     return StreamingResponse(
-        io.BytesIO(path.read_bytes()),
+        io.BytesIO(run.model_dump_json(indent=2).encode()),
         media_type="application/json",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 
 @app.get("/api/benchmark/export/csv")
-def api_export_csv():
-    run = get_current_run()
-    if run is None:
-        raise HTTPException(404, "No benchmark run")
+def api_export_csv(run_id: str | None = None):
+    run = _run_for_export(run_id)
 
     output = io.StringIO()
     writer = csv.writer(output)
@@ -2817,9 +2823,6 @@ def api_export_csv():
         ])
 
     filename = f"benchmark_{run.id}.csv"
-    path = RESULTS_DIR / filename
-    path.write_text(output.getvalue())
-
     output.seek(0)
     return StreamingResponse(
         io.BytesIO(output.getvalue().encode()),

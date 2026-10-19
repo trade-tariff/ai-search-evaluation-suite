@@ -263,12 +263,14 @@ export async function getEvalCostSummary(limit = 20): Promise<EvalCostSummary> {
   return json(`/eval-cost/summary?limit=${limit}`);
 }
 
-export function exportJsonUrl(): string {
-  return `${BASE}/benchmark/export/json`;
+export function exportJsonUrl(runId = "current"): string {
+  const query = runId === "current" ? "" : `?run_id=${encodeURIComponent(runId)}`;
+  return `${BASE}/benchmark/export/json${query}`;
 }
 
-export function exportCsvUrl(): string {
-  return `${BASE}/benchmark/export/csv`;
+export function exportCsvUrl(runId = "current"): string {
+  const query = runId === "current" ? "" : `?run_id=${encodeURIComponent(runId)}`;
+  return `${BASE}/benchmark/export/csv${query}`;
 }
 
 // --- Prompt authoring ---

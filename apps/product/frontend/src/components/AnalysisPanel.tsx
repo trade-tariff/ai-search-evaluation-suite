@@ -1132,14 +1132,14 @@ export default function AnalysisPanel() {
           </select>
         </div>
         <a
-          href={exportCsvUrl()}
+          href={exportCsvUrl(selectedRunId)}
           className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded text-sm"
           download
         >
           Export CSV
         </a>
         <a
-          href={exportJsonUrl()}
+          href={exportJsonUrl(selectedRunId)}
           className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded text-sm"
           download
         >
