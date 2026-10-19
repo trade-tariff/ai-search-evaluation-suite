@@ -2424,26 +2424,30 @@ async def api_prompts_save(payload: dict):
     Request: {"raw_query": str, "processed_query": str, "formatted_results": [...]}
     Response: {"index": int, "total": int}
     """
-    from pathlib import Path
-
     raw_query = str(payload.get("raw_query", "")).strip()
     results = payload.get("formatted_results", [])
     if not raw_query or not isinstance(results, list) or len(results) == 0:
         raise HTTPException(400, "raw_query and non-empty formatted_results required")
 
-    data_path = Path(__file__).parent.parent / "data" / "search_contexts.json"
-    data = json.loads(data_path.read_text())
-    # New index = max existing + 1 so we don't collide with existing prompts
-    max_idx = max((q["index"] for q in data["queries"]), default=0)
-    new_idx = max_idx + 1
-    data["queries"].append({
-        "index": new_idx,
-        "raw_query": raw_query,
-        "processed_query": str(payload.get("processed_query") or raw_query),
-        "result_count": len(results),
-        "formatted_results": results,
-    })
-    data_path.write_text(json.dumps(data, indent=2))
+    # search_contexts.json is shared mutable state. atar.approve_draft
+    # appends to the same file, so both writers allocate max index + 1 under
+    # the same lock or two concurrent saves/approvals overwrite each other's
+    # prompt. The lock and atomic write live in atar, the single owner of the
+    # file's write path.
+    import atar
+    with atar._ATAR_LOCK:
+        data = json.loads(atar.SEARCH_CONTEXTS_PATH.read_text())
+        # New index = max existing + 1 so we don't collide with existing prompts
+        max_idx = max((q["index"] for q in data["queries"]), default=0)
+        new_idx = max_idx + 1
+        data["queries"].append({
+            "index": new_idx,
+            "raw_query": raw_query,
+            "processed_query": str(payload.get("processed_query") or raw_query),
+            "result_count": len(results),
+            "formatted_results": results,
+        })
+        atar._write_json_atomic(atar.SEARCH_CONTEXTS_PATH, data)
     # Bust the in-memory cache so list_prompts reflects the new entry.
     from prompts import _cached_data  # noqa: F401 - exists for side-effect
     import prompts as prompts_mod

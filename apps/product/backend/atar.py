@@ -32,7 +32,10 @@ main.py's API endpoints and the AtarPanel UI.
 from __future__ import annotations
 
 import json
+import os
 import re
+import tempfile
+import threading
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -52,6 +55,13 @@ USER_AGENT = "ai-fan-out atar-research-scraper/1.0"
 DATA_DIR = Path(__file__).parent.parent / "data"
 DRAFTS_PATH = DATA_DIR / "atar_drafts.json"
 SEARCH_CONTEXTS_PATH = DATA_DIR / "search_contexts.json"
+
+# Serialises every read-modify-write of the shared JSON files. Endpoint
+# handlers run on worker threads, so two approvals used to both read the same
+# max prompt index and one overwrote the other's query. The deployment is a
+# single process, so one process-wide lock is enough; the write itself is
+# atomic (temp file + rename) so a crash cannot leave a truncated file.
+_ATAR_LOCK = threading.RLock()
 
 # gpt-5.4 low: same simulator-class model used elsewhere; cheap and good
 # enough at slot canonicalisation.
@@ -283,6 +293,23 @@ async def extract_facts(client: AsyncOpenAI, ruling: AtarRuling) -> list[dict]:
 # ─── Draft persistence ─────────────────────────────────────────────────────
 
 
+def _write_json_atomic(path: Path, data: dict) -> None:
+    """Write JSON via a temp file and rename so readers never see a partial
+    file and a crash mid-write cannot corrupt the target."""
+    payload = json.dumps(data, indent=2)
+    fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=path.name + ".", suffix=".tmp")
+    tmp_path = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w") as fh:
+            fh.write(payload)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(tmp_path, path)
+    except BaseException:
+        tmp_path.unlink(missing_ok=True)
+        raise
+
+
 def _read_drafts_file() -> dict:
     if not DRAFTS_PATH.exists():
         return {"drafts": []}
@@ -293,7 +320,7 @@ def _read_drafts_file() -> dict:
 
 
 def _write_drafts_file(data: dict) -> None:
-    DRAFTS_PATH.write_text(json.dumps(data, indent=2))
+    _write_json_atomic(DRAFTS_PATH, data)
 
 
 def list_drafts() -> list[dict]:
@@ -308,32 +335,37 @@ def get_draft(ref: str) -> dict | None:
 
 
 def upsert_draft(draft: AtarDraft) -> None:
-    data = _read_drafts_file()
-    drafts = data.get("drafts", [])
-    out = [d for d in drafts if d.get("ref") != draft.ref]
-    out.append(asdict(draft))
-    data["drafts"] = out
-    _write_drafts_file(data)
+    with _ATAR_LOCK:
+        data = _read_drafts_file()
+        drafts = data.get("drafts", [])
+        out = [d for d in drafts if d.get("ref") != draft.ref]
+        out.append(asdict(draft))
+        data["drafts"] = out
+        _write_drafts_file(data)
 
 
 def update_draft_fields(ref: str, **fields: Any) -> dict | None:
     """Patch fields on an existing draft (e.g. user-edited gold_facts after
     approval review). Returns the updated draft, or None if not found."""
-    data = _read_drafts_file()
-    for d in data.get("drafts", []):
-        if d.get("ref") == ref:
-            d.update(fields)
-            _write_drafts_file(data)
-            return d
+    with _ATAR_LOCK:
+        data = _read_drafts_file()
+        for d in data.get("drafts", []):
+            if d.get("ref") == ref:
+                d.update(fields)
+                _write_drafts_file(data)
+                return d
     return None
 
 
 def discard_draft(ref: str) -> bool:
-    data = _read_drafts_file()
-    before = len(data.get("drafts", []))
-    data["drafts"] = [d for d in data.get("drafts", []) if d.get("ref") != ref]
-    _write_drafts_file(data)
-    return len(data["drafts"]) < before
+    with _ATAR_LOCK:
+        data = _read_drafts_file()
+        before = len(data.get("drafts", []))
+        data["drafts"] = [d for d in data.get("drafts", []) if d.get("ref") != ref]
+        changed = len(data["drafts"]) < before
+        if changed:
+            _write_drafts_file(data)
+    return changed
 
 
 # ─── Approval: promote a draft into search_contexts.json ───────────────────
@@ -347,42 +379,53 @@ def approve_draft(ref: str, override_facts: list[dict] | None = None) -> dict:
     If override_facts is provided, it replaces draft.gold_facts before
     promotion (UI lets the user edit before clicking approve).
     """
-    draft = get_draft(ref)
-    if draft is None:
-        raise ValueError(f"draft {ref} not found")
-    if draft.get("status") == "approved":
-        raise ValueError(f"draft {ref} already approved as prompt #{draft.get('approved_prompt_index')}")
+    # One locked transaction covers the draft lookup, the prompt-index
+    # allocation, both file writes, and the draft status flip. Approvals run
+    # on worker threads, so anything less lets two approvals allocate the
+    # same index and one silently overwrites the other's query.
+    with _ATAR_LOCK:
+        data = _read_drafts_file()
+        draft = next(
+            (d for d in data.get("drafts", []) if d.get("ref") == ref), None
+        )
+        if draft is None:
+            raise ValueError(f"draft {ref} not found")
+        if draft.get("status") == "approved":
+            raise ValueError(f"draft {ref} already approved as prompt #{draft.get('approved_prompt_index')}")
 
-    if override_facts is not None:
-        # Validate shape
-        cleaned = []
-        for f in override_facts:
-            if not isinstance(f, dict):
-                continue
-            slot = str(f.get("slot", "")).strip()
-            answer = str(f.get("answer", "")).strip()
-            if slot and answer:
-                cleaned.append({"slot": slot, "answer": answer})
-        draft["gold_facts"] = cleaned
+        if override_facts is not None:
+            # Validate shape
+            cleaned = []
+            for f in override_facts:
+                if not isinstance(f, dict):
+                    continue
+                slot = str(f.get("slot", "")).strip()
+                answer = str(f.get("answer", "")).strip()
+                if slot and answer:
+                    cleaned.append({"slot": slot, "answer": answer})
+            draft["gold_facts"] = cleaned
 
-    contexts = json.loads(SEARCH_CONTEXTS_PATH.read_text())
-    max_idx = max((q["index"] for q in contexts["queries"]), default=0)
-    new_idx = max_idx + 1
-    contexts["queries"].append({
-        "index": new_idx,
-        "raw_query": draft["raw_query"],
-        "processed_query": draft["raw_query"],
-        "result_count": len(draft["formatted_results"]),
-        "formatted_results": draft["formatted_results"],
-        "gold_code": draft["gold_code"],
-        "gold_facts": draft["gold_facts"],
-        "oracle_text": draft["oracle_text"],
-        "source": f"atar:{ref}",
-    })
-    SEARCH_CONTEXTS_PATH.write_text(json.dumps(contexts, indent=2))
+        contexts = json.loads(SEARCH_CONTEXTS_PATH.read_text())
+        max_idx = max((q["index"] for q in contexts["queries"]), default=0)
+        new_idx = max_idx + 1
+        contexts["queries"].append({
+            "index": new_idx,
+            "raw_query": draft["raw_query"],
+            "processed_query": draft["raw_query"],
+            "result_count": len(draft["formatted_results"]),
+            "formatted_results": draft["formatted_results"],
+            "gold_code": draft["gold_code"],
+            "gold_facts": draft["gold_facts"],
+            "oracle_text": draft["oracle_text"],
+            "source": f"atar:{ref}",
+        })
+        _write_json_atomic(SEARCH_CONTEXTS_PATH, contexts)
 
-    # Flip draft status; bust the prompts cache.
-    update_draft_fields(ref, status="approved", approved_prompt_index=new_idx)
+        # Flip draft status inside the same transaction.
+        draft.update(status="approved", approved_prompt_index=new_idx)
+        _write_drafts_file(data)
+
+    # Bust the prompts cache.
     import prompts as prompts_mod  # noqa: WPS433 - circular avoidance
     prompts_mod._cached_data = None
 
