@@ -24,11 +24,11 @@ source files. A merged entry needs a pull request link and merge commit.
 
 | ID | Candidate | State | Pull request / merge commit |
 | --- | --- | --- | --- |
-| F01 | `components/CompareTab.tsx` | In progress | Pending |
-| F02 | `components/TraderJourneyTab.tsx` | Check competing entrypoint | |
+| F01 | `components/CompareTab.tsx` | Merged | [#51](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/51) / `77ef136d2986c4fe6464c14863d8fddd9ffced49` |
+| F02 | `components/TraderJourneyTab.tsx` | In progress | Pending |
 | F03 | `trader-journey/stages/CompareStage.tsx` | Queued | |
 | P01 | Move `Stage` to `trader-journey/types.ts` and update App/Stepper imports | Prerequisite before F04 | |
-| F04 | `trader-journey/TraderJourneyApp.tsx` | Depends on P01 and entrypoint decision | |
+| F04 | `trader-journey/TraderJourneyApp.tsx` | Depends on P01 | |
 | F05 | `trader-journey/stages/ClassifyStage.tsx` | Depends on F04 | |
 | F06 | `trader-journey/stages/ValueStage.tsx` | Depends on F04 | |
 | F07 | `trader-journey/stages/DutyStage.tsx` | Depends on F04 | |
@@ -46,11 +46,11 @@ that type to the existing types file and update both imports in a prerequisite
 pull request. Keep it until Stepper and the remaining type consumers are removed.
 
 The current `src/main.tsx` renders only `App`, which does not import these
-components. However, draft [PR #37](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/37)
-adds a separate journey entrypoint that imports F02 and reaches F04 through it.
-Resolve that competing change before removing F02, F04, or their dependencies.
-Only F01 and F03 have no caller in that change. Do not close the draft or silently
-discard its planned entrypoint.
+components. [PR #37](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/37)
+proposed a separate journey entrypoint but is closed without merge. The frontend
+removals supersede that proposal. They do not remove the separate Journey
+backend, its API, or its deployment files. R01 still requires a decision on that
+independent service.
 
 ## Worker and research separation
 
@@ -68,7 +68,7 @@ deletions when they can be reviewed independently.
 | W06 | Remove the React bundle and workbench routes from the worker image | Depends on W05 | |
 | W07 | Remove research-only code and dependencies from the worker image | Depends on W06 | |
 | W08 | Remove obsolete placeholder/in-use claims and document the worker contract | Depends on worker removals | |
-| R01 | Decide whether to retain or archive the separate journey deployment and its UI | Competing PR #37 | |
+| R01 | Decide whether to retain or archive the separate journey backend and deployment | Ownership review pending; frontend proposal #37 closed | |
 | R02 | Decide whether to retain or archive extraction, matrix, MCP, and experiment tools | Ownership review pending | |
 
 Research code that is not part of the Admin flow is not automatically dead.
