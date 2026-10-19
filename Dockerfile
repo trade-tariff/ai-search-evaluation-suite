@@ -16,9 +16,8 @@ RUN python -m venv /opt/venv
 
 WORKDIR /app
 
-COPY apps/product/backend/requirements.txt apps/product/backend/requirements.txt
-COPY apps/classification-evals/requirements.txt apps/classification-evals/requirements.txt
-RUN pip install --no-cache-dir -r apps/classification-evals/requirements.txt
+COPY apps/classification-evals/requirements-worker.txt apps/classification-evals/requirements-worker.txt
+RUN pip install --no-cache-dir -r apps/classification-evals/requirements-worker.txt
 
 
 FROM python:3.12-alpine

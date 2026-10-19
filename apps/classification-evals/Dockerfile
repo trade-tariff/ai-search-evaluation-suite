@@ -22,9 +22,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY apps/product/backend/requirements.txt apps/product/backend/requirements.txt
-COPY apps/classification-evals/requirements.txt apps/classification-evals/requirements.txt
-RUN pip install --no-cache-dir -r apps/classification-evals/requirements.txt
+COPY apps/classification-evals/requirements-worker.txt apps/classification-evals/requirements-worker.txt
+RUN pip install --no-cache-dir -r apps/classification-evals/requirements-worker.txt
 
 COPY apps/product/backend/_retry.py \
      apps/product/backend/atar.py \
