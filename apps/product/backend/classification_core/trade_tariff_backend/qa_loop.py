@@ -6,10 +6,9 @@ meta.interactive_search.answers[-1].answer is None (confirmed by the
 2026-08-14 spike and by reading search_service.rb#build_answers_list) instead
 of a local `mode` field.
 
-simulate_trader_answer and SessionFacts are imported UNCHANGED from the
-existing classification_core.qa_loop — they never touched the database
-(oracle_text is already a plain string parameter), so there is nothing to
-adapt about them.
+simulate_trader_answer and SessionFacts come from
+classification_core.trader_simulator. That shared module does not import local
+classification or database code; oracle_text is already a plain string.
 
 After max_rounds answered questions the loop makes one terminal /searches
 call with the full answer set and no extra answer: InteractiveSearchService
@@ -30,7 +29,7 @@ from __future__ import annotations
 
 import uuid
 
-from classification_core.qa_loop import SessionFacts, simulate_trader_answer
+from classification_core.trader_simulator import SessionFacts, simulate_trader_answer
 
 
 class QASessionError(RuntimeError):
