@@ -43,6 +43,36 @@ jobs:
           tags: ai-search-evaluation-suite:test
           cache-from: type=gha,scope=ci-docker
           cache-to: type=gha,scope=ci-docker,mode=max
+      - name: Build extraction tools image
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: apps/classification-evals/Dockerfile
+          target: extraction-tools
+          load: true
+          push: false
+          tags: ai-search-evaluation-suite-extraction:test
+          cache-from: type=gha,scope=ci-docker-extraction
+          cache-to: type=gha,scope=ci-docker-extraction,mode=max
+      - name: Check extraction tools without running the pipeline
+        run: |
+          docker run --rm --entrypoint python \
+            ai-search-evaluation-suite-extraction:test -c 'import psycopg'
+          docker run --rm --entrypoint python \
+            --workdir /app/apps/classification-evals \
+            -e EXTRACTION_ALLOW_PROVIDER_CALLS=0 -e EXTRACTION_ALLOW_NETWORK=0 \
+            -e 'TARIFF_DB_DSN=host=/nonexistent dbname=unused connect_timeout=1' \
+            ai-search-evaluation-suite-extraction:test \
+            scripts/extraction_pipeline.py status > /tmp/extraction-status.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          status = json.loads(Path('/tmp/extraction-status.json').read_text())
+          assert status['status'] == 'ok'
+          assert status['gates']['provider_calls_allowed'] is False
+          assert status['gates']['external_network_allowed'] is False
+          assert status['db_counts']['available'] is False
+          PY
 
   terraform:
     runs-on: ubuntu-latest

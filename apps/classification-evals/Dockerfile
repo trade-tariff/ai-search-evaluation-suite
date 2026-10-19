@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.12-slim AS worker-base
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
@@ -79,3 +79,15 @@ EXPOSE 8100
 USER appuser
 
 CMD ["uvicorn", "backend.worker_app:app", "--app-dir", "/app/apps/classification-evals", "--host", "0.0.0.0", "--port", "8100", "--no-access-log"]
+
+FROM worker-base AS extraction-tools
+
+USER root
+COPY apps/product/backend apps/product/backend
+COPY apps/product/data apps/product/data
+COPY apps/classification-evals apps/classification-evals
+RUN pip install --no-cache-dir -r apps/classification-evals/requirements.txt \
+    && chown -R appuser:appuser /app
+USER appuser
+
+FROM worker-base AS worker

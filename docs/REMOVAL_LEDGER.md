@@ -65,8 +65,9 @@ deletions when they can be reviewed independently.
 | W05 | Remove standalone research job, trial, and matrix routes from the worker app | Merged | [#70](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/70) / `baf3fca816e86a8606dbc7deb8b25ecd90a1e6be` |
 | P02 | Include extracted worker modules in the secondary image | Merged | [#71](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/71) / `e5b334f5c21dd4d957cac89209e3c8a28f2c9ffb` |
 | P03 | Isolate worker runtime dependencies in both images | Merged | [#73](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/73) / `1205aa5988de219068e809fceeb6a30261631ff4` |
-| W06 | Remove the React bundle and workbench routes from the worker image | In progress | [#72](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/72) |
-| W07 | Remove research-only code and dependencies from the worker image | Depends on W06 | |
+| W06 | Remove the React bundle and workbench routes from the worker image | Merged | [#72](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/72) / `e44d633b3bb4b96502acbf1382115051067e771b` |
+| P04 | Preserve the existing extraction Compose profiles with a separate image target | In progress | Pending |
+| W07 | Remove research-only code and dependencies from the worker image | Depends on P04 | |
 | W08 | Remove obsolete placeholder/in-use claims and document the worker contract | Depends on worker removals | |
 | R01 | Decide whether to retain or archive the separate journey backend and deployment | Ownership review pending; frontend proposal #37 closed | |
 | R02 | Decide whether to retain or archive extraction, matrix, MCP, and experiment tools | Retain source and research entrypoint; exclude from worker image in W07 | [#69](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/69) / `b0e7932b4c10bdf43f72e95f9f65cea5edb3918f` |
@@ -75,6 +76,11 @@ P03 separates the worker requirements from the full research requirements.
 The worker uses FastAPI, Uvicorn, HTTPX, and OpenAI. This excludes the unused
 Anthropic SDK that caused the W06 image scan to fail. It does not add scanner
 exceptions.
+
+P04 keeps the existing manual and scheduler extraction profiles on the
+`extraction-tools` image target. That target includes the retained scripts,
+seed data, and full research requirements. The default target remains the worker.
+This preserves the existing profiles; it adds no service or deployment.
 
 Research code that is not part of the Admin flow is not automatically dead.
 The journey has its own Dockerfile and Compose service. Extraction scripts have
