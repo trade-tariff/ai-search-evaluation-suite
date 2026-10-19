@@ -87,4 +87,4 @@ WORKDIR /app
 EXPOSE 8100
 USER appuser
 
-CMD ["uvicorn", "backend.app:app", "--app-dir", "/app/apps/classification-evals", "--host", "0.0.0.0", "--port", "8100", "--no-access-log"]
+CMD ["uvicorn", "backend.worker_app:app", "--app-dir", "/app/apps/classification-evals", "--host", "0.0.0.0", "--port", "8100", "--no-access-log"]

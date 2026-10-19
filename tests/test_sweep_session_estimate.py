@@ -20,8 +20,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "classific
 
 from fastapi import HTTPException
 
-from backend import research_app_base as app
-from backend.research_app_base import JobCreate
+from backend import app
+from backend.app import JobCreate
 from classification_core.run_classify_matrix import SWEEP_GRID
 
 

@@ -5,7 +5,7 @@ import importlib
 
 from fastapi.routing import APIRoute
 
-from .research_app_base import app
+from .app import app
 
 
 def _registered_route_methods() -> set[tuple[str, str]]:

@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "classific
 
 from fastapi.testclient import TestClient
 
-from backend.app import app as deployable_app
+from backend.worker_app import app as deployable_app
 
 import evaluation_ingress as ingress
 
