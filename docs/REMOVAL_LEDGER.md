@@ -64,8 +64,8 @@ deletions when they can be reviewed independently.
 | W04 | Remove copied research APIs from the worker app | Merged | [#69](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/69) / `b0e7932b4c10bdf43f72e95f9f65cea5edb3918f` |
 | W05 | Remove standalone research job, trial, and matrix routes from the worker app | Merged | [#70](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/70) / `baf3fca816e86a8606dbc7deb8b25ecd90a1e6be` |
 | P02 | Include extracted worker modules in the secondary image | Merged | [#71](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/71) / `e5b334f5c21dd4d957cac89209e3c8a28f2c9ffb` |
-| P03 | Isolate worker runtime dependencies in both images | In progress | Pending |
-| W06 | Remove the React bundle and workbench routes from the worker image | Draft; depends on P03 | [#72](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/72) |
+| P03 | Isolate worker runtime dependencies in both images | Merged | [#73](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/73) / `1205aa5988de219068e809fceeb6a30261631ff4` |
+| W06 | Remove the React bundle and workbench routes from the worker image | In progress | [#72](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/72) |
 | W07 | Remove research-only code and dependencies from the worker image | Depends on W06 | |
 | W08 | Remove obsolete placeholder/in-use claims and document the worker contract | Depends on worker removals | |
 | R01 | Decide whether to retain or archive the separate journey backend and deployment | Ownership review pending; frontend proposal #37 closed | |

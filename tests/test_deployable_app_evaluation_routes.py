@@ -27,6 +27,11 @@ class DeployableAppEvaluationRoutesTest(unittest.TestCase):
         self.assertEqual(response.status_code, 202)
         self.assertEqual(response.json(), {"started": True, "run_id": "107"})
 
+    def test_workbench_routes_and_assets_are_not_exposed(self):
+        for path in ("/", "/workbench", "/workbench/", "/workbench/example", "/assets/example.js"):
+            with self.subTest(path=path):
+                self.assertEqual(self.client.get(path).status_code, 404)
+
     def test_native_research_apis_are_not_exposed(self):
         for method, path in (
             ("GET", "/api/jobs"),
