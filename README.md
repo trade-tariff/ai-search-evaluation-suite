@@ -117,7 +117,7 @@ third-party dependencies retain their own terms.
 Prerequisites:
 
 - Python 3.11+.
-- Node.js and npm.
+- Node.js and npm, to build the workbench frontend bundle.
 - PostgreSQL with pgvector for live DB-backed flows.
 - Optional provider API keys for model-backed actions.
 
@@ -125,9 +125,13 @@ Start the deployable evaluation app:
 
 ```bash
 cd apps/classification-evals
-cp .env.example .env
+cp ../../.env.example .env
 ./start.sh
 ```
+
+`./start.sh` builds the workbench frontend bundle on first start. The
+example environment file lives at the repository root, not inside
+`apps/classification-evals`.
 
 Open the local app at `http://localhost:8100`.
 
@@ -294,7 +298,7 @@ run mode:
 
 ```bash
 cd apps/classification-evals
-cp .env.example .env
+cp ../../.env.example .env
 ```
 
 Common variables:
@@ -321,16 +325,18 @@ Use placeholders such as `<database-dsn>`, `<provider-api-key>`, and
 
 ## Deployment Notes
 
-The platform deployment currently builds the repository-root `Dockerfile`. It intentionally runs only a small backend placeholder that responds `OKAY` at `/` and `/healthcheckz`; it does not package the existing frontend, connect to a database, or run evaluation features. Those capabilities will be integrated incrementally through backend APIs.
+The platform deployment builds the repository-root `Dockerfile`. The image
+builds the workbench frontend, installs the backend, and serves the full
+evaluation app over HTTPS on port 8443, with a healthcheck at `/api/health`.
+It needs `SSL_CERT_PEM` and `SSL_KEY_PEM` at runtime. See
+`apps/classification-evals/docker-entrypoint.sh`.
 
-The full evaluation app currently lives in `apps/classification-evals/` for
-local development and future platform integration. It is not included in the
-placeholder deployment. Its Docker Compose setup runs the app with local
-Postgres/pgvector and local OpenSearch services:
+The Docker Compose setup in `apps/classification-evals/` runs the same app
+with local Postgres/pgvector and local OpenSearch services:
 
 ```bash
 cd apps/classification-evals
-cp .env.example .env
+cp ../../.env.example .env
 # edit .env with deployment placeholders or secret-store injected values
 docker compose up -d --build
 ```

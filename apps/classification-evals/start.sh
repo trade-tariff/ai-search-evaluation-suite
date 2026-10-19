@@ -16,6 +16,10 @@ export AI_FAN_OUT_KG_LABEL_PROFILE="${AI_FAN_OUT_KG_LABEL_PROFILE:-full}"
 export PYTHONPATH="${PRODUCT_APP_ROOT}/backend${PYTHONPATH:+:$PYTHONPATH}"
 mkdir -p "$CLASSIFY_EVAL_STATE_DIR"
 
+# Build the workbench frontend bundle when it is missing, so a clean
+# checkout serves the app at / instead of a missing-bundle 404.
+"$DIR/scripts/ensure_frontend.sh"
+
 cd "$DIR"
 if [ ! -d ".venv" ]; then
   python3 -m venv .venv

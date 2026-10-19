@@ -40,11 +40,15 @@ OpenAI host with a standard key.
 
 ```bash
 cd apps/classification-evals
-cp .env.example .env
+cp ../../.env.example .env
 ./start.sh
 ```
 
 Open `http://127.0.0.1:8100`.
+
+The example environment file lives at the repository root, not inside
+`apps/classification-evals`. `./start.sh` builds the workbench frontend
+bundle on first start, so a clean checkout needs Node.js and npm.
 
 Host `./start.sh` defaults `AI_FAN_OUT_KG_LABEL_PROFILE=full`, so local runs
 can inspect all KG scopes in the local tariff DB. Docker Compose and the image
@@ -79,7 +83,7 @@ them over the private Compose network.
 
 ```bash
 cd apps/classification-evals
-cp .env.example .env
+cp ../../.env.example .env
 # edit POSTGRES_PASSWORD and auth/provider keys
 docker compose up -d tariff-db
 ```
