@@ -47,8 +47,8 @@ The workbench entrypoint `src/main.tsx` renders only `App`. It does not import
 the Journey code. [PR #37](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/37)
 proposed a separate journey entrypoint but is closed without merge. The frontend
 removals supersede that proposal. They do not remove the separate Journey
-backend, its API, or its deployment files. R01 still requires a decision on that
-independent service.
+backend, its API, or its deployment files. R01 retains that independent service
+and its deployment definitions for the reasons below.
 
 ## Worker and research separation
 
@@ -67,10 +67,10 @@ deletions when they can be reviewed independently.
 | P03 | Isolate worker runtime dependencies in both images | Merged | [#73](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/73) / `1205aa5988de219068e809fceeb6a30261631ff4` |
 | W06 | Remove the React bundle and workbench routes from the worker image | Merged | [#72](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/72) / `e44d633b3bb4b96502acbf1382115051067e771b` |
 | P04 | Preserve the existing extraction Compose profiles with a separate image target | Merged | [#74](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/74) / `3c6fdca18f5a271779468b2b207930a8ec08815b` |
-| W07 | Remove research-only code and dependencies from the worker image | In progress | Pending |
-| W08 | Remove obsolete placeholder/in-use claims and document the worker contract | Depends on worker removals | |
-| R01 | Decide whether to retain or archive the separate journey backend and deployment | Ownership review pending; frontend proposal #37 closed | |
-| R02 | Decide whether to retain or archive extraction, matrix, MCP, and experiment tools | Retain source and research entrypoint; exclude from worker image in W07 | [#69](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/69) / `b0e7932b4c10bdf43f72e95f9f65cea5edb3918f` |
+| W07 | Remove research-only code and dependencies from the worker image | Merged | [#75](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/75) / `1aa7c952fe5ac38b7c5021b02586c32c0e7467a1` |
+| W08 | Remove obsolete placeholder/in-use claims and document the worker contract | Ready | |
+| R01 | Decide whether to retain or archive the separate journey backend and deployment | Retain source and existing deployment definitions | Pending |
+| R02 | Decide whether to retain or archive extraction, matrix, MCP, and experiment tools | Retain source and research entrypoint; excluded from worker images | [#69](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/69) / `b0e7932b4c10bdf43f72e95f9f65cea5edb3918f` |
 
 P03 separates the worker requirements from the full research requirements.
 The worker uses FastAPI, Uvicorn, HTTPX, and OpenAI. This excludes the unused
@@ -86,8 +86,18 @@ W07 limits both worker images to the ingress, backend client and runner, shared
 simulator, authentication, logging, and worker app. The worker CLI stays in its
 backend package. Research APIs and tools stay in the repository. The extraction
 image keeps the source and seed data for its existing Compose profiles. Neither
-worker image includes that research source or seed data. Empty directories remain for the ownership of existing Compose volumes. The
-local worker launcher installs only the worker requirements.
+worker image includes that research source or seed data. Empty directories remain
+for the ownership of existing Compose volumes. The local worker launcher installs
+only the worker requirements.
+
+R01 retains `apps/product/backend/journey/`, `apps/product/Dockerfile.journey`,
+and the Journey service in `apps/product/docker-compose.yml`. The Dockerfile
+launches `journey.main:app`; Compose selects that Dockerfile and exposes its
+health endpoint on port 8200. These entrypoints are independent of the removed
+frontend files and the Admin worker. Source wiring proves reachability, not
+operator use. No operator-use evidence or service-retirement decision supports
+deleting this service. Its source and deployment definitions therefore stay.
+This decision adds no deployment and does not establish that the Journey UI works.
 
 Research code that is not part of the Admin flow is not automatically dead.
 The journey has its own Dockerfile and Compose service. Extraction scripts have
@@ -99,6 +109,6 @@ select `backend.worker_app:app`. The native research implementation stays in
 `backend.app`; W07 excludes it from the worker image. Operator use remains
 unverified; removal needs a separate retirement decision.
 
-Record a source-backed retention or archive decision for R01 before
-closing this ledger. Do not report the campaign complete while any deletion or
-required decision remains unresolved.
+A later deletion of retained Journey or research tools needs a separate
+retirement decision. Do not report the campaign complete while any approved
+deletion or required decision remains unresolved.
