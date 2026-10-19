@@ -43,6 +43,50 @@ jobs:
           tags: ai-search-evaluation-suite:test
           cache-from: type=gha,scope=ci-docker
           cache-to: type=gha,scope=ci-docker,mode=max
+      - name: Build secondary worker image
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: apps/classification-evals/Dockerfile
+          load: true
+          push: false
+          tags: ai-search-evaluation-suite-secondary:test
+          cache-from: type=gha,scope=ci-docker-secondary
+          cache-to: type=gha,scope=ci-docker-secondary,mode=max
+      - name: Check worker image boundaries and existing worker tests
+        run: |
+          for image in ai-search-evaluation-suite:test ai-search-evaluation-suite-secondary:test; do
+            docker run --rm -i --entrypoint python \
+              --workdir /app/apps/classification-evals "$image" - <<'PY'
+          import importlib.util
+          import os
+          from pathlib import Path
+          from backend.worker_app import app, health
+          assert os.geteuid() != 0
+          assert health()['product_backend_present'] is True
+          assert set(app.openapi()['paths']) == {
+              '/api/health', '/api/live', '/api/evaluation/runs/{run_id}/start',
+          }
+          for name in ('anthropic', 'google', 'numpy', 'matplotlib', 'sklearn',
+                       'asyncpg', 'psycopg', 'bs4', 'docx', 'main', 'backend.app',
+                       'backend.research_app', 'classification_core.classification',
+                       'classification_core.local_db', 'classification_core.qa_loop'):
+              assert importlib.util.find_spec(name) is None, name
+          assert not Path('/app/apps/classification-evals/scripts').exists()
+          assert not Path('/app/apps/product/frontend').exists()
+          assert not any(Path('/app/apps/product/data').iterdir())
+          print('WORKER_IMAGE_BOUNDARY_OK')
+          PY
+            docker run --rm --entrypoint sh --workdir /app \
+              --mount "type=bind,source=$PWD/tests,target=/app/tests,readonly" \
+              -e CLASSIFICATION_ALLOW_PROVIDER_CALLS=0 \
+              -e PYTHONPATH=/app/tests:/app/apps/product/backend "$image" -c '
+                set -eu
+                python -m unittest discover -s tests -p "test_classification_core_trade_tariff_backend*.py"
+                python -m unittest discover -s tests -p "test_evaluation_ingress.py"
+                python -m unittest test_classification_core_qa_loop.SimulateTraderAnswerModelSelectionTest test_classification_core_qa_loop.SimulatorImportBoundaryTest test_classification_core_qa_loop.SessionFactsTest test_classification_core_qa_loop.SimulateTraderAnswerBehaviourTest
+              '
+          done
       - name: Build extraction tools image
         uses: docker/build-push-action@v7.4.0
         with:
