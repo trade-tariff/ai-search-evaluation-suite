@@ -1,8 +1,15 @@
 # Removal ledger
 
-Remove one candidate per pull request. Obtain a Copilot review, address its
-findings, and let the repository auto-merger merge the pull request before
-starting the next candidate. Record the merged pull request and commit here.
+This ledger records the approved removals, their prerequisites, and retention
+decisions. Each removal and prerequisite has a separate pull request. The links
+below record the reviews and merge commits.
+
+## Status
+
+The approved queue is closed. F01-F13 and W01-W08 are merged. P01-P04 are merged.
+R01 retains the independent Journey service and its deployment definitions.
+R02 retains research source and the existing extraction profiles. No further
+approved deletions or pending disposition decisions remain.
 
 ## Contract to preserve
 
@@ -16,11 +23,11 @@ Do not delete data, run paid evaluations, or change the Admin/backend API
 contract as part of these removals. Source reachability does not establish
 operator use. Recheck callers and open pull requests before each removal.
 
-## Frontend deletion queue
+## Frontend removals
 
-Paths in this table are relative to `apps/product/frontend/src/`. Remove callers
-before their dependencies so that TypeScript can still check the remaining
-source files. A merged entry needs a pull request link and merge commit.
+Paths in this table are relative to `apps/product/frontend/src/`. The queue
+removed callers before their dependencies so that TypeScript could check the
+remaining source. Each merged entry records a pull request and merge commit.
 
 | ID | Candidate | State | Pull request / merge commit |
 | --- | --- | --- | --- |
@@ -52,9 +59,9 @@ and its deployment definitions for the reasons below.
 
 ## Worker and research separation
 
-These candidates remain in scope after the independent frontend removals.
-Take each row through its own pull request. Keep prerequisites separate from
-deletions when they can be reviewed independently.
+These entries record the worker and research separation after the frontend
+removals. Prerequisites stayed separate from deletions so that each change could
+be reviewed independently.
 
 | ID | Candidate or prerequisite | State | Pull request / merge commit |
 | --- | --- | --- | --- |
@@ -68,7 +75,7 @@ deletions when they can be reviewed independently.
 | W06 | Remove the React bundle and workbench routes from the worker image | Merged | [#72](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/72) / `e44d633b3bb4b96502acbf1382115051067e771b` |
 | P04 | Preserve the existing extraction Compose profiles with a separate image target | Merged | [#74](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/74) / `3c6fdca18f5a271779468b2b207930a8ec08815b` |
 | W07 | Remove research-only code and dependencies from the worker image | Merged | [#75](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/75) / `1aa7c952fe5ac38b7c5021b02586c32c0e7467a1` |
-| W08 | Remove obsolete placeholder/in-use claims and document the worker contract | In progress | Pending |
+| W08 | Remove obsolete placeholder/in-use claims and document the worker contract | Merged | [#77](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/77) / `296c782fd011d6f6ab74c95b0af2c0e12e37da43` |
 | R01 | Decide whether to retain or archive the separate journey backend and deployment | Retain source and existing deployment definitions | [#76](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/76) / `637958043cdef3e13407bff7c35defee661db15f` |
 | R02 | Decide whether to retain or archive extraction, matrix, MCP, and experiment tools | Retain source and research entrypoint; excluded from worker images | [#69](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/69) / `b0e7932b4c10bdf43f72e95f9f65cea5edb3918f` |
 
@@ -108,7 +115,3 @@ loading them in the worker. This adds no research deployment. Default launchers
 select `backend.worker_app:app`. The native research implementation stays in
 `backend.app`; W07 excludes it from the worker image. Operator use remains
 unverified; removal needs a separate retirement decision.
-
-A later deletion of retained Journey or research tools needs a separate
-retirement decision. Do not report the campaign complete while any approved
-deletion or required decision remains unresolved.
