@@ -25,8 +25,8 @@ source files. A merged entry needs a pull request link and merge commit.
 | ID | Candidate | State | Pull request / merge commit |
 | --- | --- | --- | --- |
 | F01 | `components/CompareTab.tsx` | Merged | [#51](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/51) / `77ef136d2986c4fe6464c14863d8fddd9ffced49` |
-| F02 | `components/TraderJourneyTab.tsx` | In progress | Pending |
-| F03 | `trader-journey/stages/CompareStage.tsx` | Queued | |
+| F02 | `components/TraderJourneyTab.tsx` | Merged | [#52](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/52) / `186a3336cff0d3d0a078334c7e33c1af078d3aff` |
+| F03 | `trader-journey/stages/CompareStage.tsx` | In progress | Pending |
 | P01 | Move `Stage` to `trader-journey/types.ts` and update App/Stepper imports | Prerequisite before F04 | |
 | F04 | `trader-journey/TraderJourneyApp.tsx` | Depends on P01 | |
 | F05 | `trader-journey/stages/ClassifyStage.tsx` | Depends on F04 | |
