@@ -1,11 +1,16 @@
 # Demo Playbook - AI Search Evaluation Suite
 
-This is the run-sheet for demoing the evaluation apps end to end. Everything
-in it was checked against the live system on 2026-07-02 - every screen was
-opened, every number below is what actually came back, and every timing was
-measured, not guessed.
+This is a historical research demo run-sheet recorded on 2026-07-02. The hosts,
+timings, screens, and deployment commands below are not current worker operating
+instructions or evidence of current operator use.
 
-There are two apps, both running on the same cloud server:
+The default worker does not serve the workbench or Journey UI. Do not rebuild
+the `classification-evals` Compose service to obtain those UIs. Use the
+[worker contract](../README.md#worker-contract) for current deployment scope and
+the [optional research setup](../README.md#optional-research-workbench) for local
+workbench use. Retaining the Journey service does not restore a Journey UI.
+
+The recorded demo used two apps on one cloud server:
 
 - **The evaluation workbench** - https://18.175.148.215.sslip.io/
   Sixteen tabs for running and inspecting search-quality experiments,

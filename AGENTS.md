@@ -26,7 +26,7 @@ Read these first:
 - `docs/MEASUREMENT_REVIEW.md`
 - `docs/suite-primer-run.md`
 
-AI Search Evaluation Suite is a standalone deployable app for tariff classification and search evaluation. It combines a React workbench, FastAPI services, retrieval and classification evaluation runners, knowledge graph tooling, ATaR workflows, intercept analysis, and provider benchmarking.
+AI Search Evaluation Suite contains the Admin evaluation worker and retained research tools. Default launchers and worker images run `backend.worker_app:app`. They do not serve the workbench or research APIs. The React workbench, local evaluation runners, knowledge graph tools, ATaR workflows, intercept analysis, and provider benchmarks remain research source. Read the worker contract in `README.md` before changing runtime boundaries.
 
 ## Working Rules
 

@@ -1,74 +1,80 @@
 # AI Search Evaluation Suite
 
-Single-process app for AI search evaluation, retrieval experimentation, and
-classification eval runs. It serves:
+The default application is the backend-driven Admin evaluation worker.
+The workbench and local-DB evaluation tools remain separate research source.
 
-- the React/Vite product UI at `/`;
-- KG coverage/facet/edge/commodity/graph/audit browse and edit routes;
-- ATaR ingest/draft/fact extraction/approval routes;
-- prompt/config/search-reference, simulator, judge, benchmark, analysis,
-  financial, intercept, and complexity product routes;
-- retrieval matrix review, fresh retrieval trials, classification Q&A matrices,
-  and long-running classification experiment/simulation jobs.
+| Entrypoint | Purpose |
+|---|---|
+| `backend.worker_app:app` | Default worker. Uses `requirements-worker.txt` and backend HTTP APIs. |
+| `backend.app:app` | Native research job and matrix server. Needs full source and research requirements. |
+| `backend.research_app:app` | Optional research app that also registers product research APIs. |
 
-- Q&A/E2E handover contract: `docs/QNA_E2E_CONTRACT.md`
-- Extraction pipeline runner: `scripts/extraction_pipeline.py`
+Both worker images exclude the workbench, research APIs, research scripts, and
+seed data. The existing extraction profiles use the separate `extraction-tools`
+image target. The worker CLI remains in the worker backend package.
 
-The runner wraps the classification matrix module:
-
-```text
-apps/product/backend/classification_core/run_classify_matrix.py
-```
-
-Jobs write their canonical experiment rows to `kg.classify_runs` in the tariff
-database and store local runner status/logs in `var/jobs.sqlite` and
-`var/jobs/*.log`.
-
-The local playground OpenAI key, when needed on this machine, is stored in
-`apps/classification-evals/.env`. That file is git-ignored, must remain
-`0600`, and must never be copied into docs, screenshots, command logs, Docker
-images, AMIs, or commits.
-
-Deployed environments (development, staging, production) send OpenAI requests
-to `https://gb.api.openai.com/v1` (`OPENAI_BASE_URL`), a UK data-residency
-host that only accepts UK-region-scoped keys. Leave `OPENAI_BASE_URL` unset
-locally unless your own personal key is also UK-region-scoped — a standard
-key against that host fails outright, so the default here is the standard
-OpenAI host with a standard key.
-
-## Local Start
+## Local Worker Start
 
 ```bash
 cd apps/classification-evals
-cp .env.example .env
+# Create .env from .env.example if needed. Do not replace existing secrets.
 ./start.sh
 ```
 
-Open `http://127.0.0.1:8100`.
+In another terminal:
 
-Host `./start.sh` defaults `AI_FAN_OUT_KG_LABEL_PROFILE=full`, so local runs
-can inspect all KG scopes in the local tariff DB. Docker Compose and the image
-default to `AI_FAN_OUT_KG_LABEL_PROFILE=deployable` for EC2.
+```bash
+curl -fsS http://127.0.0.1:8100/api/health
+```
 
-## Required Runtime State
+The launcher installs worker requirements in this directory's `.venv`. It does
+not remove packages from an existing environment. The worker does not use local
+PostgreSQL, OpenSearch, or `var/jobs.sqlite`. `/` returns 404; it is not a UI.
+Health checks source presence, not backend connectivity or evaluation quality.
+Send the configured authorization header if health is protected.
+See the [worker contract](../../README.md#worker-contract) for run ownership,
+authentication, cancellation, scoring, and spend boundaries.
+
+## Local Research Start
+
+Use the [optional research setup](../../README.md#optional-research-workbench).
+It installs the full `requirements.txt`, builds the frontend, and starts
+`backend.research_app:app` on port 8000. `start.sh` does not start this app.
+
+The retained research app serves workbench APIs for KG, ATaR, prompts, retrieval,
+simulation, judging, benchmarks, analysis, intercepts, and local evaluation jobs.
+The native job runner wraps
+`apps/product/backend/classification_core/run_classify_matrix.py`. It writes
+canonical experiment rows to `kg.classify_runs` and local job state to
+`var/jobs.sqlite` and `var/jobs/*.log`.
+
+- Research Q&A/E2E contract: `docs/QNA_E2E_CONTRACT.md`
+- Retained extraction CLI: `scripts/extraction_pipeline.py`
+
+## Research Runtime State
 
 - `TARIFF_DB_DSN` pointing at a Postgres database with `uk` and `kg` schemas.
 - `kg.eval_gold`, `kg.kg_edges`, facet/KG retrieval tables, and pgvector support.
-- `OPENAI_API_KEY` for actual classification eval jobs and OpenAI-backed
-  product actions.
+- `OPENAI_API_KEY` for paid research jobs and OpenAI-backed product actions.
 - Optional multi-provider keys for benchmark and product fan-out.
 
-The API refuses to start a paid job unless the request includes
-`allow_spend: true`, an `OPENAI_API_KEY` is present, and the request fits the
-server-side caps below.
+Research jobs require `allow_spend: true`, an OpenAI key, and the research caps
+below. Keep `AI_FAN_OUT_WORKBENCH_SPEND_ENABLED` off unless research provider spend
+is approved. These request gates and caps do not govern backend-driven Admin
+runs. Backend search controls and the worker simulator gate apply separately.
 
-Provider-backed actions are blocked unless the request includes
-`allow_spend: true` where supported or `AI_FAN_OUT_WORKBENCH_SPEND_ENABLED=1`
-is set for the process. Keep that flag off by default on EC2.
+Keep `.env` files git-ignored and mode `0600`. Never copy keys into docs, logs,
+images, AMIs, or commits. Deployed OpenAI requests use the UK host configured by
+`OPENAI_BASE_URL`; that host requires a compatible region-scoped key. Leave the
+variable unset for a standard local OpenAI key.
 
-## Self-Contained EC2 Database
+## Research Database
 
-For the minimum-spend EC2 shape, use one encrypted root EBS volume with
+These operations prepare retained research and extraction data, not the worker.
+Restore and profile-apply commands can delete data. Confirm the target and obtain
+approval before using them.
+
+For the minimum-spend EC2 research shape, use one encrypted root EBS volume with
 `DeleteOnTermination=false`. Run the eval runner and Postgres on that same
 volume. A separate data EBS is cleaner for reattachment, but it adds provisioned
 GB-month cost and is not necessary for the initial eval box.
@@ -79,7 +85,7 @@ them over the private Compose network.
 
 ```bash
 cd apps/classification-evals
-cp .env.example .env
+test -f .env || cp .env.example .env
 # edit POSTGRES_PASSWORD and auth/provider keys
 docker compose up -d tariff-db
 ```
@@ -96,7 +102,7 @@ Load a fresh snapshot before starting eval jobs:
 ./scripts/apply_deploy_kg_profile.py \
   --dsn "postgresql://postgres:<password>@127.0.0.1:5432/tariff_db" \
   --apply
-docker compose up -d --build classification-evals
+docker compose up -d tariff-db opensearch
 ```
 
 After the tariff snapshot is loaded, hydrate the local OpenSearch keyword
@@ -104,27 +110,25 @@ index from the VM Postgres database. The hydrator indexes only current-valid,
 non-stale commodity self-text rows according to tariff validity dates:
 
 ```bash
-docker compose exec classification-evals \
+docker compose --profile manual run --rm extraction-pipeline \
   python scripts/hydrate_opensearch_index.py --recreate
 ```
 
-The app uses OpenSearch for the keyword leg and pgvector for the semantic leg,
-then fuses the two result sets with reciprocal rank fusion. If OpenSearch is
+The research app uses OpenSearch for the keyword leg and pgvector for the
+semantic leg, then fuses the two result sets with reciprocal rank fusion. If OpenSearch is
 not configured or unavailable, prompt/search preview falls back to Postgres
 full-text search.
 
 ## Extraction Pipeline
 
-The deployed image includes the KG extraction seeders, SQL migrations, bundled
-seed data, and an operational manifest runner under `scripts/etl_seeders` and
-`scripts/extraction_pipeline.py`.
+The `extraction-tools` target retains extraction source, seed data, and full
+research requirements. The existing manual and scheduler profiles select this
+target. Neither default worker image includes these scripts or data.
 
 Check status without mutating data:
 
 ```bash
 docker compose --profile manual run --rm extraction-pipeline
-curl -k -u "$APP_USERNAME:$APP_PASSWORD" \
-  https://18.175.148.215.sslip.io/api/extraction/status
 ```
 
 Write a dry-run manifest for the safe no-provider profile:
@@ -162,10 +166,10 @@ retrieval, classification, and Q&A, keeps audit labels for curation/provenance,
 and drops copied KG rows that are not consumed by this app.
 
 The restore creates the required `vector` and `pg_trgm` extensions before
-loading the snapshot. The app is then self-contained on the VM: product and
-eval APIs use the local Postgres volume, runner logs/status live in the
-`classification_eval_state` volume, and product runtime data/results live in
-`product_app_data` and `product_app_results`.
+loading the snapshot. Research and extraction use this database and the retained
+state/data/results volumes. These are not worker dependencies. The Compose
+`classification-evals` service is still the worker; it does not start a research
+web app.
 
 ## Teardown And Preservation
 
@@ -317,9 +321,10 @@ The suite can also use `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`,
 same way if needed. Runtime env keys override blank saved product config values
 without being written back to the saved product config file.
 
-## Spend And Execution Caps
+## Research Spend And Execution Caps
 
-These are server-side operator controls, not client hints:
+These are server-side controls for research jobs, not client hints. They are not
+budget limits for backend-driven worker runs:
 
 | Variable | Default | Purpose |
 |---|---:|---|
@@ -336,15 +341,14 @@ These are server-side operator controls, not client hints:
 When a job passes these gates, the runner sets
 `CLASSIFICATION_ALLOW_PROVIDER_CALLS=1`, `CLASSIFY_LLM_MODEL=<selected model>`, and
 `QA_SIMULATOR_MODEL=<selected Q&A simulator model>` only for that subprocess.
-The suite remains no-spend by default unless
-`AI_FAN_OUT_WORKBENCH_SPEND_ENABLED=1` is explicitly enabled.
+The workbench spend switch applies to research routes. It is not a global
+budget switch for backend search requests or worker runs.
 
 ## Console Progress Logging (evaluation runs)
 
-A `trade-tariff-backend`-driven evaluation run (`execute_run.py`) can take
-several minutes and, by default, prints nothing to the console while it's
-running. Set `EVAL_PROGRESS_LOGGING` to see per-gold-query progress as it
-happens: the total gold query count at the start, a line when each gold
+The worker logs accepted requests and run lifecycle events as structured console
+logs. Set `EVAL_PROGRESS_LOGGING` for additional per-gold-query progress:
+the total gold query count at the start, a line when each gold
 query begins (position, ATaR reference, expected code, persona, query text),
 a line when it ends (final code, gold_in_top1/gold_in_top5, questions
 answered, or the error on failure), and a one-line summary when the whole
@@ -355,19 +359,27 @@ is off, one of `1`/`true`/`yes`/`on` is on. **Off by default everywhere.**
 
 - **Local dev:** set `EVAL_PROGRESS_LOGGING=1` in `apps/classification-evals/.env`
   (gitignored).
-- **Deployed (ECS):** stays off by default — the service already ships
-  container stdout to CloudWatch for free (`cloudwatch_log_group_name` in
-  `terraform/main.tf`), so there's no need to pay extra ingestion cost or add
-  log noise for every run when nothing's wrong. To turn it on for a specific
-  deploy (e.g. to debug a remote run), add an entry to `terraform/locals.tf`'s
-  `service_environment` list — `{ name = "EVAL_PROGRESS_LOGGING", value = "1" }` —
-  and redeploy. Once it's printing, CloudWatch picks it up automatically like
-  any other console output; nothing further to configure there.
+- **Deployed (ECS):** stays off by default. The configured CloudWatch log group
+  collects container stdout. Detailed progress increases log volume and can
+  include query text. Enable it only for approved diagnosis through the service
+  environment, then disable it when no longer needed.
 
 This is console output only — it never changes what gets persisted via
 `post_result`/`update_run`.
 
-## API
+## Worker API
+
+| Route | Purpose |
+|---|---|
+| `POST /api/evaluation/runs/{run_id}/start` | Start an existing backend run. Return 202, or 409 for an active duplicate. |
+| `GET /api/health` | Status, auth state, and product backend source presence. No research DB initialization. |
+| `GET /api/live` | Liveness status. |
+
+The worker does not expose the following research routes or the workbench.
+
+## Research API
+
+These routes belong to the optional research process, not the worker:
 
 | Route | Purpose |
 |---|---|
@@ -387,8 +399,8 @@ This is console output only — it never changes what gets persisted via
 | `GET /eval/classify-matrix` | Server-rendered classification matrix from `kg.classify_runs`. |
 | `GET /` | Bundled React product UI. |
 
-Product routes are also registered in this same FastAPI process. Deploy-owned
-routes above take precedence where paths overlap.
+`backend.research_app:app` also registers product research routes. Native research
+routes take precedence where paths overlap. The UI needs built frontend assets.
 
 Example dry-sized paid job payload:
 
@@ -411,15 +423,19 @@ Example dry-sized paid job payload:
 
 ## Docker
 
-Build from the repository root so the image can include the product modules and
-the runner:
+Build the secondary worker from the repository root:
 
 ```bash
 docker build -f apps/classification-evals/Dockerfile -t ai-search-evaluation-suite .
-docker run --env-file apps/classification-evals/.env -p 8100:8100 ai-search-evaluation-suite
+docker run --env-file apps/classification-evals/.env -p 127.0.0.1:8100:8100 ai-search-evaluation-suite
 ```
 
-Prefer Compose for EC2 because it also starts the local pgvector database:
+The default target is `worker`, not a workbench server. The repository-root
+Dockerfile is the separate TLS worker image on port 8443.
+
+Compose keeps its existing database services and volumes, but its default app
+is still the worker. The manual and scheduler profiles select `extraction-tools`.
+No research web service is added:
 
 ```bash
 cd apps/classification-evals

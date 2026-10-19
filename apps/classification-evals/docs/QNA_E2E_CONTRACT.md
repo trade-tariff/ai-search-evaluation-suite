@@ -1,20 +1,23 @@
-# Q&A / E2E Contract
+# Research Q&A / E2E Contract
 
-Last updated: 2026-06-11.
+Original research handover: 2026-06-11.
 
-This document is the handover contract for the deployed Q&A and end-to-end
-classification evaluation surface.
+This reference covers retained local-DB research, not the deployed Admin worker.
+Its persistence rules do not describe worker session facts or backend-owned run
+records. See the [worker contract](../../../README.md#worker-contract).
 
-## Live Surfaces
+## Research Surfaces
 
 - Q&A matrix: `/eval/qa-matrix`
 - E2E matrix: `/eval/e2e-matrix`
 - Classification trial API: `POST /api/evals/classification/trial`
 - Input scoring API: `POST /api/input/score` and `POST /api/scoring/input`
-- Health: `/api/health`
+- Research health: `/api/health`
 
-The active deployed process is `apps/classification-evals/backend/app.py`.
-Q&A logic is implemented in `apps/product/backend/classification_core`.
+The native research implementation remains in `backend.app`. The optional
+combined entrypoint is `backend.research_app:app`, with full source and research
+requirements. Neither is part of the worker images. Research Q&A logic remains
+in `apps/product/backend/classification_core`.
 
 ## Core Tables
 
