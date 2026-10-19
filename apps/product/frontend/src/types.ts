@@ -149,6 +149,7 @@ export interface QARound {
 export interface CompletionResult {
   model_id: string;
   prompt_index: number;
+  top_code?: string | null;
   response_text: string;
   response_type: string;
   rounds: QARound[];

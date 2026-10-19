@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse, StreamingResponse, Response
 
 from auth import install_optional_auth
 from benchmark import (
+    _extract_top_code,
     cancel_current_run,
     get_current_run,
     list_saved_runs,
@@ -2680,6 +2681,7 @@ def _serialise_run(run) -> dict:
         for r in results:
             d = r.model_dump()
             d["response_type"] = detect_response_type(r)
+            d["top_code"] = _extract_top_code(r.response_text)
             out.append(d)
         return out
 

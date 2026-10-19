@@ -425,12 +425,7 @@ function SimulatorTraceBlock({
 }
 
 function topCodeOf(result: CompletionResult | undefined): string | null {
-  if (!result) return null;
-  try {
-    return JSON.parse(result.response_text || "{}")?.answers?.[0]?.commodity_code ?? null;
-  } catch {
-    return null;
-  }
+  return result?.top_code ?? null;
 }
 
 /**
@@ -2090,18 +2085,8 @@ export default function AnalysisPanel() {
                     )}
                     {/* Divergence badge: show candidate's top code vs reference's */}
                     {ev.model_id !== "consensus" && (() => {
-                      const candTop = modelResult && (() => {
-                        try {
-                          const p = JSON.parse(modelResult.response_text || "{}");
-                          return p?.answers?.[0]?.commodity_code ?? null;
-                        } catch { return null; }
-                      })();
-                      const refTop = baselineResult && (() => {
-                        try {
-                          const p = JSON.parse(baselineResult.response_text || "{}");
-                          return p?.answers?.[0]?.commodity_code ?? null;
-                        } catch { return null; }
-                      })();
+                      const candTop = topCodeOf(modelResult);
+                      const refTop = topCodeOf(baselineResult);
                       if (!candTop || !refTop) return null;
                       if (candTop === refTop) {
                         return (
