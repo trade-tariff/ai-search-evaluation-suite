@@ -126,10 +126,31 @@ def _running_process_count() -> int:
         return sum(1 for process in _PROCESSES.values() if process.poll() is None)
 
 
+# Both strategies the sweep in run_classify_matrix.main runs every
+# SWEEP_GRID combination under; see its --sweep path.
+_SWEEP_STRATEGIES = ("converge", "eliminate")
+
+
+def _sweep_combo_count() -> int:
+    """Sweep run-label count: every SWEEP_GRID combination under both
+    strategies. Derived from the real grid so the estimate cannot drift from
+    what the sweep actually runs."""
+    try:
+        from classification_core.run_classify_matrix import SWEEP_GRID
+    except Exception as exc:
+        raise HTTPException(500, f"Could not load the sweep grid for session estimation: {exc}") from exc
+    return len(_SWEEP_STRATEGIES) * len(SWEEP_GRID)
+
+
 def _estimated_sessions(req: "JobCreate") -> int:
-    if req.sweep:
-        return _env_int("CLASSIFY_EVAL_SWEEP_SESSION_ESTIMATE", 500)
     per_persona = req.limit if req.limit is not None else _env_int("CLASSIFY_EVAL_UNCAPPED_SESSION_ESTIMATE", 500)
+    if req.sweep:
+        # A sweep runs every SWEEP_GRID combination under both strategies,
+        # each over the same personas and per-persona limit as one run, so the
+        # estimate scales by that real combination count. The per-persona
+        # figure is the same uncapped upper bound a non-sweep estimate uses
+        # when limit is not set.
+        return _sweep_combo_count() * len(req.personas) * per_persona
     modes = 1
     if getattr(req, "harness", "classify") == "e2e" and req.question_modes:
         modes = max(1, len([m for m in req.question_modes.split(",") if m.strip()]))
