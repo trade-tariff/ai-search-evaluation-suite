@@ -1,6 +1,8 @@
 """Offline coverage for the shared trader simulator and per-session facts."""
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -8,7 +10,7 @@ from unittest.mock import AsyncMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "product" / "backend"))
 
-from classification_core.qa_loop import SIMULATOR_MODEL, SessionFacts, simulate_trader_answer
+from classification_core.trader_simulator import SIMULATOR_MODEL, SessionFacts, simulate_trader_answer
 
 
 class FakeResponse:
@@ -56,6 +58,41 @@ class SimulateTraderAnswerModelSelectionTest(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(client.chat.completions.calls[0]["model"], SIMULATOR_MODEL)
+
+
+class SimulatorImportBoundaryTest(unittest.TestCase):
+    def test_worker_adapter_import_does_not_load_local_classification_or_database(self):
+        backend = str(Path(__file__).resolve().parents[1] / "apps" / "product" / "backend")
+        subprocess.run(
+            [sys.executable, "-c", "\n".join([
+                "import sys",
+                "import classification_core.trade_tariff_backend.qa_loop",
+                "assert 'classification_core.qa_loop' not in sys.modules",
+                "assert 'classification_core.classification' not in sys.modules",
+                "assert 'classification_core.local_db' not in sys.modules",
+            ])],
+            env={**os.environ, "PYTHONPATH": backend}, check=True,
+        )
+
+
+class LegacySimulatorModelTest(unittest.IsolatedAsyncioTestCase):
+    async def test_legacy_default_override_does_not_change_the_worker_default(self):
+        import classification_core.qa_loop as legacy
+
+        client = FakeClient(FakeResponse(_VALID_CHOICE))
+        arguments = {
+            "client": client, "session": SessionFacts(), "raw_query": "pipe",
+            "question": "What is it made of?", "options": ["Steel", "Plastic"],
+            "round_number": 1,
+        }
+        with patch.object(legacy, "SIMULATOR_MODEL", "legacy-research-model"):
+            await legacy.simulate_trader_answer(**arguments)
+            await simulate_trader_answer(**arguments)
+            await legacy.simulate_trader_answer(**arguments, model="explicit-model")
+
+        self.assertEqual([call["model"] for call in client.chat.completions.calls],
+                         ["legacy-research-model", SIMULATOR_MODEL, "explicit-model"])
+        self.assertIs(legacy.SessionFacts, SessionFacts)
 
 
 class SessionFactsTest(unittest.TestCase):
