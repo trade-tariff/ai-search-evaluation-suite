@@ -69,6 +69,7 @@ services:
     build:
       context: ../..
       dockerfile: apps/classification-evals/Dockerfile
+      target: extraction-tools
     env_file:
       - .env
     environment:
@@ -98,6 +99,7 @@ services:
     build:
       context: ../..
       dockerfile: apps/classification-evals/Dockerfile
+      target: extraction-tools
     env_file:
       - .env
     environment:
