@@ -1184,6 +1184,8 @@ export default function AnalysisPanel() {
         const improvements: Array<{ name: string; before: number; after: number; delta: number }> = [];
         const missing: string[] = [];
         const added: string[] = [];
+        const incomparable: string[] = [];
+        let comparedCount = 0;
         const candByIdCur = new Map(summaries.map((s) => [s.model_id, s]));
         const candByIdCmp = new Map(compareResults.summaries.filter((s) => s.model_id !== "consensus").map((s) => [s.model_id, s]));
         for (const [mid, before] of candByIdCmp) {
@@ -1191,7 +1193,11 @@ export default function AnalysisPanel() {
           if (!after) { missing.push(before.model_name); continue; }
           // Regression tracking only makes sense for reference-scored runs;
           // gold-mode runs carry null reference top-1.
-          if (after.top1_accuracy == null || before.top1_accuracy == null) continue;
+          if (after.top1_accuracy == null || before.top1_accuracy == null) {
+            incomparable.push(after.model_name);
+            continue;
+          }
+          comparedCount += 1;
           const delta = after.top1_accuracy - before.top1_accuracy;
           if (delta <= -THRESHOLD) regressions.push({ name: after.model_name, before: before.top1_accuracy, after: after.top1_accuracy, delta });
           else if (delta >= THRESHOLD) improvements.push({ name: after.model_name, before: before.top1_accuracy, after: after.top1_accuracy, delta });
@@ -1203,7 +1209,10 @@ export default function AnalysisPanel() {
         if (!hasFindings) {
           return (
             <section className="rounded-lg border border-gray-800 bg-gray-950/50 p-3 text-xs text-gray-400">
-              No significant regressions or improvements vs compared run (top-1 within ±{(THRESHOLD * 100).toFixed(0)}pp for all models).
+              {comparedCount === 0
+                ? "No comparable reference top-1 accuracy data. Gold-mode runs do not include this metric."
+                : `Reference top-1 accuracy is within ±${(THRESHOLD * 100).toFixed(0)}pp for ${comparedCount} compared model${comparedCount === 1 ? "" : "s"}.`}
+              {incomparable.length > 0 && <div className="mt-1">Not compared (reference top-1 unavailable): {incomparable.join(", ")}.</div>}
             </section>
           );
         }
@@ -1215,6 +1224,8 @@ export default function AnalysisPanel() {
                 threshold: ±{(THRESHOLD * 100).toFixed(0)}pp top-1 accuracy
               </div>
             </div>
+            {comparedCount === 0 && <div className="mb-2 text-xs text-gray-400">No comparable reference top-1 accuracy data.</div>}
+            {incomparable.length > 0 && <div className="mb-2 text-xs text-gray-400">Not compared (reference top-1 unavailable): {incomparable.join(", ")}.</div>}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
               {regressions.length > 0 && (
                 <div>
