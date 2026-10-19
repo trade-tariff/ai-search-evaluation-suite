@@ -33,6 +33,7 @@ COPY apps/product/backend/_retry.py \
      apps/product/backend/commodity_codes.py \
      apps/product/backend/complexity_charts.py \
      apps/product/backend/config.py \
+     apps/product/backend/evaluation_ingress.py \
      apps/product/backend/experiment_retrieval.py \
      apps/product/backend/fact_store.py \
      apps/product/backend/intercept_kpis.py \
@@ -63,6 +64,7 @@ COPY apps/product/backend/classification_core/__init__.py \
      apps/product/backend/classification_core/run_hydrated_e2e_matrix.py \
      apps/product/backend/classification_core/run_qna_mode_comparison.py \
      apps/product/backend/classification_core/session_facts.py \
+     apps/product/backend/classification_core/trader_simulator.py \
      apps/product/backend/classification_core/triage.py \
      apps/product/backend/classification_core/
 COPY apps/product/backend/classification_core/trade_tariff_backend/__init__.py \
