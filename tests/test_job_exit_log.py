@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "classification-evals"))
 
-from backend import app
+from backend import research_app_base as app
 
 
 class RecordExitTest(unittest.TestCase):
