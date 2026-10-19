@@ -27,8 +27,8 @@ source files. A merged entry needs a pull request link and merge commit.
 | F01 | `components/CompareTab.tsx` | Merged | [#51](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/51) / `77ef136d2986c4fe6464c14863d8fddd9ffced49` |
 | F02 | `components/TraderJourneyTab.tsx` | Merged | [#52](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/52) / `186a3336cff0d3d0a078334c7e33c1af078d3aff` |
 | F03 | `trader-journey/stages/CompareStage.tsx` | Merged | [#53](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/53) / `cdb008607430333539a175d1043505b1652e5f0d` |
-| P01 | Move `Stage` to `trader-journey/types.ts` and update App/Stepper imports | In progress | Pending |
-| F04 | `trader-journey/TraderJourneyApp.tsx` | Depends on P01 | |
+| P01 | Move `Stage` to `trader-journey/types.ts` and update App/Stepper imports | Merged | [#54](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/54) / `15212f1c367d3badfaf60b5fd2e5197c6011f801` |
+| F04 | `trader-journey/TraderJourneyApp.tsx` | In progress | Pending |
 | F05 | `trader-journey/stages/ClassifyStage.tsx` | Depends on F04 | |
 | F06 | `trader-journey/stages/ValueStage.tsx` | Depends on F04 | |
 | F07 | `trader-journey/stages/DutyStage.tsx` | Depends on F04 | |
