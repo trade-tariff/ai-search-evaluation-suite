@@ -35,8 +35,8 @@ source files. A merged entry needs a pull request link and merge commit.
 | F08 | `trader-journey/stages/LandedStage.tsx` | Merged | [#60](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/60) / `12e5e1c68570472ed0aacca3fec34258c23ce732` |
 | F09 | `trader-journey/stages/DeclareStage.tsx` | Merged | [#61](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/61) / `d072987e2a5b570b7a891616e47da1e4692d9a35` |
 | F10 | `trader-journey/components/Stepper.tsx` | Merged | [#62](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/62) / `0f0db62e50f851bbad32c2ca756e0c3f95685f91` |
-| F11 | `trader-journey/components/Money.tsx` | In progress | Pending |
-| F12 | `trader-journey/api.ts` | Depends on stage removals | |
+| F11 | `trader-journey/components/Money.tsx` | Merged | [#63](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/63) / `21b138cbe15159385445c18d86a81e562871631f` |
+| F12 | `trader-journey/api.ts` | In progress | Pending |
 | F13 | `trader-journey/types.ts` | Depends on F10-F12 and stage removals | |
 
 P01 must merge before F04. It moves `Stage` to the shared types file so that
