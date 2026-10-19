@@ -7,9 +7,7 @@ import sys
 import time
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI, Request
 
 from .auth import auth_enabled, install_optional_auth
 from .logging_config import configure_logging, is_healthcheck_path
@@ -27,10 +25,6 @@ if str(PRODUCT_BACKEND) not in sys.path:
     sys.path.insert(0, str(PRODUCT_BACKEND))
 
 from evaluation_ingress import router as evaluation_router
-
-PRODUCT_FRONTEND_DIST = PRODUCT_APP_ROOT / "frontend" / "dist"
-PRODUCT_FRONTEND_ASSETS = PRODUCT_FRONTEND_DIST / "assets"
-PRODUCT_FRONTEND_INDEX = PRODUCT_FRONTEND_DIST / "index.html"
 
 app = FastAPI(
     title="AI Search Evaluation Worker",
@@ -75,35 +69,3 @@ def health() -> dict:
 @app.get("/api/live")
 def live() -> dict:
     return {"status": "ok"}
-
-
-def _react_index() -> FileResponse:
-    if not PRODUCT_FRONTEND_INDEX.exists():
-        raise HTTPException(
-            404,
-            "React app bundle is missing. Build the frontend or rebuild the deployable image.",
-        )
-    return FileResponse(PRODUCT_FRONTEND_INDEX, media_type="text/html")
-
-
-app.mount(
-    "/assets",
-    StaticFiles(directory=str(PRODUCT_FRONTEND_ASSETS), check_dir=False),
-    name="workbench-assets",
-)
-
-
-@app.get("/", include_in_schema=False)
-def deployable_app() -> FileResponse:
-    return _react_index()
-
-
-@app.get("/workbench", include_in_schema=False)
-@app.get("/workbench/", include_in_schema=False)
-def workbench_redirect() -> RedirectResponse:
-    return RedirectResponse("/", status_code=308)
-
-
-@app.get("/workbench/{path:path}", include_in_schema=False)
-def workbench_spa_redirect(path: str) -> RedirectResponse:
-    return workbench_redirect()

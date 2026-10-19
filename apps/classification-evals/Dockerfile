@@ -1,12 +1,3 @@
-FROM node:20-slim AS frontend-build
-
-WORKDIR /app/apps/product/frontend
-COPY apps/product/frontend/package.json apps/product/frontend/package-lock.json ./
-RUN npm ci --ignore-scripts
-COPY apps/product/frontend ./
-RUN npm run build
-
-
 FROM python:3.12-slim
 
 RUN apt-get update \
@@ -78,7 +69,6 @@ COPY apps/product/backend/classification_core/data/commodities.json \
      apps/product/backend/classification_core/data/kg_edges.json \
      apps/product/backend/classification_core/data/
 COPY apps/product/data apps/product/data
-COPY --from=frontend-build /app/apps/product/frontend/dist apps/product/frontend/dist
 COPY apps/classification-evals apps/classification-evals
 RUN mkdir -p /app/apps/classification-evals/var /app/apps/product/results \
     && useradd --create-home --shell /usr/sbin/nologin appuser \
