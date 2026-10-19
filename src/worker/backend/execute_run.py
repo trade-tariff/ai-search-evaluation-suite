@@ -117,10 +117,10 @@ async def execute_run(run_id: str, client) -> dict:
 
         gold_queries = await client.get_gold_queries(set_id)
         if not gold_queries:
-            raise RuntimeError(
-                f"gold query set {set_id} has no gold queries. It may still be generating, "
-                "or every item in it may have failed"
-            )
+            # Deliberately doesn't guess why the set is empty (still generating, every
+            # item failed, or something else entirely) — the run has no way to tell, and
+            # a wrong guess here is worse than no guess.
+            raise RuntimeError(f"gold query set {set_id} has no gold queries")
         total_gold_queries = len(gold_queries)
         _log_experiment(
             f"experiment run started run_id={run_id} gold_queries={total_gold_queries}",

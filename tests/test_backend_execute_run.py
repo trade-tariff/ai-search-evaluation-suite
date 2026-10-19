@@ -750,7 +750,7 @@ class GoldQuerySetTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(summary["status"], "failed")
         self.assertEqual(client.update_run_calls, ["failed"])
 
-    async def test_an_empty_gold_query_set_fails_the_run_with_a_clear_message(self):
+    async def test_an_empty_gold_query_set_fails_the_run_without_guessing_why(self):
         client = FakeClient()
         client.gold_queries = []
 
@@ -758,8 +758,13 @@ class GoldQuerySetTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(client.update_run_calls, ["running", "failed"])
         self.assertEqual(summary, {"status": "failed", "succeeded": 0, "failed": 0})
-        self.assertIn("gold query set 5 has no gold queries", client.update_run_kwargs[-1]["error_summary"])
-        self.assertIn("still be generating", client.update_run_kwargs[-1]["error_summary"])
+        # The set could be empty because it's still generating, because every item in it
+        # failed, or for some other reason entirely — the run has no way to tell which, so
+        # the message states the fact and stops there instead of guessing a cause.
+        self.assertEqual(
+            client.update_run_kwargs[-1]["error_summary"],
+            "run aborted early: gold query set 5 has no gold queries",
+        )
 
 class ProgressLoggingTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
