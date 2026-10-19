@@ -237,18 +237,9 @@ def _parse_questions(response_text: str) -> list[dict]:
 
 
 def _extract_top_code(response_text: str) -> str | None:
-    """Pull the strongest commodity_code from an 'answers' JSON response, for UI."""
-    if not response_text:
-        return None
-    try:
-        parsed = json.loads(response_text)
-        if isinstance(parsed, dict) and parsed.get("answers"):
-            first = parsed["answers"][0]
-            if isinstance(first, dict):
-                return first.get("commodity_code")
-    except (json.JSONDecodeError, TypeError, KeyError, IndexError):
-        pass
-    return None
+    """Use the same confidence-ranked codes as deterministic scoring."""
+    codes = _extract_codes(response_text)
+    return codes[0] if codes else None
 
 
 def _auto_answer(questions: list[dict]) -> list[dict]:
