@@ -423,6 +423,8 @@ export interface JourneyPersona {
 
 export type QaProcessMode = "local_rules" | "legacy_eliminate" | "ott_staging" | "ott_staging_kg";
 
+export type Stage = "classify" | "value" | "duty" | "landed" | "declare";
+
 // Shared journey state held by App and threaded through stages.
 export interface JourneyState {
   // Classify

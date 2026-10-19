@@ -5,14 +5,12 @@ import ValueStage from "./stages/ValueStage";
 import DutyStage from "./stages/DutyStage";
 import LandedStage from "./stages/LandedStage";
 import DeclareStage from "./stages/DeclareStage";
-import { initialJourneyState, type JourneyState } from "./types";
+import { initialJourneyState, type JourneyState, type Stage } from "./types";
 
 // Native end-to-end trader journey (Classify -> Value -> Duty inputs -> Import costs -> Declare).
 // Calls /api/* (relative paths) proxied to the single :8000 backend.
 // The original standalone app's page chrome (header/footer) was dropped - the fan-out
 // shell provides the header + tab nav.
-
-export type Stage = "classify" | "value" | "duty" | "landed" | "declare";
 
 const ORDER: Stage[] = ["classify", "value", "duty", "landed", "declare"];
 

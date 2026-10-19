@@ -26,8 +26,8 @@ source files. A merged entry needs a pull request link and merge commit.
 | --- | --- | --- | --- |
 | F01 | `components/CompareTab.tsx` | Merged | [#51](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/51) / `77ef136d2986c4fe6464c14863d8fddd9ffced49` |
 | F02 | `components/TraderJourneyTab.tsx` | Merged | [#52](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/52) / `186a3336cff0d3d0a078334c7e33c1af078d3aff` |
-| F03 | `trader-journey/stages/CompareStage.tsx` | In progress | Pending |
-| P01 | Move `Stage` to `trader-journey/types.ts` and update App/Stepper imports | Prerequisite before F04 | |
+| F03 | `trader-journey/stages/CompareStage.tsx` | Merged | [#53](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/53) / `cdb008607430333539a175d1043505b1652e5f0d` |
+| P01 | Move `Stage` to `trader-journey/types.ts` and update App/Stepper imports | In progress | Pending |
 | F04 | `trader-journey/TraderJourneyApp.tsx` | Depends on P01 | |
 | F05 | `trader-journey/stages/ClassifyStage.tsx` | Depends on F04 | |
 | F06 | `trader-journey/stages/ValueStage.tsx` | Depends on F04 | |
@@ -39,11 +39,10 @@ source files. A merged entry needs a pull request link and merge commit.
 | F12 | `trader-journey/api.ts` | Depends on stage removals | |
 | F13 | `trader-journey/types.ts` | Depends on F10-F12 and stage removals | |
 
-P01 must merge before F04. `Stepper.tsx` imports `Stage` from
-`TraderJourneyApp.tsx`, so deleting F04 first would leave a broken type import.
-TypeScript checks all of `src`, including components that are not mounted. Move
-that type to the existing types file and update both imports in a prerequisite
-pull request. Keep it until Stepper and the remaining type consumers are removed.
+P01 must merge before F04. It moves `Stage` to the shared types file so that
+`Stepper.tsx` does not import the app. TypeScript checks all of `src`, including
+components that are not mounted. Keep the type until Stepper and the remaining
+type consumers are removed.
 
 The current `src/main.tsx` renders only `App`, which does not import these
 components. [PR #37](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/37)

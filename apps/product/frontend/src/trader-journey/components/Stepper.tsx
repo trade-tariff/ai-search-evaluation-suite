@@ -1,4 +1,4 @@
-import { Stage } from "../TraderJourneyApp";
+import type { Stage } from "../types";
 
 const STAGES: { key: Stage; label: string; subtitle: string }[] = [
   { key: "classify", label: "Classify", subtitle: "Find the commodity code" },
