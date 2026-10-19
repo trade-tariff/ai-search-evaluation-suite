@@ -29,7 +29,7 @@ if [ ! -f ".venv/.requirements-installed" ] \
   touch ".venv/.requirements-installed"
 fi
 
-exec uvicorn backend.app:app \
+exec uvicorn backend.worker_app:app \
   --host "${CLASSIFY_EVAL_HOST:-127.0.0.1}" \
   --port "${CLASSIFY_EVAL_PORT:-8100}" \
   --no-access-log

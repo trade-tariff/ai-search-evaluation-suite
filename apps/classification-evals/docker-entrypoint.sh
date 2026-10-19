@@ -13,7 +13,7 @@ printf '%s' "${SSL_CERT_PEM//\\n/$'\n'}" > "$CERT_DIR/certificate.pem"
 printf '%s' "${SSL_KEY_PEM//\\n/$'\n'}" > "$CERT_DIR/private-key.pem"
 chmod 600 "$CERT_DIR/certificate.pem" "$CERT_DIR/private-key.pem"
 
-exec uvicorn backend.app:app \
+exec uvicorn backend.worker_app:app \
   --host 0.0.0.0 \
   --port 8443 \
   --no-access-log \

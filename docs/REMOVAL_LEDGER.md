@@ -74,10 +74,10 @@ The journey has its own Dockerfile and Compose service. Extraction scripts have
 explicit CLI and scheduled entrypoints. Preserve historical experiment evidence.
 R02 retains those reachable tools and the workbench API source. The optional
 `backend.research_app:app` entrypoint preserves the copied research APIs without
-loading them in the worker. This adds no research deployment. W05 separates the
-remaining native research routes into `backend.research_app_base`, and W07
-excludes research code from the worker image. Operator use remains unverified;
-removal needs a separate retirement decision.
+loading them in the worker. This adds no research deployment. Default launchers
+select `backend.worker_app:app`. The native research implementation stays in
+`backend.app`; W07 excludes it from the worker image. Operator use remains
+unverified; removal needs a separate retirement decision.
 
 Record a source-backed retention or archive decision for R01 before
 closing this ledger. Do not report the campaign complete while any deletion or
