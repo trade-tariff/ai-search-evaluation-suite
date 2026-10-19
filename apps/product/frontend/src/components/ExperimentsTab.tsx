@@ -796,7 +796,7 @@ export default function ExperimentsTab() {
                   setTrialError(null);
                   setHydrationError(null);
                 }}
-                className="mt-2 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
+                className="mt-2 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 focus-visible:border-blue-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500/30"
               >
                 {sortedExperiments.map((experiment) => (
                   <option key={experiment.run_label} value={experiment.run_label}>
@@ -824,7 +824,7 @@ export default function ExperimentsTab() {
                   }}
                   name="input_query"
                   autoComplete="off"
-                  className="mt-2 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
+                  className="mt-2 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 focus-visible:border-blue-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500/30"
                   placeholder="Fresh goods description..."
                 />
               </div>
@@ -839,7 +839,7 @@ export default function ExperimentsTab() {
                   inputMode="numeric"
                   autoComplete="off"
                   spellCheck={false}
-                  className="mt-2 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
+                  className="mt-2 w-full rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 focus-visible:border-blue-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500/30"
                   placeholder="Optional 10-digit code..."
                 />
                 <div className="mt-1 text-xs text-gray-500">
@@ -862,7 +862,7 @@ export default function ExperimentsTab() {
                   onChange={(event) => setRetrievalLimit(Number(event.target.value))}
                   name="retrieval_limit"
                   autoComplete="off"
-                  className="mt-2 w-36 rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 focus-visible:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30"
+                  className="mt-2 w-36 rounded border border-gray-700 bg-gray-950 px-3 py-2 text-sm text-gray-100 focus-visible:border-blue-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500/30"
                 />
               </label>
               <label
@@ -885,14 +885,14 @@ export default function ExperimentsTab() {
                       resetHydratedQa();
                     }
                   }}
-                  className="h-4 w-4 rounded border-gray-700 bg-gray-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/50"
+                  className="h-4 w-4 rounded border-gray-700 bg-gray-950 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/50"
                 />
                 Allow provider calls
               </label>
               <button
                 type="submit"
                 disabled={!canRun}
-                className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/50 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 disabled:hover:bg-gray-700"
+                className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-400/50 disabled:cursor-not-allowed disabled:bg-gray-700 disabled:text-gray-400 disabled:hover:bg-gray-700"
               >
                 {running ? "Running..." : "Run Retrieval"}
               </button>

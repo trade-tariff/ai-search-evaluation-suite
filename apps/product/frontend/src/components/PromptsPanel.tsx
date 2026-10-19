@@ -236,7 +236,7 @@ export default function PromptsPanel({
               max={80}
               value={opensearchLimit}
               onChange={(e) => onOpensearchLimitChange(Math.min(80, Math.max(1, parseInt(e.target.value) || 10)))}
-              className="w-16 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm text-center focus:outline-none focus:border-blue-500"
+              className="w-16 bg-gray-800 border border-gray-700 rounded px-2 py-1.5 text-sm text-center focus:outline-hidden focus:border-blue-500"
             />
           </div>
         </div>

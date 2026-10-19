@@ -140,7 +140,7 @@ export default function SimulatorPanel() {
           <select
             value={draft.model}
             onChange={(e) => selectModel(e.target.value)}
-            className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+            className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-hidden focus:border-blue-500"
           >
             {models.map((model) => (
               <option key={model.id} value={model.id}>
@@ -203,7 +203,7 @@ export default function SimulatorPanel() {
             onChange={(e) =>
               setDraft({ ...draft, temperature: Math.max(0, Math.min(2, parseFloat(e.target.value) || 0)) })
             }
-            className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+            className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:outline-hidden focus:border-blue-500"
           />
           <p className="text-xs text-gray-500 mt-1">
             Only used if reasoning effort is blank in the backend path.
