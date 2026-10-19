@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import AsyncIterator
 
+from anyio import CancelScope
+
 from judge import (
     _extract_codes,
     _schema_valid_score,
@@ -793,10 +795,48 @@ async def run_benchmark(
     opensearch_limit: int = 80,
     gold_mode: bool | None = None,
 ) -> AsyncIterator[SSEEvent]:
+    global _cancel_event
+    # Reserve at stream start too: two HTTP responses can be constructed
+    # before either response starts iterating its body.
+    if is_run_active():
+        yield SSEEvent(event="error", data={"message": "A benchmark is already running."})
+        return
+    tasks: list[asyncio.Task] = []
+    stream = _run_benchmark(prompt_indices, model_ids, config, opensearch_limit, gold_mode, all_tasks=tasks)
+    run = None
+    try:
+        async for event in stream:
+            if run is None:
+                run = _current_run
+            yield event
+    finally:
+        # HTTP disconnects cancel the surrounding AnyIO scope. Cleanup must
+        # finish here, before that cancellation closes this generator.
+        with CancelScope(shield=True):
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
+            await stream.aclose()
+            if run is not None and _current_run is run:
+                if run.status == "running":
+                    checkpoint_current_run(status="interrupted")
+                _cancel_event = None
+
+
+async def _run_benchmark(
+    prompt_indices: list[int],
+    model_ids: list[str],
+    config: AppConfig,
+    opensearch_limit: int = 80,
+    gold_mode: bool | None = None,
+    *,
+    all_tasks: list[asyncio.Task],
+) -> AsyncIterator[SSEEvent]:
     global _current_run, _cancel_event, _current_model_map
     clear_provider_cache()
     _cancel_event = asyncio.Event()
-    all_tasks: list[asyncio.Task] = []
 
     def check_cancelled() -> bool:
         """Call at drain boundaries. Returns True if run should abort."""

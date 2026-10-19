@@ -9,6 +9,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
+from anyio import CancelScope
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse, Response
@@ -2612,25 +2613,19 @@ async def api_start_benchmark(req: BenchmarkRequest):
     cfg = load_config()
 
     async def event_stream():
-        from benchmark import checkpoint_current_run
-
-        finished = False
+        stream = run_benchmark(
+            req.prompt_indices, req.model_ids, cfg, req.opensearch_limit,
+            gold_mode=req.gold_mode,
+        )
         try:
-            async for event in run_benchmark(
-                req.prompt_indices, req.model_ids, cfg, req.opensearch_limit,
-                gold_mode=req.gold_mode,
-            ):
-                if event.event in ("benchmark:complete", "benchmark:cancelled", "error"):
-                    finished = True
+            async for event in stream:
                 data = json.dumps(event.data)
                 yield f"event: {event.event}\ndata: {data}\n\n"
         finally:
-            # A disconnected client closes this generator, so run_benchmark
-            # never reaches its own save and the whole run - already billed -
-            # would vanish. Persist what completed, flagged honestly so the
-            # partial numbers are not mistaken for a finished run.
-            if not finished:
-                checkpoint_current_run(status="interrupted")
+            # A disconnect cancels the response's AnyIO scope. Shield teardown
+            # so every child task exits before the interrupted run is saved.
+            with CancelScope(shield=True):
+                await stream.aclose()
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
