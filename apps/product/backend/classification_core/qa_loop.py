@@ -250,6 +250,19 @@ def persist_session_facts_to_kg(
     return summary
 
 
+def session_facts_persist_skipped(facts) -> dict:
+    """Summary to record when a runner deliberately does NOT persist facts.
+
+    Evaluation runners keep their oracle/session facts out of the shared KG
+    classification/qa scopes by default, because those scopes are what their
+    own later sessions and readers retrieve from. The shape mirrors
+    persist_session_facts_to_kg's return so result readers can treat both
+    uniformly.
+    """
+    n = len(facts or [])
+    return {"opt_in": False, "attempted": n, "persisted": 0, "skipped": n, "ids": []}
+
+
 # ---------- simulator (oracle-backed) ----------
 
 _TRAILING_PUNCT = ".,;:!?\"'"

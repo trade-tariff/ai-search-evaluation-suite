@@ -16,6 +16,11 @@ simulator_calls, and an ESTIMATED $/session (per-call price x calls; labelled es
 
 Writes one row per session to kg.classify_runs. Idempotent table create.
 
+Session facts are NOT persisted to the shared KG by default (measurement
+isolation): they would land in the classification/qa scopes that this same
+runner's later sessions and its LOO gold exclusions read from. Pass
+--persist-session-facts for intentional enrichment runs.
+
 Usage (single config):
   .venv/bin/python -m classification_core.run_classify_matrix \
       --run-label baseline_converge \
@@ -185,7 +190,8 @@ def _ensure_table(conn) -> None:
 async def run_one_session(gold: dict, oracle_text: str, *, strategy: str,
                           prompt_mode: str, augmentation: str, model: str,
                           candidate_limit: int, max_rounds: int,
-                          loo_map: dict[str, tuple[list[str], list[str]]] | None = None) -> dict:
+                          loo_map: dict[str, tuple[list[str], list[str]]] | None = None,
+                          persist_session_facts: bool = False) -> dict:
     fact_excl, edge_excl = (loo_map or {}).get(_norm_code(gold.get("expected_code")), ([], []))
     config = build_config(strategy, prompt_mode, augmentation, candidate_limit, fact_excl, edge_excl)
 
@@ -197,25 +203,32 @@ async def run_one_session(gold: dict, oracle_text: str, *, strategy: str,
     elapsed = time.time() - started
 
     expected = gold["expected_code"]
-    persisted_session_facts = qa_loop.persist_session_facts_to_kg(
-        commodity_code=expected,
-        facts=result.get("facts") or [],
-        source=f"qna_session:classify_matrix:{gold['id']}:{strategy}:{prompt_mode}",
-        provenance={
-            "runner": "run_classify_matrix",
-            "run_label": "classify_matrix",
-            "gold_id": gold.get("id"),
-            "source_id": gold.get("source_id"),
-            "persona": gold.get("persona"),
-            "query": gold.get("query"),
-            "strategy": strategy,
-            "prompt_mode": prompt_mode,
-            "augmentation": augmentation,
-            "model": model,
-            "source_authority_tier": _session_fact_authority_tier(gold, oracle_text, result.get("rounds")),
-        },
-        authority_tier=_session_fact_authority_tier(gold, oracle_text, result.get("rounds")),
-    )
+    if persist_session_facts:
+        # Opt-in enrichment only: persisted facts land in the shared
+        # kg.commodity_facets classification/qa scopes that this same runner's
+        # later sessions read from. Trace/result recording is unchanged either
+        # way; only the shared-KG write is gated.
+        persisted_session_facts = qa_loop.persist_session_facts_to_kg(
+            commodity_code=expected,
+            facts=result.get("facts") or [],
+            source=f"qna_session:classify_matrix:{gold['id']}:{strategy}:{prompt_mode}",
+            provenance={
+                "runner": "run_classify_matrix",
+                "run_label": "classify_matrix",
+                "gold_id": gold.get("id"),
+                "source_id": gold.get("source_id"),
+                "persona": gold.get("persona"),
+                "query": gold.get("query"),
+                "strategy": strategy,
+                "prompt_mode": prompt_mode,
+                "augmentation": augmentation,
+                "model": model,
+                "source_authority_tier": _session_fact_authority_tier(gold, oracle_text, result.get("rounds")),
+            },
+            authority_tier=_session_fact_authority_tier(gold, oracle_text, result.get("rounds")),
+        )
+    else:
+        persisted_session_facts = qa_loop.session_facts_persist_skipped(result.get("facts") or [])
     result["persisted_session_facts"] = persisted_session_facts
 
     # Final SET = the full committed/surviving answer list (not truncated to 5).
@@ -259,6 +272,7 @@ async def run_one_session(gold: dict, oracle_text: str, *, strategy: str,
 
 async def run_config(conn, *, run_label: str, strategy: str, prompt_mode: str,
                      augmentation: str, model: str, candidate_limit: int,
+                     persist_session_facts: bool = False,
                      personas: list[str], limit: int | None, concurrency: int,
                      max_rounds: int) -> tuple[list[dict], list[dict]]:
     os.environ["CLASSIFY_LLM_MODEL"] = model  # both classify + eliminate read this
@@ -311,6 +325,7 @@ async def run_config(conn, *, run_label: str, strategy: str, prompt_mode: str,
                     augmentation=augmentation, model=model,
                     candidate_limit=candidate_limit, max_rounds=max_rounds,
                     loo_map=loo_map,
+                    persist_session_facts=persist_session_facts,
                 )
             except Exception as exc:
                 print(f"  [error] {gold['source_id']} {gold['persona']}: {exc!r}")
@@ -327,7 +342,8 @@ async def run_config(conn, *, run_label: str, strategy: str, prompt_mode: str,
         if res.get("failure"):
             failures.append(res)
             continue
-        res["config"] = {**res["config"], "gold_set": {"n": len(gold_rows), "md5": gold_sig}}
+        res["config"] = {**res["config"], "gold_set": {"n": len(gold_rows), "md5": gold_sig},
+                          "persist_session_facts": persist_session_facts}
         results.append(res)
         with conn.cursor() as cur:
             cur.execute(
@@ -417,6 +433,10 @@ async def main() -> None:
     ap.add_argument("--max-rounds", type=int, default=int(os.environ.get("EXP6_MAX_ROUNDS", "5")))
     ap.add_argument("--sweep", action="store_true",
                     help="Run SWEEP_GRID across BOTH strategies (each combo -> own run_label).")
+    ap.add_argument("--persist-session-facts", action="store_true",
+                    help="Opt in to persisting session facts to the shared KG. Off by default "
+                         "for measurement isolation: persisted facts land in the "
+                         "classification/qa scopes later sessions read from.")
     args = ap.parse_args()
 
     if not os.environ.get("OPENAI_API_KEY"):
@@ -449,6 +469,7 @@ async def main() -> None:
             augmentation=aug, model=args.model, candidate_limit=args.candidate_limit,
             personas=personas, limit=args.limit, concurrency=args.concurrency,
             max_rounds=args.max_rounds,
+            persist_session_facts=args.persist_session_facts,
         )
         _print_summary(label, results)
         total_results += len(results)
