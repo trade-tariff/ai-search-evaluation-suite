@@ -90,6 +90,10 @@ async def log_http_requests(request: Request, call_next):
     return response
 
 _PROCESS_LOCK = threading.Lock()
+# Serialises the job-start reservation: capacity check, spawn, register,
+# and the initial jobs row. A request that fails after spawning releases
+# its slot by unregistering and killing the process.
+_JOB_START_LOCK = threading.Lock()
 _CLASSIFY_TRIAL_LOCK = threading.Lock()
 _PROCESSES: dict[str, subprocess.Popen] = {}
 _RUNNER_INSTANCE_ID = uuid.uuid4().hex
@@ -445,9 +449,6 @@ def _validate_request(req: JobCreate) -> None:
         raise HTTPException(422, "Trader emulator model is not enabled for classification eval jobs.")
     if req.sweep and not _env_bool("CLASSIFY_EVAL_ALLOW_SWEEP"):
         raise HTTPException(403, "Sweep jobs are disabled. Set CLASSIFY_EVAL_ALLOW_SWEEP=1 to enable them.")
-    max_running = _env_int("CLASSIFY_EVAL_MAX_RUNNING_JOBS", 1)
-    if _running_process_count() >= max_running:
-        raise HTTPException(429, f"Runner already has {max_running} active job(s).")
     max_concurrency = _env_int("CLASSIFY_EVAL_MAX_CONCURRENCY", 4)
     if req.concurrency > max_concurrency:
         raise HTTPException(422, f"Concurrency exceeds server cap CLASSIFY_EVAL_MAX_CONCURRENCY={max_concurrency}.")
@@ -1454,42 +1455,61 @@ def create_job(req: JobCreate) -> dict:
     # positive; this comment is the reasoning, kept out of the alert's
     # exact flagged line so future edits nearby don't reopen it under a new
     # alert number.
-    process = subprocess.Popen(
-        cmd,
-        cwd=PRODUCT_BACKEND,
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        start_new_session=True,
-    )
-    with _PROCESS_LOCK:
-        _PROCESSES[job_id] = process
-
-    now = time.time()
-    with _connect() as conn:
-        conn.execute(
-            """
-            INSERT INTO jobs
-              (id, created_at, updated_at, status, pid, returncode, command_json, request_json,
-               log_path, error, runner_instance, estimated_sessions, estimated_cost_usd)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                job_id,
-                now,
-                now,
-                "running",
-                process.pid,
-                None,
-                json.dumps(cmd),
-                json.dumps(req.model_dump(mode="json")),
-                str(log_path),
-                None,
-                _RUNNER_INSTANCE_ID,
-                estimated_sessions,
-                estimated_cost,
-            ),
+    #
+    # One reservation covers the capacity check, spawn, register, and the
+    # initial jobs row. Synchronous requests run on worker threads, so two
+    # concurrent create calls would otherwise both pass the cap before either
+    # registers its process. The reservation lock is separate from
+    # _PROCESS_LOCK: helpers below (for example _running_process_count)
+    # re-acquire _PROCESS_LOCK, which is not reentrant.
+    with _JOB_START_LOCK:
+        max_running = _env_int("CLASSIFY_EVAL_MAX_RUNNING_JOBS", 1)
+        if _running_process_count() >= max_running:
+            raise HTTPException(429, f"Runner already has {max_running} active job(s).")
+        process = subprocess.Popen(
+            cmd,
+            cwd=PRODUCT_BACKEND,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
         )
+        with _PROCESS_LOCK:
+            _PROCESSES[job_id] = process
+        now = time.time()
+        try:
+            with _connect() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO jobs
+                      (id, created_at, updated_at, status, pid, returncode, command_json, request_json,
+                       log_path, error, runner_instance, estimated_sessions, estimated_cost_usd)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        job_id,
+                        now,
+                        now,
+                        "running",
+                        process.pid,
+                        None,
+                        json.dumps(cmd),
+                        json.dumps(req.model_dump(mode="json")),
+                        str(log_path),
+                        None,
+                        _RUNNER_INSTANCE_ID,
+                        estimated_sessions,
+                        estimated_cost,
+                    ),
+                )
+        except BaseException:
+            # Release the reserved slot on failure: unregister first, then kill
+            # the already-spawned process so no orphan counts against the cap.
+            with _PROCESS_LOCK:
+                _PROCESSES.pop(job_id, None)
+            process.kill()
+            process.wait()
+            raise
     threading.Thread(target=_watch_process, args=(job_id, process, log_path), daemon=True).start()
     _log_experiment(
         "experiment_run_started",
