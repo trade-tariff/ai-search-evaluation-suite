@@ -27,7 +27,8 @@ source files. A merged entry needs a pull request link and merge commit.
 | F01 | `components/CompareTab.tsx` | In progress | Pending |
 | F02 | `components/TraderJourneyTab.tsx` | Check competing entrypoint | |
 | F03 | `trader-journey/stages/CompareStage.tsx` | Queued | |
-| F04 | `trader-journey/TraderJourneyApp.tsx` | Check competing entrypoint | |
+| P01 | Move `Stage` to `trader-journey/types.ts` and update App/Stepper imports | Prerequisite before F04 | |
+| F04 | `trader-journey/TraderJourneyApp.tsx` | Depends on P01 and entrypoint decision | |
 | F05 | `trader-journey/stages/ClassifyStage.tsx` | Depends on F04 | |
 | F06 | `trader-journey/stages/ValueStage.tsx` | Depends on F04 | |
 | F07 | `trader-journey/stages/DutyStage.tsx` | Depends on F04 | |
@@ -36,7 +37,13 @@ source files. A merged entry needs a pull request link and merge commit.
 | F10 | `trader-journey/components/Stepper.tsx` | Depends on F04 | |
 | F11 | `trader-journey/components/Money.tsx` | Depends on stage removals | |
 | F12 | `trader-journey/api.ts` | Depends on stage removals | |
-| F13 | `trader-journey/types.ts` | Depends on F12 and stage removals | |
+| F13 | `trader-journey/types.ts` | Depends on F10-F12 and stage removals | |
+
+P01 must merge before F04. `Stepper.tsx` imports `Stage` from
+`TraderJourneyApp.tsx`, so deleting F04 first would leave a broken type import.
+TypeScript checks all of `src`, including components that are not mounted. Move
+that type to the existing types file and update both imports in a prerequisite
+pull request. Keep it until Stepper and the remaining type consumers are removed.
 
 The current `src/main.tsx` renders only `App`, which does not import these
 components. However, draft [PR #37](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/37)
