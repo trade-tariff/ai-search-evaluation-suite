@@ -33,8 +33,8 @@ source files. A merged entry needs a pull request link and merge commit.
 | F06 | `trader-journey/stages/ValueStage.tsx` | Merged | [#58](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/58) / `a03941d1b7a9aed8757b7728a24bfa0c4269eb1e` |
 | F07 | `trader-journey/stages/DutyStage.tsx` | Merged | [#59](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/59) / `52b4ee521f09c3666527094c2d26c14d0be8e891` |
 | F08 | `trader-journey/stages/LandedStage.tsx` | Merged | [#60](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/60) / `12e5e1c68570472ed0aacca3fec34258c23ce732` |
-| F09 | `trader-journey/stages/DeclareStage.tsx` | In progress | Pending |
-| F10 | `trader-journey/components/Stepper.tsx` | Depends on F04 | |
+| F09 | `trader-journey/stages/DeclareStage.tsx` | Merged | [#61](https://github.com/trade-tariff/ai-search-evaluation-suite/pull/61) / `d072987e2a5b570b7a891616e47da1e4692d9a35` |
+| F10 | `trader-journey/components/Stepper.tsx` | In progress | Pending |
 | F11 | `trader-journey/components/Money.tsx` | Depends on stage removals | |
 | F12 | `trader-journey/api.ts` | Depends on stage removals | |
 | F13 | `trader-journey/types.ts` | Depends on F10-F12 and stage removals | |
