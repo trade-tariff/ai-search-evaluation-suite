@@ -79,6 +79,7 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
   const [goldMode, setGoldMode] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [done, setDone] = useState(false);
+  const [outcomeMessage, setOutcomeMessage] = useState<string | null>(null);
   const [fanoutTotal, setFanoutTotal] = useState(0);
   const [fanoutDone, setFanoutDone] = useState(0);
   const [commits, setCommits] = useState<LiveCommit[]>([]);
@@ -113,8 +114,10 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
       `${modelIds.length} model${modelIds.length === 1 ? "" : "s"}? This spends real money on AI calls.`
     )) return;
 
+    let outcome: "running" | "complete" | "error" | "cancelled" = "running";
     setRunning(true);
     setDone(false);
+    setOutcomeMessage(null);
     setLogs([]);
     setTasksDone(0);
     setGoldMode(false);
@@ -129,12 +132,24 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
     setDedupedNote(null);
     setUnscoredNote(null);
 
-    ctrlRef.current = startBenchmarkSSE(
+    const controller = startBenchmarkSSE(
       promptIndices,
       modelIds,
       (event, data) => {
-
+        if (controller.signal.aborted || ctrlRef.current !== controller) return;
         addLog(event, data);
+        if (event === "benchmark:complete" && outcome === "running") {
+          outcome = "complete";
+          setDone(true);
+          setRunning(false);
+        } else if (event === "error" || event === "benchmark:cancelled") {
+          outcome = event === "error" ? "error" : "cancelled";
+          setDone(false);
+          setRunning(false);
+          setOutcomeMessage(event === "error"
+            ? `Benchmark failed: ${String(data.message || "Unknown error")}`
+            : "Benchmark cancelled. Partial results are not a completed run.");
+        }
 
         if (event === "benchmark:start") {
           // Gold codes arrive up-front so live marking never has to wait on a
@@ -239,28 +254,38 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
         }
       },
       () => {
+        if (controller.signal.aborted || ctrlRef.current !== controller) return;
         setRunning(false);
-        setDone(true);
+        if (outcome === "running") {
+          outcome = "error";
+          setOutcomeMessage("Benchmark stream ended before completion. Partial results are not a completed run.");
+        }
       },
       (err) => {
+        if (controller.signal.aborted || ctrlRef.current !== controller) return;
+        outcome = "error";
         addLog("error", { message: err });
+        setDone(false);
+        setOutcomeMessage(`Benchmark failed: ${err}`);
         setRunning(false);
       },
       opensearchLimit,
       scoring === "gold",
     );
+    ctrlRef.current = controller;
   };
 
   const stop = async () => {
-    // Tell the backend to actually stop (cancels in-flight tasks, no more
-    // provider/judge calls). Then abort the SSE stream on the client.
+    ctrlRef.current?.abort();
+    setDone(false);
+    setRunning(false);
+    setOutcomeMessage("Benchmark cancelled. Partial results are not a completed run.");
+    // Stop backend work too; closing the stream alone does not cancel provider calls.
     try {
       await cancelBenchmark();
     } catch {
       /* best-effort; still abort the stream */
     }
-    ctrlRef.current?.abort();
-    setRunning(false);
   };
 
   const formatLog = (entry: LogEntry) => {
@@ -424,7 +449,9 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
       )}
 
       {/* Progress bar */}
-      {(running || done) && (
+      {outcomeMessage && <div role="status" className="rounded border border-amber-800 bg-amber-950/30 p-3 text-sm text-amber-200">{outcomeMessage}</div>}
+
+      {(running || done || logs.length > 0) && (
         <div className="bg-gray-800 rounded-full h-3 overflow-hidden">
           <div
             className="bg-blue-500 h-full transition-all duration-300"
@@ -559,7 +586,7 @@ export default function BenchmarkPanel({ promptIndices, modelIds, opensearchLimi
       {/* Reference Build - per-prompt status for each reference call. In
           gold mode the reference/consensus phases are skipped, so show a
           one-line note instead of waiting on panel events that never come. */}
-      {goldMode && (running || done) && (
+      {goldMode && (running || done || logs.length > 0) && (
         <div className="bg-gray-900 rounded-lg p-4 text-xs text-gray-500 italic">
           Reference Build skipped - gold mode (prompts are anchored to gold
           answers; no reference, consensus or judge phases).
