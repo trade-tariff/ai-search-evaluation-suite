@@ -11,22 +11,17 @@ fi
 
 DEFAULT_PRODUCT_APP_ROOT="$DIR/../product"
 export PRODUCT_APP_ROOT="${PRODUCT_APP_ROOT:-$DEFAULT_PRODUCT_APP_ROOT}"
-export CLASSIFY_EVAL_STATE_DIR="${CLASSIFY_EVAL_STATE_DIR:-$DIR/var}"
-export AI_FAN_OUT_KG_LABEL_PROFILE="${AI_FAN_OUT_KG_LABEL_PROFILE:-full}"
 export PYTHONPATH="${PRODUCT_APP_ROOT}/backend${PYTHONPATH:+:$PYTHONPATH}"
-mkdir -p "$CLASSIFY_EVAL_STATE_DIR"
 
 cd "$DIR"
 if [ ! -d ".venv" ]; then
   python3 -m venv .venv
 fi
 source .venv/bin/activate
-PRODUCT_REQUIREMENTS="${PRODUCT_APP_ROOT}/backend/requirements.txt"
-if [ ! -f ".venv/.requirements-installed" ] \
-  || [ "requirements.txt" -nt ".venv/.requirements-installed" ] \
-  || [ "$PRODUCT_REQUIREMENTS" -nt ".venv/.requirements-installed" ]; then
-  pip install -r requirements.txt
-  touch ".venv/.requirements-installed"
+if [ ! -f ".venv/.worker-requirements-installed" ] \
+  || [ "requirements-worker.txt" -nt ".venv/.worker-requirements-installed" ]; then
+  pip install -r requirements-worker.txt
+  touch ".venv/.worker-requirements-installed"
 fi
 
 exec uvicorn backend.worker_app:app \
