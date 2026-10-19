@@ -85,21 +85,28 @@ export function startBenchmarkSSE(
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
 
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        let currentEvent = "";
-        for (const line of lines) {
-          if (line.startsWith("event: ")) {
-            currentEvent = line.slice(7).trim();
-          } else if (line.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              onEvent(currentEvent, data);
-            } catch {
-              // skip malformed
-            }
+        // Dispatch only complete SSE frames, regardless of network chunk boundaries.
+        let boundary: RegExpExecArray | null;
+        while ((boundary = /\r?\n\r?\n/.exec(buffer))) {
+          const frame = buffer.slice(0, boundary.index);
+          buffer = buffer.slice(boundary.index + boundary[0].length);
+          let event = "message";
+          const dataLines: string[] = [];
+          for (const line of frame.split(/\r?\n/)) {
+            const colon = line.indexOf(":");
+            const field = colon < 0 ? line : line.slice(0, colon);
+            const value = colon < 0 ? "" : line.slice(colon + 1).replace(/^ /, "");
+            if (field === "event") event = value || "message";
+            if (field === "data") dataLines.push(value);
           }
+          if (!dataLines.length) continue;
+          let data: Record<string, unknown>;
+          try {
+            data = JSON.parse(dataLines.join("\n"));
+          } catch {
+            continue; // Ignore malformed frames without leaking their event name.
+          }
+          onEvent(event, data);
         }
       }
       onDone();
