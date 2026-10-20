@@ -1,14 +1,9 @@
-import sys
 import unittest
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "product" / "backend"))
 
 import httpx
 
-from classification_core.trade_tariff_backend.client import TradeTariffBackendClient, TradeTariffBackendValidationError
-from classification_core_trade_tariff_backend_fixtures import RESULT_POST_RESPONSE, RESULT_POST_VALIDATION_ERROR_RESPONSE
-
+from worker.backend.client import TradeTariffBackendClient, TradeTariffBackendValidationError
+from backend_fixtures import RESULT_POST_RESPONSE, RESULT_POST_VALIDATION_ERROR_RESPONSE
 
 class PostResultTest(unittest.IsolatedAsyncioTestCase):
     async def test_wraps_the_single_result_in_a_one_item_bulk_array_with_no_attributes_wrapper(self):
@@ -40,7 +35,6 @@ class PostResultTest(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(TradeTariffBackendValidationError):
             await client.post_result({"run_id": "does-not-exist", "source_type": "atar", "source_id": "x", "persona": "emu_generic"})
-
 
 if __name__ == "__main__":
     unittest.main()

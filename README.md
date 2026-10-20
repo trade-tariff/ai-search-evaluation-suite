@@ -30,28 +30,31 @@ live evaluation.
 
 The worker keeps optional bearer/basic authentication and structured logging.
 The root image uses its TLS entrypoint on port 8443. The secondary image uses
-HTTP on port 8100. Both install `requirements-worker.txt`. The worker CLI is
-`classification_core.trade_tariff_backend.cli`.
+HTTP on port 8100. Both install the `ai-search-evaluation-worker` package. The
+worker CLI is `worker.backend.cli`.
 
 ## Repository Layout
 
 | Path | Purpose |
 |---|---|
-| `apps/classification-evals/` | Worker application, worker image, local launcher, and Compose service. |
-| `apps/product/backend/classification_core/trade_tariff_backend/` | Backend HTTP client, run executor, Q&A loop, and CLI. |
-| `apps/product/backend/evaluation_ingress.py` | Worker ingress endpoint and active-run guard. |
-| `apps/product/backend/classification_core/trader_simulator.py` | Shared trader simulator. |
+| `src/worker/app.py` | Worker application, authentication, logging, and health routes. |
+| `src/worker/ingress.py` | Evaluation start endpoint and active-run guard. |
+| `src/worker/simulator.py` | Trader simulator. |
+| `src/worker/backend/` | Backend HTTP client, run executor, Q&A loop, and CLI. |
+| `Dockerfile` | Deployed TLS worker image. |
+| `Dockerfile.http` | HTTP worker image for local use. |
+| `compose.yml` | Local worker service. |
 | `terraform/` | ECS service definition for the deployed worker. |
 | `tests/` | Offline worker tests. |
 
 ## Checks, contributions and licence
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for the fork workflow, review process and
-private security reporting. After installing the worker requirements, run:
+private security reporting. After `pip install -e .`, run:
 
 ```sh
 python -m unittest discover -s tests
-python -m compileall -q apps
+python -m compileall -q src
 ```
 
 Live evaluations are separate from unit tests. They can send prompts to external
@@ -70,7 +73,6 @@ The worker needs Python 3.11+. It does not need Node.js, local PostgreSQL, or
 OpenSearch. From the repository root:
 
 ```bash
-cd apps/classification-evals
 # Create .env from .env.example if needed. Do not replace existing secrets.
 ./start.sh
 ```
@@ -81,13 +83,13 @@ In another terminal:
 curl -fsS http://127.0.0.1:8100/api/health
 ```
 
-`start.sh` installs `requirements-worker.txt` in this directory's `.venv`.
-Health does not require provider keys and does not start an evaluation. Send the
+`start.sh` creates `.venv` in the repository root and installs the package in
+editable mode. Health does not require provider keys and does not start an evaluation. Send the
 configured authorization header if health is protected. `/` returns 404.
 
 ## Trade Tariff Backend Integration
 
-`apps/product/backend/classification_core/trade_tariff_backend/` talks to
+`src/worker/backend/` talks to
 Trade Tariff Backend over HTTP. It does not use a local database.
 
 ### Running an experiment end-to-end
@@ -137,7 +139,7 @@ run.status  # => "queued": nothing has executed yet
 
 **3. Execute the run.** The backend starts the worker for Admin-created runs.
 For a run created directly in a Rails console, call the ingress explicitly.
-Start the worker with `cd apps/classification-evals && ./start.sh`. Set
+Start the worker with `./start.sh`. Set
 `TRADE_TARIFF_BACKEND_BASE_URL` to the backend used in steps 1-2 and set `RUN_ID`
 to the approved run ID:
 
@@ -170,7 +172,7 @@ run.evaluation_results_dataset.first.values
 ```
 
 **Alternative for local/manual testing only:**
-`classification_core.trade_tariff_backend.cli` creates the experiment and run
+`worker.backend.cli` creates the experiment and run
 over HTTP, then follows the run's status until it finishes. It does not execute
 the run itself: creating the run makes trade-tariff-backend start it in this
 app, the same as the admin screens do, so this app must be running and reachable
@@ -179,8 +181,7 @@ the Rails-console and ingress-endpoint split directly.
 
 ```bash
 export TRADE_TARIFF_BACKEND_BASE_URL=http://127.0.0.1:3000  # defaults to this already
-cd apps/product/backend
-python -m classification_core.trade_tariff_backend.cli "my-local-test-experiment" --gold-query-set 5
+python -m worker.backend.cli "my-local-test-experiment" --gold-query-set 5
 ```
 
 ### Run-level cost and latency (retrieval side only)
@@ -199,7 +200,7 @@ Rails side, this repository's half of the same design).
 This covers the retrieval and question-asking cost only: the Rails-side LLM
 calls behind `/searches`. The simulator side of this app (the
 `simulate_trader_answer` calls imported from
-`classification_core.trader_simulator`) has no cost or latency tracking of its
+`worker.simulator`) has no cost or latency tracking of its
 own yet. It is tracked separately as AI-1226, since it needs its own small
 $/token pricing table in Python (`AiUsage::PricingCalculator` is not callable
 from this repository). Until AI-1226 lands, a run's totals understate a gold
@@ -212,7 +213,7 @@ python -m unittest discover -s tests -v
 ```
 
 This also runs automatically in CI on every PR (`.github/workflows/ci.yml`).
-The `classification_core.trade_tariff_backend` tests are fixture-based. They
+The `worker.backend` tests are fixture-based. They
 mock the HTTP layer with `httpx.MockTransport` against response shapes captured
 from a real `trade-tariff-backend` during development, not a live Rails server.
 `trade-tariff-backend` is therefore not a test dependency and the tests run
@@ -226,8 +227,7 @@ Copy the example environment file and fill in only the values needed for the
 run mode:
 
 ```bash
-cd apps/classification-evals
-test -f .env || cp ../../.env.example .env
+test -f .env || cp .env.example .env
 ```
 
 | Variable | Purpose |
@@ -252,7 +252,7 @@ The platform builds the repository-root `Dockerfile` and runs the backend-driven
 worker with TLS on port 8443. Health checks use `/api/health`, not `/` or
 `/healthcheckz`. This is an evaluation worker, not a placeholder.
 
-`apps/classification-evals/Dockerfile` builds the same worker for port 8100.
+`Dockerfile.http` builds the same worker for port 8100.
 Terraform deploys one ECS service, `eval`. The worker does not depend on a
 database, OpenSearch, or object storage. It uses the Trade Tariff Backend HTTP
 API only.
@@ -283,4 +283,4 @@ Before running paid or provider-backed runs in a deployment:
 
 ## Further Reading
 
-- [`apps/classification-evals/README.md`](apps/classification-evals/README.md) for worker operations.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) for the fork, review, and licensing workflow.

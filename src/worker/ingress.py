@@ -6,8 +6,8 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
-from classification_core.trade_tariff_backend.client import TradeTariffBackendClient
-from classification_core.trade_tariff_backend.execute_run import execute_run
+from .backend.client import TradeTariffBackendClient
+from .backend.execute_run import execute_run
 
 router = APIRouter()
 

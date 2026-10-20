@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 from openai import AsyncOpenAI
 
-from classification_core.provider_guard import TRUE_VALUES, openai_allowed
+from ..provider_guard import TRUE_VALUES, openai_allowed
 
 from .client import TradeTariffBackendUnavailableError, TradeTariffBackendValidationError
 from .qa_loop import QASessionError, run_qa_session_via_trade_tariff_backend
@@ -36,7 +36,7 @@ def _progress_logging_enabled() -> bool:
     # unset/empty = off. Off by default everywhere (including deployed ECS,
     # which already ships container stdout to CloudWatch for free -- no need to
     # pay ingestion cost/add log noise for every run when nothing's wrong);
-    # local dev turns it on via apps/classification-evals/.env (gitignored).
+    # local dev turns it on via .env (gitignored).
     return os.environ.get("EVAL_PROGRESS_LOGGING", "").strip().lower() in TRUE_VALUES
 
 
@@ -132,8 +132,7 @@ async def execute_run(run_id: str, client) -> dict:
                 run_id=run_id,
             )
 
-        # Built once for the whole run, the same way classification_core.qa_loop's
-        # existing run_qa_session builds it. openai_allowed() is this repo's spend
+        # Built once for the whole run, the same way each Q&A session builds it. openai_allowed() is this repo's spend
         # gate (CLASSIFICATION_ALLOW_PROVIDER_CALLS + OPENAI_API_KEY): with it off,
         # sim_client stays None and any gold query that reaches a clarifying
         # question fails fast and explicitly via simulator_failed, rather than

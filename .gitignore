@@ -6,15 +6,10 @@
 *.pyc
 __pycache__/
 .venv/
-node_modules/
-dist/
-test-results/
+build/
+*.egg-info/
 
 # Runtime state and sensitive local config.
 results/
 reports/
 exports/
-apps/classification-evals/var/
-apps/classification-evals/.venv/
-apps/product/backend/.venv/
-apps/product/backend/**/__pycache__/

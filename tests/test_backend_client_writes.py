@@ -1,19 +1,13 @@
 import json
-import sys
 import unittest
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "product" / "backend"))
 
 import httpx
 
-from classification_core.trade_tariff_backend.client import TradeTariffBackendClient
-from classification_core_trade_tariff_backend_fixtures import EXPERIMENT_CREATE_RESPONSE, RUN_CREATE_RESPONSE, RUN_UPDATE_RESPONSE
-
+from worker.backend.client import TradeTariffBackendClient
+from backend_fixtures import EXPERIMENT_CREATE_RESPONSE, RUN_CREATE_RESPONSE, RUN_UPDATE_RESPONSE
 
 def _client_with_transport(handler):
     return TradeTariffBackendClient(base_url="http://backend.test", transport=httpx.MockTransport(handler))
-
 
 class CreateExperimentTest(unittest.IsolatedAsyncioTestCase):
     async def test_posts_the_name_and_returns_id_plus_attributes(self):
@@ -55,7 +49,6 @@ class CreateExperimentTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(sent, [{"data": {"attributes": {"name": "without-set"}}}])
 
-
 class CreateRunTest(unittest.IsolatedAsyncioTestCase):
     async def test_sends_the_idempotency_key_header_and_returns_run_id(self):
         seen_keys = []
@@ -87,7 +80,6 @@ class CreateRunTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(seen_keys, ["fixed-key-123", "fixed-key-123"])
 
-
 class GetRunTest(unittest.IsolatedAsyncioTestCase):
     async def test_fetches_a_run_by_id_including_effective_configuration(self):
         def handler(request):
@@ -100,7 +92,6 @@ class GetRunTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["id"], "107")
         self.assertEqual(result["effective_configuration"]["question_model"], "gpt-5-mini-2025-08-07")
 
-
 class UpdateRunTest(unittest.IsolatedAsyncioTestCase):
     async def test_patches_status_and_extra_fields(self):
         def handler(request):
@@ -112,7 +103,6 @@ class UpdateRunTest(unittest.IsolatedAsyncioTestCase):
         result = await client.update_run("107", status="running")
 
         self.assertEqual(result["status"], "running")
-
 
 if __name__ == "__main__":
     unittest.main()

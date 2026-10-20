@@ -1,20 +1,14 @@
 """Offline coverage for the shared trader simulator and per-session facts."""
 from __future__ import annotations
 
-import sys
 import unittest
-from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "product" / "backend"))
-
-from classification_core.trader_simulator import SIMULATOR_MODEL, SessionFacts, simulate_trader_answer
-
+from worker.simulator import SIMULATOR_MODEL, SessionFacts, simulate_trader_answer
 
 class FakeResponse:
     def __init__(self, content: str):
         self.choices = [type("Choice", (), {"message": type("Message", (), {"content": content})()})()]
-
 
 class FakeCompletions:
     def __init__(self, response: FakeResponse):
@@ -25,14 +19,11 @@ class FakeCompletions:
         self.calls.append(kwargs)
         return self._response
 
-
 class FakeClient:
     def __init__(self, response: FakeResponse):
         self.chat = type("Chat", (), {"completions": FakeCompletions(response)})()
 
-
 _VALID_CHOICE = '{"slot": "material", "choice_index": 0, "reasoning": "matches the oracle text"}'
-
 
 class SimulateTraderAnswerModelSelectionTest(unittest.IsolatedAsyncioTestCase):
     async def test_uses_the_explicitly_passed_model_for_the_api_call(self):
@@ -57,7 +48,6 @@ class SimulateTraderAnswerModelSelectionTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(client.chat.completions.calls[0]["model"], SIMULATOR_MODEL)
 
-
 class SessionFactsTest(unittest.TestCase):
     def test_sessions_and_snapshot_mappings_are_independent(self):
         session = SessionFacts()
@@ -72,7 +62,6 @@ class SessionFactsTest(unittest.TestCase):
         self.assertEqual(session.as_qa_history(), [
             {"question": "Where was it made?", "answer": "UK"},
         ])
-
 
 class SimulateTraderAnswerBehaviourTest(unittest.IsolatedAsyncioTestCase):
     async def test_commits_the_exact_option_and_includes_oracle_and_known_facts(self):

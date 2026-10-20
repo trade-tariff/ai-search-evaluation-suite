@@ -1,27 +1,22 @@
 import io
 import logging
 import os
-import sys
 import unittest
 from contextlib import redirect_stdout
 from datetime import datetime
-from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "product" / "backend"))
-
-from classification_core.trade_tariff_backend.client import (
+from worker.backend.client import (
     TradeTariffBackendUnavailableError,
     TradeTariffBackendValidationError,
 )
-from classification_core.trade_tariff_backend.execute_run import execute_run
-from classification_core_trade_tariff_backend_fixtures import (
+from worker.backend.execute_run import execute_run
+from backend_fixtures import (
     GOLD_QUERIES_RESPONSE,
     GOLD_QUERY_SIX_DIGIT,
     RUN_SHOW_RESPONSE,
     SEARCH_RESPONSE_PENDING_QUESTION,
 )
-
 
 class FakeClient:
     def __init__(self):
@@ -69,13 +64,12 @@ class FakeClient:
     async def post_result(self, result):
         self.post_result_calls.append(result)
 
-
 class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
     async def test_marks_running_then_completed_and_posts_one_result_per_gold_query(self):
         client = FakeClient()
 
         with patch(
-            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
             new=AsyncMock(return_value={
                 "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                 "converged": True, "simulator_failed": False,
@@ -94,7 +88,7 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         client = FakeClient()
 
         with patch(
-            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
             new=AsyncMock(return_value={
                 "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                 "converged": True, "simulator_failed": False,
@@ -118,7 +112,7 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         client = FakeClient()
 
         with patch(
-            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
             new=AsyncMock(return_value={
                 "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                 "converged": True, "simulator_failed": False,
@@ -137,7 +131,7 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         client = FakeClient()
 
         with patch(
-            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
             new=AsyncMock(return_value={
                 "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                 "converged": True, "simulator_failed": False, "pricing_known": False,
@@ -155,7 +149,7 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         trace = [{"round": 1, "question": "What material?", "chosen": "Rubber", "simulator_failed": False}]
 
         with patch(
-            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
             new=AsyncMock(return_value={
                 "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                 "converged": True, "simulator_failed": False, "question_trace": trace,
@@ -170,7 +164,7 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
             with self.subTest(converged=converged):
                 client = FakeClient()
                 with patch(
-                    "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+                    "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
                     new=AsyncMock(return_value={
                         "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                         "converged": converged,
@@ -194,9 +188,9 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
                 client.search = AsyncMock(side_effect=[SEARCH_RESPONSE_PENDING_QUESTION, error])
                 with (
                     patch.dict(os.environ, {"OPENAI_API_KEY": "test-key"}),
-                    patch("classification_core.trade_tariff_backend.execute_run.openai_allowed", return_value=True),
-                    patch("classification_core.trade_tariff_backend.execute_run.AsyncOpenAI", return_value=object()),
-                    patch("classification_core.trade_tariff_backend.qa_loop.simulate_trader_answer",
+                    patch("worker.backend.execute_run.openai_allowed", return_value=True),
+                    patch("worker.backend.execute_run.AsyncOpenAI", return_value=object()),
+                    patch("worker.backend.qa_loop.simulate_trader_answer",
                           new=AsyncMock(return_value={"chosen": "Textile", "slot": "material"})),
                 ):
                     summary = await execute_run("107", client)
@@ -225,7 +219,7 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         client = FakeClient()
 
         with patch(
-            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
             new=AsyncMock(return_value={
                 "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                 "converged": True, "simulator_failed": False,
@@ -239,7 +233,7 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         client = FakeClient()
 
         with patch(
-            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
             new=AsyncMock(return_value={
                 "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                 "converged": True, "simulator_failed": False,
@@ -264,7 +258,7 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
             return {"final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}], "converged": True, "simulator_failed": False}
         flaky.calls = 0
 
-        with patch("classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend", new=flaky):
+        with patch("worker.backend.execute_run.run_qa_session_via_trade_tariff_backend", new=flaky):
             summary = await execute_run("107", client)
 
         self.assertEqual(client.update_run_calls, ["running", "partially_failed"])
@@ -283,7 +277,7 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         async def always_fails(*args, **kwargs):
             raise RuntimeError("search errored")
 
-        with patch("classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend", new=always_fails):
+        with patch("worker.backend.execute_run.run_qa_session_via_trade_tariff_backend", new=always_fails):
             summary = await execute_run("107", client)
 
         self.assertEqual(client.update_run_calls, ["running", "failed"])
@@ -296,7 +290,7 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         client = FakeClient()
 
         with patch(
-            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
             new=AsyncMock(return_value={
                 "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                 "converged": False, "simulator_failed": True,
@@ -322,7 +316,7 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         ]
 
         with patch(
-            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
             new=AsyncMock(return_value={
                 "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                 "converged": False, "simulator_failed": True, "question_trace": trace_so_far,
@@ -347,7 +341,7 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         trace = [{"round": 1, "question": "What material?", "chosen": "Rubber", "simulator_failed": False}]
 
         with patch(
-            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
             new=AsyncMock(return_value={
                 "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                 "converged": False, "simulator_failed": False, "question_trace": trace,
@@ -380,7 +374,7 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         client.cancel_after_calls = 2
 
         with patch(
-            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
             new=AsyncMock(return_value={
                 "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                 "converged": True, "simulator_failed": False,
@@ -413,7 +407,7 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         client.transient_get_run_failures = {3}
 
         with patch(
-            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
             new=AsyncMock(return_value={
                 "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                 "converged": True, "simulator_failed": False,
@@ -451,7 +445,7 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         client.cancel_when_rejected = True
 
         with patch(
-            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
             new=AsyncMock(return_value={
                 "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                 "converged": True, "simulator_failed": False,
@@ -461,7 +455,6 @@ class ExecuteRunTest(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(client.update_run_calls, ["running", "completed"])
         self.assertEqual(summary["status"], "cancelled")
-
 
 class ScoringGranularityTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_six_digit_expected_code_matches_a_ten_digit_search_result(self):
@@ -473,7 +466,7 @@ class ScoringGranularityTest(unittest.IsolatedAsyncioTestCase):
         client.gold_queries = [GOLD_QUERY_SIX_DIGIT]
 
         with patch(
-            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
             new=AsyncMock(return_value={
                 "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6403910000"}}],
                 "converged": True, "simulator_failed": False,
@@ -495,7 +488,7 @@ class ScoringGranularityTest(unittest.IsolatedAsyncioTestCase):
         client.gold_queries = [GOLD_QUERY_SIX_DIGIT]
 
         with patch(
-            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
             new=AsyncMock(return_value={
                 "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                 "converged": True, "simulator_failed": False,
@@ -517,7 +510,7 @@ class ScoringGranularityTest(unittest.IsolatedAsyncioTestCase):
         client.gold_queries = [GOLD_QUERY_SIX_DIGIT | {"expected_code_digits": None}]
 
         with patch(
-            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
             new=AsyncMock(return_value={
                 "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6403910000"}}],
                 "converged": True, "simulator_failed": False,
@@ -539,7 +532,7 @@ class ScoringGranularityTest(unittest.IsolatedAsyncioTestCase):
         ]
 
         with patch(
-            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
             new=AsyncMock(return_value={"final_candidates": candidates, "converged": True, "simulator_failed": False}),
         ):
             await execute_run("107", client)
@@ -548,7 +541,6 @@ class ScoringGranularityTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(posted["gold_in_top1"])
         self.assertTrue(posted["gold_in_top5"])
         self.assertEqual(posted["final_rank"], 3)
-
 
 class MalformedGoldQueryTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_gold_row_missing_its_fields_is_recorded_as_a_failure_not_an_escaped_exception(self):
@@ -565,7 +557,6 @@ class MalformedGoldQueryTest(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(client.post_result_calls[0]["error"])
         self.assertEqual(summary, {"status": "failed", "succeeded": 0, "failed": 1})
 
-
 class FailureRecordingItselfFailsClient(FakeClient):
     """A FakeClient whose post_result raises when handed a FAILURE-shaped
     payload (error is not None) but succeeds for a success-shaped one — models
@@ -577,11 +568,9 @@ class FailureRecordingItselfFailsClient(FakeClient):
             raise RuntimeError("backend rejected the failure record too")
         await super().post_result(result)
 
-
 class GetGoldQueriesFailsClient(FakeClient):
     async def get_gold_queries(self, set_id=None):
         raise RuntimeError("gold queries endpoint unreachable")
-
 
 class RunStrandingGuardTest(unittest.IsolatedAsyncioTestCase):
     async def test_the_except_handlers_own_post_result_call_raising_still_reaches_final_update_run(self):
@@ -597,7 +586,7 @@ class RunStrandingGuardTest(unittest.IsolatedAsyncioTestCase):
             raise RuntimeError("search errored")
 
         with patch(
-            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
             new=always_fails,
         ):
             summary = await execute_run("107", client)
@@ -629,7 +618,6 @@ class RunStrandingGuardTest(unittest.IsolatedAsyncioTestCase):
         final_kwargs = client.update_run_kwargs[-1]
         self.assertIn("gold queries endpoint unreachable", final_kwargs["error_summary"])
 
-
 class NoOracleTextDisablesSimulatorTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_gold_query_with_no_oracle_text_is_run_with_sim_client_none(self):
         # A gold query whose source had no description or justification has an
@@ -641,12 +629,12 @@ class NoOracleTextDisablesSimulatorTest(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch(
-                "classification_core.trade_tariff_backend.execute_run.openai_allowed",
+                "worker.backend.execute_run.openai_allowed",
                 return_value=True,
             ),
             patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}),
             patch(
-                "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+                "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
                 new=AsyncMock(return_value={
                     "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                     "converged": True, "simulator_failed": False,
@@ -667,12 +655,12 @@ class NoOracleTextDisablesSimulatorTest(unittest.IsolatedAsyncioTestCase):
 
         with (
             patch(
-                "classification_core.trade_tariff_backend.execute_run.openai_allowed",
+                "worker.backend.execute_run.openai_allowed",
                 return_value=True,
             ),
             patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}),
             patch(
-                "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+                "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
                 new=AsyncMock(return_value={
                     "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                     "converged": True, "simulator_failed": False,
@@ -684,7 +672,6 @@ class NoOracleTextDisablesSimulatorTest(unittest.IsolatedAsyncioTestCase):
         mocked_qa_session.assert_awaited_once()
         self.assertIsNotNone(mocked_qa_session.await_args.kwargs["sim_client"])
 
-
 class GoldQuerySetTest(unittest.IsolatedAsyncioTestCase):
     """A run scores the one gold query set its experiment points at, using each
     query's own oracle text."""
@@ -693,7 +680,7 @@ class GoldQuerySetTest(unittest.IsolatedAsyncioTestCase):
         client = FakeClient()
 
         with patch(
-            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
             new=AsyncMock(return_value={
                 "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                 "converged": True, "simulator_failed": False,
@@ -707,7 +694,7 @@ class GoldQuerySetTest(unittest.IsolatedAsyncioTestCase):
         client = FakeClient()
 
         with patch(
-            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
             new=AsyncMock(return_value={
                 "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                 "converged": True, "simulator_failed": False,
@@ -728,7 +715,7 @@ class GoldQuerySetTest(unittest.IsolatedAsyncioTestCase):
         }
 
         with patch(
-            "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+            "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
             new=AsyncMock(return_value={
                 "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                 "converged": True, "simulator_failed": False,
@@ -774,7 +761,6 @@ class GoldQuerySetTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("gold query set 5 has no gold queries", client.update_run_kwargs[-1]["error_summary"])
         self.assertIn("still be generating", client.update_run_kwargs[-1]["error_summary"])
 
-
 class ProgressLoggingTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         # These tests assert the no-handler print path used by subprocess runners.
@@ -795,7 +781,7 @@ class ProgressLoggingTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict(os.environ, {}, clear=False),
             patch(
-                "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+                "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
                 new=AsyncMock(return_value={
                     "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                     "converged": True, "simulator_failed": False, "questions_answered": 0,
@@ -819,7 +805,7 @@ class ProgressLoggingTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict(os.environ, {"EVAL_PROGRESS_LOGGING": "1"}),
             patch(
-                "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+                "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
                 new=AsyncMock(return_value={
                     "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                     "converged": True, "simulator_failed": False, "questions_answered": 2,
@@ -847,7 +833,7 @@ class ProgressLoggingTest(unittest.IsolatedAsyncioTestCase):
             with (
                 patch.dict(os.environ, {"EVAL_PROGRESS_LOGGING": value}),
                 patch(
-                    "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+                    "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
                     new=AsyncMock(return_value={
                         "final_candidates": [{"attributes": {"goods_nomenclature_item_id": "6404199000"}}],
                         "converged": True, "simulator_failed": False, "questions_answered": 0,
@@ -866,7 +852,7 @@ class ProgressLoggingTest(unittest.IsolatedAsyncioTestCase):
         with (
             patch.dict(os.environ, {"EVAL_PROGRESS_LOGGING": "1"}),
             patch(
-                "classification_core.trade_tariff_backend.execute_run.run_qa_session_via_trade_tariff_backend",
+                "worker.backend.execute_run.run_qa_session_via_trade_tariff_backend",
                 new=AsyncMock(side_effect=RuntimeError("search errored")),
             ),
         ):
@@ -877,7 +863,6 @@ class ProgressLoggingTest(unittest.IsolatedAsyncioTestCase):
         output = buffer.getvalue()
         self.assertIn("search errored", output)
         self.assertIn("status=failed", output)
-
 
 if __name__ == "__main__":
     unittest.main()

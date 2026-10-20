@@ -2,29 +2,19 @@
 from __future__ import annotations
 
 import logging
-import os
-import sys
 import time
 from pathlib import Path
 
 from fastapi import FastAPI, Request
 
 from .auth import auth_enabled, install_optional_auth
+from .ingress import router as evaluation_router
 from .logging_config import configure_logging, is_healthcheck_path
 
 configure_logging()
 _access_log = logging.getLogger("ecs.access")
 
-APP_ROOT = Path(__file__).resolve().parents[1]
-REPO_ROOT = APP_ROOT.parents[1]
-PRODUCT_APP_ROOT = Path(
-    os.environ.get("PRODUCT_APP_ROOT") or REPO_ROOT / "apps" / "product"
-).resolve()
-PRODUCT_BACKEND = PRODUCT_APP_ROOT / "backend"
-if str(PRODUCT_BACKEND) not in sys.path:
-    sys.path.insert(0, str(PRODUCT_BACKEND))
-
-from evaluation_ingress import router as evaluation_router
+PACKAGE_ROOT = Path(__file__).resolve().parent
 
 app = FastAPI(
     title="AI Search Evaluation Worker",
@@ -62,7 +52,7 @@ def health() -> dict:
     return {
         "status": "ok",
         "auth_enabled": auth_enabled(),
-        "product_backend_present": PRODUCT_BACKEND.exists(),
+        "product_backend_present": (PACKAGE_ROOT / "backend").is_dir(),
     }
 
 

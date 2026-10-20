@@ -1,19 +1,14 @@
 """Exercise the worker evaluation router."""
-import sys
 import unittest
-from pathlib import Path
 from unittest.mock import AsyncMock, patch
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "product" / "backend"))
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-import evaluation_ingress as ingress
+import worker.ingress as ingress
 
 unit_app = FastAPI()
 unit_app.include_router(ingress.router)
-
 
 class EvaluationIngressTest(unittest.TestCase):
     def setUp(self):
@@ -42,7 +37,6 @@ class EvaluationIngressTest(unittest.TestCase):
             response = self.client.post("/api/evaluation/runs/108/start")
 
         self.assertEqual(response.status_code, 202)
-
 
 class EvaluationIngressGuardReleaseTest(unittest.IsolatedAsyncioTestCase):
     """Await the retained background task to check guard and client cleanup."""
@@ -82,7 +76,6 @@ class EvaluationIngressGuardReleaseTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("108", ingress._active_evaluation_runs)
         self.assertEqual(ingress._background_evaluation_tasks, set())
         backend.aclose.assert_awaited_once()
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -9,7 +9,7 @@ make duplicate provider calls and overwrite the same results.
 This app must be running and reachable from trade-tariff-backend, or the run ends as
 failed with the reason in error_summary.
 
-Usage: python -m classification_core.trade_tariff_backend.cli "my-experiment-name" --gold-query-set 5
+Usage: python -m worker.backend.cli "my-experiment-name" --gold-query-set 5
 
 The gold query set must already exist and be ready in trade-tariff-backend (create one in
 the Admin app or with `rake tariff:evaluation:generate_gold_queries`). Every run scores

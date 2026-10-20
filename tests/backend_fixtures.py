@@ -1,4 +1,4 @@
-"""Realistic response bodies for classification_core.trade_tariff_backend tests, shaped to
+"""Realistic response bodies for worker.backend tests, shaped to
 match the real trade-tariff-backend serializers exactly (verified against
 app/serializers/api/admin/search/evaluation/*.rb and
 app/serializers/api/internal/*.rb in trade-tariff-backend, not guessed)."""
