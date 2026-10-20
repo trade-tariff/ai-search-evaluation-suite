@@ -21,12 +21,9 @@ as `<type>(<optional scope>): <short imperative description>`.
 Read these first:
 
 - `README.md`
-- `docs/PATH_TO_PROD.md`
-- `docs/DEMO_PLAYBOOK.md`
-- `docs/MEASUREMENT_REVIEW.md`
-- `docs/suite-primer-run.md`
+- `apps/classification-evals/README.md`
 
-AI Search Evaluation Suite contains the Admin evaluation worker and retained research tools. Default launchers and worker images run `backend.worker_app:app`. They do not serve the workbench or research APIs. The React workbench, local evaluation runners, knowledge graph tools, ATaR workflows, intercept analysis, and provider benchmarks remain research source. Read the worker contract in `README.md` before changing runtime boundaries.
+AI Search Evaluation Suite contains the Admin evaluation worker. It serves an API only and does not serve a UI. Trade Tariff Backend starts runs and stores results. The worker talks to the backend over HTTP and does not use a local database. Read the worker contract in `README.md` before changing runtime boundaries.
 
 ## Working Rules
 

@@ -1,4 +1,4 @@
-"""Exercise the worker router without importing the research workbench."""
+"""Exercise the worker evaluation router."""
 import sys
 import unittest
 from pathlib import Path

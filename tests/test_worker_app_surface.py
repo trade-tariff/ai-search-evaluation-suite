@@ -1,4 +1,4 @@
-"""Check the worker ingress on the actual deployable app."""
+"""Check the worker application surface and ingress."""
 import sys
 import unittest
 from pathlib import Path
@@ -9,30 +9,30 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "classific
 
 from fastapi.testclient import TestClient
 
-from backend.worker_app import app as deployable_app
+from backend.worker_app import app as worker_app
 
 import evaluation_ingress as ingress
 
 
-class DeployableAppEvaluationRoutesTest(unittest.TestCase):
+class WorkerAppSurfaceTest(unittest.TestCase):
     def setUp(self):
         ingress._active_evaluation_runs.clear()
         ingress._background_evaluation_tasks.clear()
-        self.client = TestClient(deployable_app)
+        self.client = TestClient(worker_app)
 
-    def test_evaluation_start_route_is_reachable_on_the_real_deployable_app(self):
+    def test_evaluation_start_route_is_reachable_on_the_real_worker_app(self):
         with patch.object(ingress, "execute_run", new=AsyncMock(return_value={"status": "completed", "succeeded": 1, "failed": 0})):
             response = self.client.post("/api/evaluation/runs/107/start")
 
         self.assertEqual(response.status_code, 202)
         self.assertEqual(response.json(), {"started": True, "run_id": "107"})
 
-    def test_workbench_routes_and_assets_are_not_exposed(self):
+    def test_ui_routes_and_assets_are_not_exposed(self):
         for path in ("/", "/workbench", "/workbench/", "/workbench/example", "/assets/example.js"):
             with self.subTest(path=path):
                 self.assertEqual(self.client.get(path).status_code, 404)
 
-    def test_native_research_apis_are_not_exposed(self):
+    def test_research_api_paths_are_not_exposed(self):
         for method, path in (
             ("GET", "/api/jobs"),
             ("POST", "/api/evals/classification/trial"),
@@ -49,18 +49,7 @@ class DeployableAppEvaluationRoutesTest(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.json()["status"], "ok")
 
-    def test_research_entrypoint_does_not_add_its_routes_to_worker(self):
-        from backend.research_app import app as research_app
-
-        self.assertIsNot(research_app, deployable_app)
-        research_paths = research_app.openapi()["paths"]
-        worker_paths = deployable_app.openapi()["paths"]
-        for path in ("/api/config", "/api/jobs", "/api/evals/classification/trial", "/eval/matrix"):
-            with self.subTest(path=path):
-                self.assertIn(path, research_paths)
-                self.assertNotIn(path, worker_paths)
-
-    def test_copied_workbench_api_is_not_exposed(self):
+    def test_workbench_api_path_is_not_exposed(self):
         response = self.client.get("/api/config")
 
         self.assertEqual(response.status_code, 404)

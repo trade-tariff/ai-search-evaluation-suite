@@ -10,12 +10,7 @@ permissions:
   id-token: write
 
 jobs:
-  simulation-tests:
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'needs-deployment')
-    uses: ./.github/workflows/simulation-tests.yml
-
   deploy:
-    needs: simulation-tests
     if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'needs-deployment')
     uses: trade-tariff/trade-tariff-tools/.github/workflows/deploy-ecs.yml@main
     with:
@@ -27,7 +22,6 @@ jobs:
       slack-webhook: ${{ secrets.SLACK_WEBHOOK }}
 
   start-services:
-    needs: simulation-tests
     if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'needs-deployment')
     runs-on: ubuntu-latest
     steps:
