@@ -1,18 +1,13 @@
 import copy
-import sys
 import unittest
-from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "product" / "backend"))
-
-from classification_core.trade_tariff_backend.qa_loop import run_qa_session_via_trade_tariff_backend
-from classification_core_trade_tariff_backend_fixtures import (
+from worker.backend.qa_loop import run_qa_session_via_trade_tariff_backend
+from backend_fixtures import (
     SEARCH_RESPONSE_CONVERGED,
     SEARCH_RESPONSE_CONVERGED_NO_USAGE,
     SEARCH_RESPONSE_PENDING_QUESTION,
 )
-
 
 class FakeClient:
     def __init__(self, responses):
@@ -22,7 +17,6 @@ class FakeClient:
     async def search(self, query, answers_so_far, run_time_overrides, request_id=None):
         self.calls.append({"query": query, "answers_so_far": list(answers_so_far), "run_time_overrides": run_time_overrides, "request_id": request_id})
         return self._responses.pop(0)
-
 
 class RunQaSessionViaBackendTest(unittest.IsolatedAsyncioTestCase):
     async def test_stops_as_soon_as_a_round_has_no_pending_question(self):
@@ -58,7 +52,7 @@ class RunQaSessionViaBackendTest(unittest.IsolatedAsyncioTestCase):
         client = FakeClient([SEARCH_RESPONSE_PENDING_QUESTION, SEARCH_RESPONSE_CONVERGED])
 
         with patch(
-            "classification_core.trade_tariff_backend.qa_loop.simulate_trader_answer",
+            "worker.backend.qa_loop.simulate_trader_answer",
             new=AsyncMock(return_value={
                 "chosen": "Textile", "choice_index": 1, "slot": "material", "reasoning": "",
                 "simulator_failed": False, "attempts": 1, "last_error": None,
@@ -80,7 +74,7 @@ class RunQaSessionViaBackendTest(unittest.IsolatedAsyncioTestCase):
         client = FakeClient([SEARCH_RESPONSE_PENDING_QUESTION, SEARCH_RESPONSE_CONVERGED])
 
         with patch(
-            "classification_core.trade_tariff_backend.qa_loop.simulate_trader_answer",
+            "worker.backend.qa_loop.simulate_trader_answer",
             new=AsyncMock(return_value={
                 "chosen": "Textile", "choice_index": 1, "slot": "material", "reasoning": "",
                 "simulator_failed": False, "attempts": 1, "last_error": None,
@@ -152,7 +146,7 @@ class RunQaSessionViaBackendTest(unittest.IsolatedAsyncioTestCase):
         client = FakeClient([unpriced_pending, SEARCH_RESPONSE_CONVERGED])
 
         with patch(
-            "classification_core.trade_tariff_backend.qa_loop.simulate_trader_answer",
+            "worker.backend.qa_loop.simulate_trader_answer",
             new=AsyncMock(return_value={
                 "chosen": "Textile", "choice_index": 1, "slot": "material", "reasoning": "",
                 "simulator_failed": False, "attempts": 1, "last_error": None,
@@ -169,7 +163,7 @@ class RunQaSessionViaBackendTest(unittest.IsolatedAsyncioTestCase):
         client = FakeClient([SEARCH_RESPONSE_PENDING_QUESTION, SEARCH_RESPONSE_CONVERGED])
 
         with patch(
-            "classification_core.trade_tariff_backend.qa_loop.simulate_trader_answer",
+            "worker.backend.qa_loop.simulate_trader_answer",
             new=AsyncMock(return_value={
                 "chosen": "Textile", "choice_index": 1, "slot": "material", "reasoning": "",
                 "simulator_failed": False, "attempts": 1, "last_error": None,
@@ -198,7 +192,7 @@ class RunQaSessionViaBackendTest(unittest.IsolatedAsyncioTestCase):
         client = FakeClient([SEARCH_RESPONSE_PENDING_QUESTION, SEARCH_RESPONSE_CONVERGED])
 
         with patch(
-            "classification_core.trade_tariff_backend.qa_loop.simulate_trader_answer",
+            "worker.backend.qa_loop.simulate_trader_answer",
             new=AsyncMock(return_value={
                 "chosen": "Textile", "choice_index": 1, "slot": "material", "reasoning": "",
                 "simulator_failed": False, "attempts": 1, "last_error": None,
@@ -215,7 +209,7 @@ class RunQaSessionViaBackendTest(unittest.IsolatedAsyncioTestCase):
         client = FakeClient([SEARCH_RESPONSE_PENDING_QUESTION, SEARCH_RESPONSE_CONVERGED])
 
         with patch(
-            "classification_core.trade_tariff_backend.qa_loop.simulate_trader_answer",
+            "worker.backend.qa_loop.simulate_trader_answer",
             new=AsyncMock(return_value={
                 "chosen": "Textile", "choice_index": 1, "slot": "material", "reasoning": "",
                 "simulator_failed": False, "attempts": 1, "last_error": None,
@@ -236,7 +230,7 @@ class RunQaSessionViaBackendTest(unittest.IsolatedAsyncioTestCase):
         client = FakeClient([SEARCH_RESPONSE_PENDING_QUESTION])
 
         with patch(
-            "classification_core.trade_tariff_backend.qa_loop.simulate_trader_answer",
+            "worker.backend.qa_loop.simulate_trader_answer",
             new=AsyncMock(),
         ) as mocked_answer:
             result = await run_qa_session_via_trade_tariff_backend(
@@ -259,7 +253,7 @@ class RunQaSessionViaBackendTest(unittest.IsolatedAsyncioTestCase):
         client = FakeClient([SEARCH_RESPONSE_PENDING_QUESTION] * 4)
 
         with patch(
-            "classification_core.trade_tariff_backend.qa_loop.simulate_trader_answer",
+            "worker.backend.qa_loop.simulate_trader_answer",
             new=AsyncMock(return_value={
                 "chosen": "Textile", "choice_index": 1, "slot": "material", "reasoning": "",
                 "simulator_failed": False, "attempts": 1, "last_error": None,
@@ -294,7 +288,7 @@ class RunQaSessionViaBackendTest(unittest.IsolatedAsyncioTestCase):
         ])
 
         with patch(
-            "classification_core.trade_tariff_backend.qa_loop.simulate_trader_answer",
+            "worker.backend.qa_loop.simulate_trader_answer",
             new=AsyncMock(return_value={
                 "chosen": "Textile", "choice_index": 1, "slot": "material", "reasoning": "",
                 "simulator_failed": False, "attempts": 1, "last_error": None,
@@ -321,7 +315,7 @@ class RunQaSessionViaBackendTest(unittest.IsolatedAsyncioTestCase):
         client = FakeClient([SEARCH_RESPONSE_PENDING_QUESTION] * 3)
 
         with patch(
-            "classification_core.trade_tariff_backend.qa_loop.simulate_trader_answer",
+            "worker.backend.qa_loop.simulate_trader_answer",
             new=AsyncMock(return_value={
                 "chosen": "Textile", "choice_index": 1, "slot": "material", "reasoning": "",
                 "simulator_failed": False, "attempts": 1, "last_error": None,
@@ -349,7 +343,7 @@ class RunQaSessionViaBackendTest(unittest.IsolatedAsyncioTestCase):
             {"chosen": "Rubber", "choice_index": 0, "slot": "material", "reasoning": "oracle text says rubber sole", "simulator_failed": False, "attempts": 1, "last_error": None},
             {"chosen": None, "choice_index": None, "slot": None, "reasoning": None, "simulator_failed": True, "attempts": 3, "last_error": "could not parse a choice"},
         ]
-        with patch("classification_core.trade_tariff_backend.qa_loop.simulate_trader_answer", new=AsyncMock(side_effect=sim_results)):
+        with patch("worker.backend.qa_loop.simulate_trader_answer", new=AsyncMock(side_effect=sim_results)):
             result = await run_qa_session_via_trade_tariff_backend(
                 client=client, sim_client=object(), query="boots", oracle_text="Rubber-soled leather boots.",
                 run_time_overrides={}, max_rounds=5,
@@ -380,7 +374,7 @@ class RunQaSessionViaBackendTest(unittest.IsolatedAsyncioTestCase):
         client = FakeClient([SEARCH_RESPONSE_PENDING_QUESTION])
 
         with patch(
-            "classification_core.trade_tariff_backend.qa_loop.simulate_trader_answer",
+            "worker.backend.qa_loop.simulate_trader_answer",
             new=AsyncMock(return_value={
                 "chosen": None, "choice_index": None, "slot": "failed_round_1", "reasoning": "",
                 "simulator_failed": True, "attempts": 3, "last_error": "could not parse response",
@@ -395,7 +389,6 @@ class RunQaSessionViaBackendTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result["converged"])
         # Must stop immediately on failure, not keep looping with a fabricated answer.
         self.assertEqual(len(client.calls), 1)
-
 
 if __name__ == "__main__":
     unittest.main()

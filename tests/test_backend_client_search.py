@@ -1,24 +1,18 @@
 import json
-import sys
 import unittest
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "product" / "backend"))
 
 import httpx
 
-from classification_core.trade_tariff_backend.client import (
+from worker.backend.client import (
     TradeTariffBackendClient,
     TradeTariffBackendUnavailableError,
     TradeTariffBackendValidationError,
 )
-from classification_core_trade_tariff_backend_fixtures import SEARCH_RESPONSE_CONVERGED
-
+from backend_fixtures import SEARCH_RESPONSE_CONVERGED
 
 def _polling_client(handler, **kwargs):
     kwargs.setdefault("poll_interval_s", 0.01)
     return TradeTariffBackendClient(base_url="http://backend.test", transport=httpx.MockTransport(handler), **kwargs)
-
 
 class SearchTest(unittest.IsolatedAsyncioTestCase):
     async def test_posts_query_answers_so_far_and_overrides_then_polls_until_complete(self):
@@ -103,7 +97,6 @@ class SearchTest(unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(TradeTariffBackendUnavailableError):
             await client.search(query="women's trainers", answers_so_far=[], run_time_overrides={}, request_id="req-1")
-
 
 if __name__ == "__main__":
     unittest.main()

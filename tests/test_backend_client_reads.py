@@ -1,13 +1,9 @@
-import sys
 import unittest
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "product" / "backend"))
 
 import httpx
 
-from classification_core.trade_tariff_backend.client import TradeTariffBackendClient, TradeTariffBackendUnavailableError, TradeTariffBackendValidationError
-from classification_core_trade_tariff_backend_fixtures import (
+from worker.backend.client import TradeTariffBackendClient, TradeTariffBackendUnavailableError, TradeTariffBackendValidationError
+from backend_fixtures import (
     ATAR_RULING_RESPONSE,
     GOLD_QUERIES_RESPONSE,
     GOLD_QUERIES_RESPONSE_PAGE_1,
@@ -15,15 +11,12 @@ from classification_core_trade_tariff_backend_fixtures import (
     VALIDATION_ERROR_RESPONSE,
 )
 
-
 def _client_with_transport(handler):
     transport = httpx.MockTransport(handler)
     return TradeTariffBackendClient(base_url="http://backend.test", transport=transport)
 
-
 def _flattened(response):
     return [row["attributes"] | {"id": row["id"]} for row in response["data"]]
-
 
 class GetGoldQueriesTest(unittest.IsolatedAsyncioTestCase):
     async def test_returns_flattened_rows_on_success(self):
@@ -143,7 +136,6 @@ class GetGoldQueriesTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, _flattened(GOLD_QUERIES_RESPONSE))
         self.assertEqual(attempts, 2)
 
-
 class GetAtarRulingTest(unittest.IsolatedAsyncioTestCase):
     async def test_returns_the_ruling_attributes_by_ref(self):
         def handler(request):
@@ -154,7 +146,6 @@ class GetAtarRulingTest(unittest.IsolatedAsyncioTestCase):
         result = await client.get_atar_ruling("600004365")
 
         self.assertEqual(result, ATAR_RULING_RESPONSE["data"]["attributes"])
-
 
 if __name__ == "__main__":
     unittest.main()

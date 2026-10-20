@@ -1,5 +1,5 @@
 """Backend-driven Q&A orchestrator. Same loop shape as the existing
-classification_core.qa_loop.run_qa_session (ask -> simulate answer -> feed
+worker.backend.qa_loop.run_qa_session (ask -> simulate answer -> feed
 back -> repeat), but each round calls TradeTariffBackendClient.search instead of local
 classification.classify_step, and convergence is detected from
 meta.interactive_search.answers[-1].answer is None (confirmed by the
@@ -7,7 +7,7 @@ meta.interactive_search.answers[-1].answer is None (confirmed by the
 of a local `mode` field.
 
 simulate_trader_answer and SessionFacts come from
-classification_core.trader_simulator. That shared module does not import local
+worker.simulator. That shared module does not import local
 classification or database code; oracle_text is already a plain string.
 
 After max_rounds answered questions the loop makes one terminal /searches
@@ -19,7 +19,7 @@ On simulator failure: simulate_trader_answer exhausts its own internal
 retries (SIMULATOR_MAX_RETRIES) before returning simulator_failed=True with
 chosen=None. The loop below stops immediately in that case rather than
 substituting a fabricated answer (e.g. options[0]) and continuing — the
-existing classification_core.qa_loop.run_qa_session does the same thing
+existing worker.backend.qa_loop.run_qa_session does the same thing
 (returns a distinct final_mode="simulator_failed" rather than guessing), and
 for an eval suite this matters more than usual: a silently fabricated answer
 would corrupt the gold_in_top1/gold_in_top5 metrics this whole plan exists to
@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import uuid
 
-from classification_core.trader_simulator import SessionFacts, simulate_trader_answer
+from ..simulator import SessionFacts, simulate_trader_answer
 
 
 class QASessionError(RuntimeError):
@@ -107,7 +107,7 @@ async def run_qa_session_via_trade_tariff_backend(
             # simulate_trader_answer with a None client, which would burn every
             # SIMULATOR_MAX_RETRIES attempt on an AttributeError before failing
             # for a misleading reason. Mirrors the `sim_client is not None`
-            # guard in the existing classification_core.qa_loop.
+            # guard used for every Q&A round.
             return {"final_candidates": response.get("data") or [], "converged": False, "simulator_failed": True, **usage_totals()}
 
         options = pending.get("options") or ["Yes"]

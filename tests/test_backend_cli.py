@@ -2,13 +2,9 @@ import contextlib
 import io
 import sys
 import unittest
-from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "product" / "backend"))
-
-from classification_core.trade_tariff_backend.cli import create_and_run, main
-
+from worker.backend.cli import create_and_run, main
 
 class CreateAndRunTest(unittest.IsolatedAsyncioTestCase):
     def fake_client(self, *run_statuses):
@@ -21,7 +17,7 @@ class CreateAndRunTest(unittest.IsolatedAsyncioTestCase):
     async def test_creates_an_experiment_then_a_run_with_a_fresh_idempotency_key(self):
         client = self.fake_client({"status": "completed", "result_count": 3, "error_count": 0, "error_summary": None})
 
-        with patch("classification_core.trade_tariff_backend.cli.TradeTariffBackendClient", return_value=client):
+        with patch("worker.backend.cli.TradeTariffBackendClient", return_value=client):
             await create_and_run(experiment_name="local-test", run_time_overrides={"max_rounds": 2}, gold_query_set_id=5, poll_interval_seconds=0)
 
         # The experiment is created pointing at the gold query set, because a run for an
@@ -39,7 +35,7 @@ class CreateAndRunTest(unittest.IsolatedAsyncioTestCase):
             {"status": "completed", "result_count": 3, "error_count": 0, "error_summary": None},
         )
 
-        with patch("classification_core.trade_tariff_backend.cli.TradeTariffBackendClient", return_value=client):
+        with patch("worker.backend.cli.TradeTariffBackendClient", return_value=client):
             summary = await create_and_run(experiment_name="local-test", run_time_overrides={}, gold_query_set_id=5, poll_interval_seconds=0)
 
         self.assertEqual(client.get_run.await_count, 3)
@@ -52,17 +48,16 @@ class CreateAndRunTest(unittest.IsolatedAsyncioTestCase):
             {"status": "failed", "result_count": 0, "error_count": 0, "error_summary": "could not reach the eval app: connection refused"},
         )
 
-        with patch("classification_core.trade_tariff_backend.cli.TradeTariffBackendClient", return_value=client):
+        with patch("worker.backend.cli.TradeTariffBackendClient", return_value=client):
             summary = await create_and_run(experiment_name="local-test", run_time_overrides={}, gold_query_set_id=5, poll_interval_seconds=0)
 
         self.assertEqual(summary["status"], "failed")
         self.assertIn("could not reach the eval app", summary["error_summary"])
 
-
 class MainTest(unittest.TestCase):
     def test_passes_the_gold_query_set_option_through_as_a_number(self):
         with patch.object(sys, "argv", ["cli", "local-test", "--gold-query-set", "5"]), \
-             patch("classification_core.trade_tariff_backend.cli.create_and_run", new=AsyncMock(return_value={"status": "completed"})) as mocked, \
+             patch("worker.backend.cli.create_and_run", new=AsyncMock(return_value={"status": "completed"})) as mocked, \
              contextlib.redirect_stdout(io.StringIO()):
             main()
 
@@ -70,14 +65,13 @@ class MainTest(unittest.TestCase):
 
     def test_refuses_to_start_without_a_gold_query_set(self):
         with patch.object(sys, "argv", ["cli", "local-test"]), \
-             patch("classification_core.trade_tariff_backend.cli.create_and_run", new=AsyncMock()) as mocked, \
+             patch("worker.backend.cli.create_and_run", new=AsyncMock()) as mocked, \
              contextlib.redirect_stderr(io.StringIO()) as stderr, \
              self.assertRaises(SystemExit):
             main()
 
         mocked.assert_not_awaited()
         self.assertIn("--gold-query-set", stderr.getvalue())
-
 
 if __name__ == "__main__":
     unittest.main()

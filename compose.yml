@@ -1,8 +1,8 @@
 services:
-  classification-evals:
+  worker:
     build:
-      context: ../..
-      dockerfile: apps/classification-evals/Dockerfile
+      context: .
+      dockerfile: Dockerfile.http
     env_file:
       - .env
     ports:

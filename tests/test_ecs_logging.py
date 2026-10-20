@@ -4,14 +4,9 @@ from __future__ import annotations
 
 import json
 import logging
-import sys
 import unittest
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "classification-evals"))
-
-from backend.logging_config import DropHealthCheckFilter, EcsJsonFormatter, is_healthcheck_path
-
+from worker.logging_config import DropHealthCheckFilter, EcsJsonFormatter, is_healthcheck_path
 
 class HealthCheckFilterTest(unittest.TestCase):
     def setUp(self):
@@ -47,7 +42,6 @@ class HealthCheckFilterTest(unittest.TestCase):
         )
         record.path = "/api/jobs"
         self.assertTrue(self.filter.filter(record))
-
 
 class EcsJsonFormatterTest(unittest.TestCase):
     def test_logstash_fields_for_an_experiment_run(self):
@@ -87,7 +81,6 @@ class EcsJsonFormatterTest(unittest.TestCase):
         self.assertEqual(payload["path"], "/api/jobs")
         self.assertEqual(payload["status"], 202)
         self.assertEqual(payload["message"], "[202] POST /api/jobs")
-
 
 if __name__ == "__main__":
     unittest.main()

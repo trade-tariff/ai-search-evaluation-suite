@@ -11,18 +11,14 @@ with nothing hand-authored in between.
 """
 import json
 import os
-import sys
 import unittest
-from pathlib import Path
 from unittest.mock import patch
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "product" / "backend"))
 
 import httpx
 
-from classification_core.trade_tariff_backend.client import TradeTariffBackendClient
-from classification_core.trade_tariff_backend.execute_run import execute_run
-from classification_core_trade_tariff_backend_fixtures import (
+from worker.backend.client import TradeTariffBackendClient
+from worker.backend.execute_run import execute_run
+from backend_fixtures import (
     GOLD_QUERIES_RESPONSE,
     GOLD_QUERIES_RESPONSE_PAGE_1,
     GOLD_QUERIES_RESPONSE_PAGE_2,
@@ -37,7 +33,6 @@ from classification_core_trade_tariff_backend_fixtures import (
 # the test from constructing an OpenAI client on a developer machine that
 # happens to have the gate enabled.
 NO_PROVIDER_CALLS = {"CLASSIFICATION_ALLOW_PROVIDER_CALLS": "", "OPENAI_API_KEY": ""}
-
 
 class RecordingBackend:
     """Serves the real trade-tariff-backend routes from this repo's fixtures."""
@@ -85,7 +80,6 @@ class RecordingBackend:
 
     def client(self):
         return TradeTariffBackendClient(base_url="http://backend.test", transport=httpx.MockTransport(self.handler))
-
 
 class RealClientExecuteRunTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_run_completes_end_to_end_through_the_real_client(self):
@@ -136,7 +130,6 @@ class RealClientExecuteRunTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(backend.posted_results), 2)
         # Every page was requested for the same set.
         self.assertEqual({params["set_id"] for params in backend.gold_query_params}, {"5"})
-
 
 if __name__ == "__main__":
     unittest.main()

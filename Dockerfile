@@ -5,18 +5,16 @@ RUN apk add --no-cache build-base
 ENV PATH="/opt/venv/bin:$PATH"
 RUN python -m venv /opt/venv
 
-WORKDIR /app
-
-COPY apps/classification-evals/requirements-worker.txt apps/classification-evals/requirements-worker.txt
-RUN pip install --no-cache-dir -r apps/classification-evals/requirements-worker.txt
+WORKDIR /build
+COPY pyproject.toml README.md ./
+COPY src ./src
+RUN pip install --no-cache-dir .
 
 
 FROM python:3.12-alpine
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PRODUCT_APP_ROOT=/app/apps/product \
-    PYTHONPATH=/app/apps/product/backend \
     PATH="/opt/venv/bin:$PATH"
 
 RUN apk add --no-cache bash curl libgcc libstdc++
@@ -26,21 +24,8 @@ RUN apk add --no-cache bash curl libgcc libstdc++
 RUN apk add --no-cache --upgrade libuuid
 
 COPY --from=python-build /opt/venv /opt/venv
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 
-WORKDIR /app
-
-COPY apps/product/backend/evaluation_ingress.py apps/product/backend/
-COPY apps/product/backend/classification_core/__init__.py \
-     apps/product/backend/classification_core/provider_guard.py \
-     apps/product/backend/classification_core/trader_simulator.py \
-     apps/product/backend/classification_core/
-COPY apps/product/backend/classification_core/trade_tariff_backend \
-     apps/product/backend/classification_core/trade_tariff_backend
-COPY apps/classification-evals/backend/auth.py \
-     apps/classification-evals/backend/logging_config.py \
-     apps/classification-evals/backend/worker_app.py \
-     apps/classification-evals/backend/
-COPY apps/classification-evals/docker-entrypoint.sh apps/classification-evals/
 RUN addgroup -S tariff && adduser -S tariff -G tariff \
     && chown -R tariff:tariff /app
 
@@ -51,4 +36,4 @@ WORKDIR /app
 EXPOSE 8443
 USER tariff
 
-CMD ["/app/apps/classification-evals/docker-entrypoint.sh"]
+CMD ["/app/docker-entrypoint.sh"]

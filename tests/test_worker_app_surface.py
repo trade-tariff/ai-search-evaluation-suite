@@ -1,18 +1,12 @@
 """Check the worker application surface and ingress."""
-import sys
 import unittest
-from pathlib import Path
 from unittest.mock import AsyncMock, patch
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "product" / "backend"))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "apps" / "classification-evals"))
 
 from fastapi.testclient import TestClient
 
-from backend.worker_app import app as worker_app
+from worker.app import app as worker_app
 
-import evaluation_ingress as ingress
-
+import worker.ingress as ingress
 
 class WorkerAppSurfaceTest(unittest.TestCase):
     def setUp(self):
@@ -61,7 +55,6 @@ class WorkerAppSurfaceTest(unittest.TestCase):
 
         self.assertEqual(response.status_code, 409)
         self.assertEqual(response.json(), {"detail": "Run 107 is already being executed."})
-
 
 if __name__ == "__main__":
     unittest.main()

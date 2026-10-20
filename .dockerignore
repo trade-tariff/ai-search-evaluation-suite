@@ -14,7 +14,8 @@ tests
 **/.mypy_cache/
 **/.ruff_cache/
 **/.venv/
-apps/classification-evals/var/
+**/build/
+**/*.egg-info/
 
 # editor/backup residue
 *.bak*
