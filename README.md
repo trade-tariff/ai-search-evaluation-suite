@@ -415,5 +415,4 @@ Before running paid or provider-backed jobs in a deployment:
 ## Further Reading
 
 - [`apps/classification-evals/README.md`](apps/classification-evals/README.md) for worker and research operations.
-- [`docs/REMOVAL_LEDGER.md`](docs/REMOVAL_LEDGER.md) for source-retention decisions.
 - [`apps/classification-evals/docs/QNA_E2E_CONTRACT.md`](apps/classification-evals/docs/QNA_E2E_CONTRACT.md) for the research Q&A contract.
