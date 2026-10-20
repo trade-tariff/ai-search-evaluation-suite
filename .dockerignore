@@ -17,7 +17,6 @@ tests
 **/node_modules/
 **/dist/
 **/test-results/
-**/playwright-report/
 apps/classification-evals/var/
 apps/product/data/config.json
 apps/product/data/complexity_chart_cache/

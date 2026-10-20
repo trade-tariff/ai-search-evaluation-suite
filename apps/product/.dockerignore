@@ -3,9 +3,6 @@
 **/.venv/
 **/node_modules/
 frontend/dist/
-frontend/e2e/
-frontend/test-results/
-frontend/playwright-report/
 **/.DS_Store
 **/.claude/
 .env
