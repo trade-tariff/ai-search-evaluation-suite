@@ -7,7 +7,7 @@ deployment or retirement proposals as current instructions.
 
 The default images now run only the Admin evaluation worker. They do not serve
 the workbench or Journey UI. Use the [worker contract](../README.md#worker-contract)
-and [removal ledger](REMOVAL_LEDGER.md) for current scope and retention decisions.
+for current scope.
 
 ## 1. Recorded research state (2026-07-02)
 
@@ -143,7 +143,7 @@ carry knowledge):
 - The journey deployment's duplicate copy of the workbench screens - goes
   away by itself with the consolidation in section 3.
 
-Research source is retained under R01 and R02 in the removal ledger. Source
+Research source is retained. Source
 entrypoints establish reachability, not operator use. The workbench, extraction,
 matrix, MCP, experiment, and primer tools are not dead solely because they are
 outside the Admin worker. Operator use remains unverified. Worker images exclude
