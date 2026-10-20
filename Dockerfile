@@ -41,9 +41,7 @@ COPY apps/classification-evals/backend/auth.py \
      apps/classification-evals/backend/worker_app.py \
      apps/classification-evals/backend/
 COPY apps/classification-evals/docker-entrypoint.sh apps/classification-evals/
-# Keep empty directories owned by the worker for the existing Compose volumes.
-RUN mkdir -p /app/apps/classification-evals/var /app/apps/product/data /app/apps/product/results \
-    && addgroup -S tariff && adduser -S tariff -G tariff \
+RUN addgroup -S tariff && adduser -S tariff -G tariff \
     && chown -R tariff:tariff /app
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \

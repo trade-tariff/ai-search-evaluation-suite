@@ -1,4 +1,4 @@
-"""Backend-driven evaluation ingress, independent of the research workbench."""
+"""Backend-driven evaluation ingress for the worker."""
 from __future__ import annotations
 
 import asyncio

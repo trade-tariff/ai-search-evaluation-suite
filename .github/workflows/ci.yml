@@ -18,13 +18,10 @@ jobs:
         with:
           python-version: '3.13'
           cache: 'pip'
-          cache-dependency-path: apps/classification-evals/requirements.txt
-      # apps/classification-evals/requirements.txt pulls in
-      # apps/product/backend/requirements.txt via -r, so this one install
-      # covers everything tests/ imports (httpx, openai, fastapi, etc.).
-      - run: pip install -r apps/classification-evals/requirements.txt
-      - name: Run simulation unit tests
-        run: python -m unittest discover -s tests -p 'test_simulator.py' -v
+          cache-dependency-path: apps/classification-evals/requirements-worker.txt
+      # The worker requirements cover everything the remaining tests import
+      # (fastapi, httpx, openai).
+      - run: pip install -r apps/classification-evals/requirements-worker.txt
       - name: Run unit tests
         run: python -m unittest discover -s tests
       - run: python -m compileall -q apps
@@ -72,9 +69,11 @@ jobs:
                        'backend.research_app', 'classification_core.classification',
                        'classification_core.local_db', 'classification_core.qa_loop'):
               assert importlib.util.find_spec(name) is None, name
-          assert not Path('/app/apps/classification-evals/scripts').exists()
-          assert not Path('/app/apps/product/frontend').exists()
-          assert not any(Path('/app/apps/product/data').iterdir())
+          for path in ('/app/apps/classification-evals/scripts',
+                       '/app/apps/product/frontend',
+                       '/app/apps/product/data',
+                       '/app/apps/product/backend/journey'):
+              assert not Path(path).exists(), path
           print('WORKER_IMAGE_BOUNDARY_OK')
           PY
             docker run --rm --entrypoint sh --workdir /app \
@@ -84,39 +83,9 @@ jobs:
                 set -eu
                 python -m unittest discover -s tests -p "test_classification_core_trade_tariff_backend*.py"
                 python -m unittest discover -s tests -p "test_evaluation_ingress.py"
-                python -m unittest test_classification_core_qa_loop.SimulateTraderAnswerModelSelectionTest test_classification_core_qa_loop.SimulatorImportBoundaryTest test_classification_core_qa_loop.SessionFactsTest test_classification_core_qa_loop.SimulateTraderAnswerBehaviourTest
+                python -m unittest test_classification_core_qa_loop.SimulateTraderAnswerModelSelectionTest test_classification_core_qa_loop.SessionFactsTest test_classification_core_qa_loop.SimulateTraderAnswerBehaviourTest
               '
           done
-      - name: Build extraction tools image
-        uses: docker/build-push-action@v7.4.0
-        with:
-          context: .
-          file: apps/classification-evals/Dockerfile
-          target: extraction-tools
-          load: true
-          push: false
-          tags: ai-search-evaluation-suite-extraction:test
-          cache-from: type=gha,scope=ci-docker-extraction
-          cache-to: type=gha,scope=ci-docker-extraction,mode=max
-      - name: Check extraction tools without running the pipeline
-        run: |
-          docker run --rm --entrypoint python \
-            ai-search-evaluation-suite-extraction:test -c 'import psycopg'
-          docker run --rm --entrypoint python \
-            --workdir /app/apps/classification-evals \
-            -e EXTRACTION_ALLOW_PROVIDER_CALLS=0 -e EXTRACTION_ALLOW_NETWORK=0 \
-            -e 'TARIFF_DB_DSN=host=/nonexistent dbname=unused connect_timeout=1' \
-            ai-search-evaluation-suite-extraction:test \
-            scripts/extraction_pipeline.py status > /tmp/extraction-status.json
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          status = json.loads(Path('/tmp/extraction-status.json').read_text())
-          assert status['status'] == 'ok'
-          assert status['gates']['provider_calls_allowed'] is False
-          assert status['gates']['external_network_allowed'] is False
-          assert status['db_counts']['available'] is False
-          PY
 
   terraform:
     runs-on: ubuntu-latest

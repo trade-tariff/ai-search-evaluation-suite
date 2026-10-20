@@ -1,4 +1,4 @@
-# Runtime dependencies for backend.worker_app. Research uses requirements.txt.
+# Runtime dependencies for backend.worker_app.
 fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
 openai>=1.12.0
