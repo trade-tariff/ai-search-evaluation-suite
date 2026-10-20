@@ -9,7 +9,6 @@ __pycache__/
 node_modules/
 dist/
 test-results/
-playwright-report/
 
 # Runtime state and sensitive local config.
 data/config.json
