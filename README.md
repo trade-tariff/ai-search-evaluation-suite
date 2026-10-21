@@ -98,9 +98,13 @@ Admin provides the normal run workflow. The following manual path is for
 authorized diagnosis through a backend Rails console and the worker ingress.
 It can generate shared data and incur provider costs. It is not a health check.
 
-**0. Have a gold query set.** A run scores one saved set of gold queries, chosen
-on its experiment, and fails as soon as it starts if its experiment has none. Create a
-set in the Admin app, or from a shell in `trade-tariff-backend`:
+**0. Have a gold query set or a synthetic input set.** A run scores one saved
+set, chosen on its experiment, and fails as soon as it starts if its
+experiment has neither (AI-1445). Create one of the following in the Admin
+app, or from a shell in `trade-tariff-backend`:
+
+*Gold query set* — sampled and written up by a model, generated in the
+background:
 
 ```bash
 NAME="Set A" SIZE=10 bundle exec rake tariff:evaluation:generate_gold_queries
@@ -110,14 +114,28 @@ Generation runs in the background, so wait until its status is `ready` before yo
 a run (`EvaluationGoldQuerySet[<id>].status` in a Rails console). Starting a run earlier
 scores only the gold queries generated so far.
 
+*Synthetic input set* — a frozen sample of synthetic ATaRs (real,
+HMRC-analyst-written product descriptions, used as-is with no persona
+rewrite). Sampling is synchronous, so the set is ready as soon as this
+returns (Rails console):
+
+```ruby
+synthetic_input_set = Evaluation::SyntheticInputSetCreator.call(
+  name: "Set B", requested_size: 10, created_by: "console",
+)
+synthetic_input_set.actual_size  # lower than requested_size if fewer synthetic ATaRs exist
+```
+
 **1. Create an experiment** (`trade-tariff-backend` Rails console,
-`bin/rails console`):
+`bin/rails console`). Set whichever id matches the set you created in step 0
+— an experiment can have at most one of the two:
 
 ```ruby
 experiment = EvaluationExperiment.create(
   name: "my-manual-test-#{Time.now.to_i}",  # must be unique: validates_unique :name
   description: "Manual end-to-end test",
-  gold_query_set_id: EvaluationGoldQuerySet.first(name: "Set A").id,  # required to run, see step 0
+  gold_query_set_id: EvaluationGoldQuerySet.first(name: "Set A").id,  # for a gold query set, or:
+  # synthetic_input_set_id: synthetic_input_set.id,                  # for a synthetic input set
   enabled: true,
   configuration_overrides: {},              # optional: merged over the admin-config baseline; see EvaluationConfiguration::ALLOWED_OVERRIDE_KEYS for what is allowed here
 )
